@@ -1,37 +1,7 @@
 // @ts-nocheck
-import { createServerClient as createServer } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient as s } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-
-type CookieOptions = { name: string; value: string; options?: Record<string, unknown> }
-
-export const createServerClient = () =>
-  createServer(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        async getAll() {
-          const cookieStore = await cookies()
-          return cookieStore.getAll()
-        },
-        async setAll(cookiesToSet: CookieOptions[]) {
-          try {
-            const cookieStore = await cookies()
-            for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options as any)
-            }
-          } catch {
-            // Can be called from Server Components
-          }
-        },
-      },
-    }
-  )
-
-export const createAdminClient = () =>
-  createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+const U='https://mfanqkbhegxppyitxtye.supabase.co'
+const K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mYW5xa2JoZWd4cHB5aXR4dHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDc2NDYsImV4cCI6MjEwMzcyMzY0Nn0.83-3UqR1BH2uaVoTO7Gta0l3lxVlkh7qSZ0b20aszdw'
+export const createServerClient=()=>s(U,K,{cookies:{async getAll(){const c=await cookies();return c.getAll()},async setAll(v){try{const c=await cookies();for(const{name,value,options}of v)c.set(name,value,options)}catch{}}}})
+export const createAdminClient=()=>null
