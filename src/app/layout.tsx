@@ -1,16 +1,19 @@
-// @ts-nocheck
-import type { Metadata } from 'next'
 import './globals.css'
-export const metadata: Metadata = { title: 'VozIt \u2014 I was there', description: 'Citizen journalism platform' }
+
+export const metadata = {
+  title: 'VozIt! — I was there...',
+  description: 'Citizen journalism platform — report what you see, earn what you capture',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <meta name="theme-color" content="#0a3ff1" />
       </head>
-      <body style={{ background: '#fff', margin: 0 }}>{children}</body>
+      <body>{children}</body>
     </html>
   )
 }

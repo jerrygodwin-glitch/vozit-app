@@ -10,6 +10,7 @@ const PUBLIC = ['/auth', '/feed', '/api/mux-webhook', '/api/stripe', '/api/og', 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname
 
+  // Skip static assets entirely
   if (
     path.startsWith('/_next') ||
     path.startsWith('/favicon') ||
@@ -20,6 +21,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new NextResponse(null, {
       status: 204,
@@ -34,22 +36,26 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next()
 
+  // Security headers
   res.headers.set('X-Content-Type-Options', 'nosniff')
   res.headers.set('X-Frame-Options', path.startsWith('/embed') ? 'ALLOWALL' : 'DENY')
   res.headers.set('X-XSS-Protection', '1; mode=block')
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
 
+  // CORS for API routes
   if (path.startsWith('/api/')) {
     res.headers.set('Access-Control-Allow-Origin', '*')
     res.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type,Authorization')
   }
 
+  // Public routes — no auth check needed
   const isPublic = PUBLIC.some(p => path.startsWith(p)) || path === '/' || path === '/settings' || path === '/payouts' || path === '/earnings' || path === '/upload'
   if (isPublic) {
     return res
   }
 
+  // Protected routes — check auth
   try {
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookies: {
@@ -64,7 +70,9 @@ export async function middleware(req: NextRequest) {
       url.pathname = '/auth/login'
       return NextResponse.redirect(url)
     }
-  } catch {}
+  } catch {
+    // If auth check fails, allow through rather than blocking
+  }
 
   return res
 }
