@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       const { verifyMuxSignature } = await import('@/lib/security')
       const rawBody = JSON.stringify(body)
       const sig = req.headers.get('mux-signature')
-      if (!verifyMuxSignature(rawBody, sig, process.env.MUX_WEBHOOK_SECRET)) {
+      if (!(await verifyMuxSignature(rawBody, sig, process.env.MUX_WEBHOOK_SECRET))) {
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
     }

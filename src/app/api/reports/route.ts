@@ -91,12 +91,14 @@ export async function POST(req: NextRequest) {
     if (error) throw error
 
     // Update reporter's report count
-    await supabase.rpc('increment_report_count', { uid: user.id }).catch(() => {
+    const { error: rpcError } = await supabase.rpc('increment_report_count', { uid: user.id })
+    if (rpcError) {
       // Fallback if RPC not available
-      supabase.from('users').update({
-        report_count: supabase.rpc ? undefined : 1, // handled by trigger
+      const { data: reporterProfile } = await supabase.from('users').select('report_count').eq('id', user.id).single()
+      await supabase.from('users').update({
+        report_count: (reporterProfile?.report_count || 0) + 1,
       }).eq('id', user.id)
-    })
+    }
 
     // Check for tier promotion
     const promotion = await checkAndPromoteTier(supabase, user.id)
