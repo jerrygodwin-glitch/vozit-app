@@ -63,12 +63,13 @@ export async function POST(req: NextRequest) {
       const rep = report as NonNullable<typeof report>
 
       // Update report with video details
-      await supabase.from('reports').update({
+      const { error: videoUpdateError } = await supabase.from('reports').update({
         mux_asset_id: assetId,
         playback_id: playbackId,
         thumbnail_url: thumbnailUrl,
-        duration: Math.round(duration),
+        duration_seconds: Math.round(duration),
       }).eq('id', report!.id)
+      if (videoUpdateError) captureError(videoUpdateError, { route: 'POST /api/mux-webhook', step: 'save video details', reportId: report!.id })
 
       // ═══ PHASE 3: MODERATION + C2PA PIPELINE ═══════════════════
 
