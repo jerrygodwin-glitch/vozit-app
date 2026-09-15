@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { sb, LOGO } from '@/lib/ui'
+import { LOGO } from '@/lib/ui'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,8 +11,13 @@ export default function Login() {
   async function go() {
     setLoading(true); setMsg('')
     try {
-      const { error } = await sb.auth.signInWithPassword({ email, password: pw })
-      if (error) setMsg(error.message)
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pw }),
+      })
+      const data = await res.json()
+      if (!res.ok) setMsg(data.error || 'Something went wrong. Please try again.')
       else window.location.href = '/feed'
     } catch (e: any) { setMsg(e.message) }
     setLoading(false)
