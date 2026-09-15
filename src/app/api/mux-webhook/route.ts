@@ -8,6 +8,7 @@ import { generate5Ws, storeAnalysis } from '@/lib/ai-5w-analysis'
 import { assessGeoRisk } from '@/lib/security'
 import { processVideoWatermark } from '@/lib/watermark'
 import { autoDistributeToVozItChannels, logVozItDistribution } from '@/lib/auto-distribute'
+import { captureError, captureMessage } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
       const rawBody = JSON.stringify(body)
       const sig = req.headers.get('mux-signature')
       if (!(await verifyMuxSignature(rawBody, sig, process.env.MUX_WEBHOOK_SECRET))) {
+        captureMessage('Mux webhook signature verification failed', { type })
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
     }
@@ -235,7 +237,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
-    console.error('Mux webhook error:', e)
+    captureError(e, { route: 'POST /api/mux-webhook' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

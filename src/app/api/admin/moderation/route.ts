@@ -2,6 +2,7 @@
 import { logAdminAction, isAdminIpAllowed } from '@/lib/security'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/supabase-server'
+import { captureError } from '@/lib/monitoring'
 
 // Verify the user is a moderator
 async function requireMod(req: NextRequest) {
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { admin } = auth
 
+  try {
   const { searchParams } = new URL(req.url)
   const view = searchParams.get('view') ?? 'queue'   // queue | audit | stats | history
   const page = parseInt(searchParams.get('page') ?? '1')
@@ -144,6 +146,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ error: 'Invalid view' }, { status: 400 })
+  } catch (e: any) {
+    captureError(e, { route: 'GET /api/admin/moderation' })
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -154,6 +160,7 @@ export async function POST(req: NextRequest) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { user, admin, ip } = auth
 
+  try {
   const { report_id, action, reason, notes } = await req.json()
 
   if (!report_id || !action) {
@@ -299,5 +306,9 @@ export async function POST(req: NextRequest) {
       is_suspended: isSuspended,
     },
   })
+  } catch (e: any) {
+    captureError(e, { route: 'POST /api/admin/moderation' })
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
 export const dynamic = 'force-dynamic'

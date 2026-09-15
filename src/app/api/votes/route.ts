@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { rateLimit, RATE_LIMITS } from '@/lib/security'
+import { captureError } from '@/lib/monitoring'
 
 // Tier-based vote weights
 const VOTE_WEIGHT: Record<string, number> = {
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, upvotes: Math.round(upvotes), downvotes: Math.round(downvotes), credibility })
   } catch (e: any) {
+    captureError(e, { route: 'POST /api/votes' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

@@ -6,6 +6,7 @@ import { calculateTrendingScore, updateTrendingScores } from '@/lib/trending'
 import { checkAndPromoteTier } from '@/lib/revenue'
 import { rateLimit, RATE_LIMITS, sanitizeInput } from '@/lib/security'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
+import { captureError } from '@/lib/monitoring'
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ reports: data || [], total: count || 0 })
   } catch (e: any) {
+    captureError(e, { route: 'GET /api/reports' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
@@ -177,6 +179,7 @@ export async function POST(req: NextRequest) {
       } : null,
     })
   } catch (e: any) {
+    captureError(e, { route: 'POST /api/reports' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
