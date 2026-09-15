@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, getAuthedUser } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { calculateTrendingScore, updateTrendingScores } from '@/lib/trending'
 import { checkAndPromoteTier } from '@/lib/revenue'
@@ -50,8 +50,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user, supabase } = await getAuthedUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const limit = await rateLimit(`upload:${user.id}`, RATE_LIMITS.upload.max, RATE_LIMITS.upload.window, supabase)

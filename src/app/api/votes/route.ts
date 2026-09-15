@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { getAuthedUser } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { rateLimit, RATE_LIMITS } from '@/lib/security'
 import { captureError } from '@/lib/monitoring'
@@ -62,8 +62,7 @@ async function detectSybil(supabase: any, reportId: string, fingerprint: string,
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user, supabase } = await getAuthedUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const limit = await rateLimit(`vote:${user.id}`, RATE_LIMITS.vote.max, RATE_LIMITS.vote.window, supabase)
