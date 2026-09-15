@@ -10,6 +10,7 @@ export type ModerationCategory =
   | 'hate_symbol' | 'hate_speech'
   | 'drugs' | 'self_harm'
   | 'spam' | 'misleading'
+  | 'ai_generated'
 
 export type ModerationSeverity = 'safe' | 'low' | 'medium' | 'high' | 'critical'
 
@@ -40,6 +41,7 @@ const THRESHOLDS = {
     minor: 0.70,           // Lower threshold for child safety
     minor_suggestive: 0.60, // Very low — err on side of caution
     gore: 0.90,
+    ai_generated: 0.85,    // High-confidence AI-generated/deepfake — VozIt only accepts real recorded footage
   },
   // Flag for human review
   flag_review: {
@@ -54,6 +56,7 @@ const THRESHOLDS = {
     drugs: 0.75,
     self_harm: 0.60,
     misleading: 0.70,
+    ai_generated: 0.50,    // Lower-confidence AI-generated signal — don't auto-remove, but a human should look
   },
 }
 
@@ -116,6 +119,70 @@ export async function scanVideoFrames(videoUrl: string): Promise<ModerationFlag[
     return flags
   } catch (e: any) {
     console.error('Hive scan failed:', e.message)
+    return []
+  }
+}
+
+// Scan video for AI-generated / deepfake content. VozIt only publishes real
+// recorded footage of real events, so this runs on every video alongside
+// scanVideoFrames() — a high-confidence hit is treated as seriously as any
+// other auto-remove category.
+//
+// VERIFY BEFORE RELYING ON THIS: the "models" key below (and the exact
+// response class names) are Hive's documented product name for this feature
+// ("AI-Generated & Deepfake Content Detection") but the precise API key was
+// not confirmed against Hive's authenticated API reference. Check the actual
+// key in the Hive dashboard / API reference under your account and correct
+// it here if it differs before treating this as verified in production.
+export async function scanAIGeneratedContent(videoUrl: string): Promise<ModerationFlag[]> {
+  if (!process.env.HIVE_API_KEY) {
+    console.warn('Hive API key not configured — skipping AI-generated content scan')
+    return []
+  }
+
+  try {
+    const res = await fetch('https://api.thehive.ai/api/v2/task/sync', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${process.env.HIVE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: videoUrl,
+        models: { 'ai_generated_and_deepfake_detection': {} },
+      }),
+      signal: AbortSignal.timeout(60000),
+    })
+
+    if (!res.ok) {
+      console.error('Hive AI-generated detection API error:', res.status)
+      return []
+    }
+
+    const data = await res.json()
+    const flags: ModerationFlag[] = []
+    const results = data.status?.[0]?.response?.output || []
+
+    for (const frame of results) {
+      const classes = frame.classes || []
+      for (const cls of classes) {
+        if ((cls.class === 'ai_generated' || cls.class === 'deepfake') && cls.score > 0.3) {
+          flags.push({
+            category: 'ai_generated',
+            confidence: cls.score,
+            severity: scoreSeverity(cls.score),
+            timestamp: frame.time,
+            description: cls.class === 'deepfake'
+              ? `Possible deepfake: ${(cls.score * 100).toFixed(1)}% confidence`
+              : `Likely AI-generated content: ${(cls.score * 100).toFixed(1)}% confidence`,
+          })
+        }
+      }
+    }
+
+    return flags
+  } catch (e: any) {
+    console.error('Hive AI-generated content scan failed:', e.message)
     return []
   }
 }
@@ -247,6 +314,8 @@ export async function moderateContent(params: {
   if (params.videoUrl) {
     const videoFlags = await scanVideoFrames(params.videoUrl)
     allFlags.push(...videoFlags)
+    const aiGenFlags = await scanAIGeneratedContent(params.videoUrl)
+    allFlags.push(...aiGenFlags)
   }
 
   // 2. Scan text content

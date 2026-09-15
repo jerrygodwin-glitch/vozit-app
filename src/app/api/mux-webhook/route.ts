@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       // Find the report linked to this Mux upload
       const { data: report } = await supabase
         .from('reports')
-        .select('id, user_id, title, who, what, why, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
+        .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
         .eq('mux_asset_id', assetId)
         .single()
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         if (uploadId) {
           const { data: r2 } = await supabase
             .from('reports')
-            .select('id, user_id, title, who, what, why, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
+            .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
             .eq('mux_upload_id', uploadId)
             .single()
           if (!r2) return NextResponse.json({ ok: true })
@@ -138,11 +138,15 @@ export async function POST(req: NextRequest) {
         scannedAt: modResult.scannedAt,
       })
 
-      // 4. Apply auto-action from moderation
-      let reportStatus = 'published'
+      // 4. Apply auto-action from video moderation. The report's text (title/who/what/why)
+      // was already moderated when it was created (see /api/reports) — combine the two
+      // results by taking whichever is more severe, so a clean video scan can't un-flag
+      // or republish a report the text moderation already removed/flagged.
+      const STATUS_SEVERITY = { published: 0, flagged: 1, removed: 2 } as const
+      let videoStatus: 'published' | 'flagged' | 'removed' = 'published'
       switch (modResult.autoAction) {
         case 'auto_ban':
-          reportStatus = 'removed'
+          videoStatus = 'removed'
           // Ban the user
           await supabase.from('users').update({
             is_banned: true,
@@ -150,15 +154,17 @@ export async function POST(req: NextRequest) {
           }).eq('id', report.user_id)
           break
         case 'auto_remove':
-          reportStatus = 'removed'
+          videoStatus = 'removed'
           break
         case 'flag_review':
-          reportStatus = 'flagged'
+          videoStatus = 'flagged'
           break
         case 'publish':
-          reportStatus = 'published'
+          videoStatus = 'published'
           break
       }
+      const existingStatus = (report.status as keyof typeof STATUS_SEVERITY) || 'published'
+      const reportStatus = STATUS_SEVERITY[videoStatus] >= STATUS_SEVERITY[existingStatus] ? videoStatus : existingStatus
 
       // 5. Geo-risk tagging
       const country = (report.user as any)?.country || ''

@@ -35,14 +35,17 @@ export async function rateLimit(
   if (supabase) {
     try {
       const windowStart = new Date(now - windowSeconds * 1000).toISOString()
-      const { count } = await supabase.rpc('check_rate_limit', {
+      const { data, error } = await supabase.rpc('check_rate_limit', {
         limit_key: key,
         window_start: windowStart,
         max_requests: maxRequests,
       })
+      // check_rate_limit() is a Postgres function returning TABLE(count BIGINT),
+      // so supabase-js hands back an array of rows in `data`, not a top-level count.
+      const count = !error && data?.[0]?.count != null ? Number(data[0].count) : null
       if (count !== null) {
-        const allowed = count < maxRequests
-        return { allowed, remaining: Math.max(0, maxRequests - count - 1), resetAt: now + windowSeconds * 1000 }
+        const allowed = count <= maxRequests
+        return { allowed, remaining: Math.max(0, maxRequests - count), resetAt: now + windowSeconds * 1000 }
       }
     } catch { /* Fall through to memory */ }
   }

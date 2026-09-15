@@ -5,6 +5,11 @@ import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 
 // Verify the user is a moderator
 async function requireMod(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (!isAdminIpAllowed(ip)) {
+    return { error: 'Admin access is not permitted from this network.', status: 403 }
+  }
+
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', status: 401 }
@@ -20,7 +25,7 @@ async function requireMod(req: NextRequest) {
     return { error: 'Not a moderator', status: 403 }
   }
 
-  return { user, admin }
+  return { user, admin, ip }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -147,7 +152,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireMod(req)
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  const { user, admin } = auth
+  const { user, admin, ip } = auth
 
   const { report_id, action, reason, notes } = await req.json()
 
@@ -273,6 +278,16 @@ export async function POST(req: NextRequest) {
       result: actionLabel,
       strike_count_after: newStrikeCount,
     })
+
+  // Admin audit trail — separate from moderation_log, covers all admin actions platform-wide
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action,
+    targetType: 'report',
+    targetId: report_id,
+    details: { reason: reason ?? null, notes: notes ?? null, result: actionLabel, target_user_id: report.user_id },
+    ipAddress: ip,
+  })
 
   return NextResponse.json({
     ok: true,

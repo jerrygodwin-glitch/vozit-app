@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
+import { rateLimit, RATE_LIMITS } from '@/lib/security'
 
 // Tier-based vote weights
 const VOTE_WEIGHT: Record<string, number> = {
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
     const supabase = createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const limit = await rateLimit(`vote:${user.id}`, RATE_LIMITS.vote.max, RATE_LIMITS.vote.window, supabase)
+    if (!limit.allowed) {
+      return NextResponse.json({ error: 'You are voting too quickly. Please slow down.' }, { status: 429 })
+    }
 
     const { report_id, value } = await req.json()
     if (!report_id || ![1, -1].includes(value)) {

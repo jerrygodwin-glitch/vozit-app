@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getCorsHeaders, getEmbedCorsHeaders, getSecurityHeaders } from '@/lib/security'
 
 const SUPABASE_URL = 'https://mfanqkbhegxppyitxtye.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mYW5xa2JoZWd4cHB5aXR4dHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDc2NDYsImV4cCI6MjEwMzcyMzY0Nn0.83-3UqR1BH2uaVoTO7Gta0l3lxVlkh7qSZ0b20aszdw'
@@ -21,32 +22,33 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // Embed routes are meant to be loaded by any news site — the rest of the
+  // app should only ever be called from VozIt's own origins.
+  const isEmbed = path.startsWith('/embed') || path.startsWith('/api/embed')
+  const origin = req.headers.get('origin')
+  const corsHeaders = isEmbed ? getEmbedCorsHeaders() : getCorsHeaders(origin)
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Access-Control-Max-Age': '86400',
-      },
-    })
+    return new NextResponse(null, { status: 204, headers: corsHeaders })
   }
 
   const res = NextResponse.next()
 
-  // Security headers
-  res.headers.set('X-Content-Type-Options', 'nosniff')
-  res.headers.set('X-Frame-Options', path.startsWith('/embed') ? 'ALLOWALL' : 'DENY')
-  res.headers.set('X-XSS-Protection', '1; mode=block')
-  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  // Security headers (CSP, HSTS, etc.)
+  const securityHeaders = getSecurityHeaders()
+  for (const [k, v] of Object.entries(securityHeaders)) {
+    // Embeds need to be frameable by any site — CSP's frame-ancestors
+    // overrides X-Frame-Options in modern browsers, so skip both here
+    // and let the embed-specific headers below allow framing instead.
+    if (isEmbed && (k === 'X-Frame-Options' || k === 'Content-Security-Policy')) continue
+    res.headers.set(k, v)
+  }
+  if (isEmbed) res.headers.set('X-Frame-Options', 'ALLOWALL')
 
-  // CORS for API routes
+  // CORS — restricted to VozIt's own origins, except embed routes
   if (path.startsWith('/api/')) {
-    res.headers.set('Access-Control-Allow-Origin', '*')
-    res.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-    res.headers.set('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    for (const [k, v] of Object.entries(corsHeaders)) res.headers.set(k, v)
   }
 
   // Public routes — no auth check needed
