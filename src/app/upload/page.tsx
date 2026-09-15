@@ -26,6 +26,8 @@ const[videoBlob,setVideoBlob]=useState<Blob|null>(null)
 const[videoDuration,setVideoDuration]=useState(0)
 const[videoSource,setVideoSource]=useState<'live'|'upload'>('live')
 const[hasAudio,setHasAudio]=useState(true)
+const[updateToReportId,setUpdateToReportId]=useState('')
+const[updateToTitle,setUpdateToTitle]=useState('')
 
 // Get GPS on mount
 useEffect(()=>{
@@ -34,6 +36,13 @@ useEffect(()=>{
       setGps({lat:p.coords.latitude,lng:p.coords.longitude})
     },()=>{},{enableHighAccuracy:true})
   }
+},[])
+
+// If we arrived via "Post an update" from an existing report, remember which one
+useEffect(()=>{
+  const params=new URLSearchParams(window.location.search)
+  const id=params.get('update_to')
+  if(id){setUpdateToReportId(id);setUpdateToTitle(params.get('update_to_title')||'')}
 },[])
 
 // Request AI analysis
@@ -80,10 +89,11 @@ async function submitReport(){
         location_lat:gps?.lat,location_lng:gps?.lng,
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
+        update_to_report_id:updateToReportId||undefined,
       }),
     })
     const d=await r.json()
-    if(d.id)setReportId(d.id)
+    if(d.report?.id)setReportId(d.report.id)
     setStep('done')
   }catch{setStep('review')}
 }
@@ -185,6 +195,7 @@ if(step==='quick')return(<div style={{minHeight:'100vh',background:'#fff'}}>
 <span style={{fontSize:20}}>⚡</span>
 <div><div style={{fontSize:18,fontWeight:700,color:'#1a1a1a'}}>Quick tag</div><div style={{fontSize:11,color:'#888'}}>AI will fill in the rest from your video</div></div>
 </div>
+{updateToReportId&&<div style={{padding:10,borderRadius:8,background:'#FEF3E6',border:'1px solid #FED7AA',marginBottom:14,fontSize:12,color:'#92400E'}}>🔴 Posting an update to <strong>{updateToTitle||'your report'}</strong></div>}
 
 <div style={{marginBottom:14}}>
 <label style={{fontSize:12,fontWeight:600,color:'#1a1a1a',display:'block',marginBottom:4}}>Title *</label>
@@ -228,6 +239,7 @@ if(step==='detailed')return(<div style={{minHeight:'100vh',background:'#fff'}}>
 <span style={{fontSize:20}}>📝</span>
 <div><div style={{fontSize:18,fontWeight:700,color:'#1a1a1a'}}>Tag your report</div><div style={{fontSize:11,color:'#888'}}>Fill in what you can — AI helps with the rest</div></div>
 </div>
+{updateToReportId&&<div style={{padding:10,borderRadius:8,background:'#FEF3E6',border:'1px solid #FED7AA',marginBottom:14,fontSize:12,color:'#92400E'}}>🔴 Posting an update to <strong>{updateToTitle||'your report'}</strong></div>}
 
 <div style={{marginBottom:14}}>
 <label style={{fontSize:12,fontWeight:600,color:'#1a1a1a',display:'block',marginBottom:4}}>Title *</label>
@@ -323,8 +335,11 @@ return(<div style={{minHeight:'100vh',background:'#fff',display:'flex',alignItem
 <div style={{fontSize:48,marginBottom:12}}>✅</div>
 <h2 style={{fontSize:20,fontWeight:700,color:'#1a1a1a',marginBottom:4}}>Report submitted!</h2>
 <p style={{fontSize:13,color:'#888',marginBottom:20}}>Your video is processing. It will be reviewed and published shortly.</p>
+{reportId&&<div style={{marginBottom:12}}>
+<a href={`/upload?update_to=${reportId}&update_to_title=${encodeURIComponent(title)}`} style={{display:'inline-block',padding:'10px 20px',borderRadius:8,border:'1px solid #FED7AA',background:'#FEF3E6',color:'#B53D0F',fontSize:13,fontWeight:600,textDecoration:'none',fontFamily:'inherit'}}>🔴 Still unfolding? Post an update</a>
+</div>}
 <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setAiSuggestion(null)}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
+<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
 <a href="/feed" style={{padding:'10px 20px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#666',fontSize:13,fontWeight:500,textDecoration:'none',fontFamily:'inherit'}}>Go to feed</a>
 </div>
 </div>

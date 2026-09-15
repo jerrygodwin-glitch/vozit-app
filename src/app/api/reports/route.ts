@@ -58,9 +58,43 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash } = body
+    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id } = body
 
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 })
+
+    // Posting an update to an earlier report — link them via series_id/series_part
+    // so the feed and report page can show them as one unfolding story instead of
+    // disconnected posts.
+    let seriesId: string | null = null
+    let seriesPart = 1
+    if (update_to_report_id) {
+      const { data: parent } = await supabase
+        .from('reports')
+        .select('id, user_id, series_id, series_part')
+        .eq('id', update_to_report_id)
+        .single()
+
+      if (!parent || parent.user_id !== user.id) {
+        return NextResponse.json({ error: 'You can only post updates to your own reports.' }, { status: 403 })
+      }
+
+      if (parent.series_id) {
+        seriesId = parent.series_id
+        const { data: latest } = await supabase
+          .from('reports')
+          .select('series_part')
+          .eq('series_id', parent.series_id)
+          .order('series_part', { ascending: false })
+          .limit(1)
+          .single()
+        seriesPart = (latest?.series_part || parent.series_part || 1) + 1
+      } else {
+        // First update to this report — retroactively start a series with the original as part 1
+        seriesId = crypto.randomUUID()
+        seriesPart = 2
+        await supabase.from('reports').update({ series_id: seriesId, series_part: 1 }).eq('id', parent.id)
+      }
+    }
 
     // Check for duplicate content hash
     if (content_hash) {
@@ -106,6 +140,8 @@ export async function POST(req: NextRequest) {
       location_lng: location_lng || null,
       mux_upload_id: mux_upload_id || null,
       content_hash: content_hash || null,
+      series_id: seriesId,
+      series_part: seriesPart,
       status,
       upvotes: 0,
       downvotes: 0,
