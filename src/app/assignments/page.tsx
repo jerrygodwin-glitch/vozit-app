@@ -15,7 +15,7 @@ export default function Assignments() {
       <Top />
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee' }}>
         <div style={{ fontSize: 20, fontWeight: 700 }}>Assignments</div>
-        <div style={{ fontSize: 13, color: '#666' }}>Bounty-based ongoing missions</div>
+        <div style={{ fontSize: 13, color: '#666' }}>Ongoing assignments with fees</div>
       </div>
       <div className="container" style={{ padding: '12px 16px' }}>
         {A.map(a => { const u = UC[a.u]; return (

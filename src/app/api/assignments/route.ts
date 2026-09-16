@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   if (!body.title || !body.description) return NextResponse.json({ error: 'Title and description required' }, { status: 400 })
   const admin = createAdminClient()
-  const { data: assignment, error } = await admin.from('assignments').insert({ created_by: user.id, title: body.title, description: body.description, urgency: body.urgency || 'medium', regions: body.regions || [], bounty_pool_usd: body.bounty_pool_usd || 0, bounty_per_report_usd: body.bounty_per_report_usd || 10, safety_notes: body.safety_notes, allows_anonymous: body.allows_anonymous || false }).select().single()
+  const { data: assignment, error } = await admin.from('assignments').insert({ created_by: user.id, title: body.title, description: body.description, urgency: body.urgency || 'medium', regions: body.regions || [], assignment_fee_pool_usd: body.assignment_fee_pool_usd || 0, assignment_fee_per_report_usd: body.assignment_fee_per_report_usd || 10, safety_notes: body.safety_notes, allows_anonymous: body.allows_anonymous || false }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (body.angles?.length) await admin.from('assignment_angles').insert(body.angles.map((t: string) => ({ assignment_id: assignment.id, title: t })))
   await admin.from('assignment_contributors').insert({ assignment_id: assignment.id, user_id: user.id })

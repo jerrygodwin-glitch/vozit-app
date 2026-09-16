@@ -79,8 +79,8 @@ export interface Assignment {
   description?: string
   regions: string[]
   urgency: 'critical' | 'high' | 'medium' | 'low'
-  bounty_amount: number
-  bounty_currency: string
+  assignment_fee_amount: number
+  assignment_fee_currency: string
   deadline?: string
   reporter_count: number
   report_count: number
@@ -94,7 +94,7 @@ export interface Earning {
   user_id: string
   report_id?: string
   amount: number
-  source: 'ad_revenue' | 'licensing' | 'tip' | 'bounty'
+  source: 'ad_revenue' | 'licensing' | 'tip' | 'assignment_fee'
   created_at: string
   hold_until: string
   paid_out: boolean

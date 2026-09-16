@@ -77,7 +77,7 @@
 1. Ad revenue (from embedded player views)
 2. Licensing fees (share of media org payments)
 3. Tips (from viewers)
-4. Bounties (from assignment completion)
+4. Assignment fees (from assignment completion)
 
 ## 4. PAYOUT SYSTEM
 
@@ -187,7 +187,7 @@ users, reports, votes, comments, earnings, payouts, assignments, assignment_repo
 - Social accounts page with official logos via Google Favicon API
 
 ### Assignment System
-- Bounty-based missions for conflict zones and breaking news
+- Ongoing assignments with fees for conflict zones and breaking news
 - Example assignments: Ukraine ($2,400), Sudan ($3,000), Venezuela ($1,200), Pacific ($800), Myanmar ($1,800)
 - Urgency levels: Critical (red), High (orange), Ongoing (tan)
 

@@ -62,7 +62,7 @@ CREATE TABLE public.reports (
   assignment_id     UUID,  -- FK added after assignments table
   assignment_angle_id UUID,
   assignment_accepted BOOLEAN DEFAULT false,
-  assignment_bounty_paid BOOLEAN DEFAULT false,
+  assignment_fee_paid BOOLEAN DEFAULT false,
   --
   status            TEXT NOT NULL DEFAULT 'processing'
                       CHECK (status IN ('processing','published','flagged','removed')),
@@ -133,10 +133,10 @@ CREATE TABLE public.assignments (
                              CHECK (urgency IN ('critical','high','medium')),
   -- Regions stored as text array for flexible geo targeting
   regions                  TEXT[] NOT NULL DEFAULT '{}',
-  -- Bounty
-  bounty_pool_usd          NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (bounty_pool_usd >= 0),
-  bounty_per_report_usd    NUMERIC(8,2) NOT NULL DEFAULT 10 CHECK (bounty_per_report_usd >= 5),
-  bounty_spent_usd         NUMERIC(10,2) NOT NULL DEFAULT 0,
+  -- Assignment fee
+  assignment_fee_pool_usd          NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (assignment_fee_pool_usd >= 0),
+  assignment_fee_per_report_usd    NUMERIC(8,2) NOT NULL DEFAULT 10 CHECK (assignment_fee_per_report_usd >= 5),
+  assignment_fee_spent_usd         NUMERIC(10,2) NOT NULL DEFAULT 0,
   -- Safety
   safety_notes             TEXT,
   allows_anonymous         BOOLEAN NOT NULL DEFAULT false,
@@ -178,7 +178,7 @@ CREATE TABLE public.assignment_contributors (
 CREATE INDEX idx_contributors_assignment ON public.assignment_contributors(assignment_id);
 CREATE INDEX idx_contributors_user ON public.assignment_contributors(user_id);
 
--- Assignment bounty pool contributions (anyone can fund)
+-- Assignment fee pool contributions (anyone can fund)
 CREATE TABLE public.assignment_funding (
   id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   assignment_id            UUID NOT NULL REFERENCES public.assignments(id) ON DELETE CASCADE,
@@ -205,7 +205,7 @@ CREATE TABLE public.payout_records (
   user_id             UUID NOT NULL REFERENCES public.users(id),
   amount_usd          NUMERIC(10,2) NOT NULL,
   source              TEXT NOT NULL
-                        CHECK (source IN ('ad_revenue','task_reward','licensing','community_pool','assignment_bounty')),
+                        CHECK (source IN ('ad_revenue','task_reward','licensing','community_pool','assignment_fee')),
   report_id           UUID REFERENCES public.reports(id),
   task_id             UUID REFERENCES public.tasks(id),
   assignment_id       UUID REFERENCES public.assignments(id),
@@ -317,48 +317,48 @@ CREATE TRIGGER trg_assignment_report_count
   AFTER INSERT OR UPDATE OF status ON public.reports
   FOR EACH ROW EXECUTE FUNCTION update_assignment_report_count();
 
--- When a report is accepted, pay the bounty
-CREATE OR REPLACE FUNCTION pay_assignment_bounty()
+-- When a report is accepted, pay the assignment fee
+CREATE OR REPLACE FUNCTION pay_assignment_fee()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_bounty NUMERIC(8,2);
+  v_fee    NUMERIC(8,2);
   v_pool   NUMERIC(10,2);
   v_spent  NUMERIC(10,2);
 BEGIN
   IF NEW.assignment_id IS NOT NULL
      AND NEW.assignment_accepted = true
      AND (OLD.assignment_accepted IS DISTINCT FROM true)
-     AND NEW.assignment_bounty_paid = false
+     AND NEW.assignment_fee_paid = false
   THEN
-    SELECT bounty_per_report_usd, bounty_pool_usd, bounty_spent_usd
-      INTO v_bounty, v_pool, v_spent
+    SELECT assignment_fee_per_report_usd, assignment_fee_pool_usd, assignment_fee_spent_usd
+      INTO v_fee, v_pool, v_spent
       FROM public.assignments WHERE id = NEW.assignment_id;
 
     -- Only pay if pool has funds remaining
-    IF v_spent + v_bounty <= v_pool THEN
+    IF v_spent + v_fee <= v_pool THEN
       -- Mark report as paid
-      NEW.assignment_bounty_paid := true;
+      NEW.assignment_fee_paid := true;
 
       -- Debit assignment pool
       UPDATE public.assignments
-      SET bounty_spent_usd = bounty_spent_usd + v_bounty, updated_at = now()
+      SET assignment_fee_spent_usd = assignment_fee_spent_usd + v_fee, updated_at = now()
       WHERE id = NEW.assignment_id;
 
       -- Credit contributor
       UPDATE public.assignment_contributors
-      SET total_earned = total_earned + v_bounty
+      SET total_earned = total_earned + v_fee
       WHERE assignment_id = NEW.assignment_id AND user_id = NEW.user_id;
 
       -- Create payout record (7-day hold)
       INSERT INTO public.payout_records
         (user_id, amount_usd, source, report_id, assignment_id, clears_at)
       VALUES
-        (NEW.user_id, v_bounty, 'assignment_bounty', NEW.id, NEW.assignment_id,
+        (NEW.user_id, v_fee, 'assignment_fee', NEW.id, NEW.assignment_id,
          now() + interval '7 days');
 
       -- Update user earnings
       UPDATE public.users
-      SET pending_payout = pending_payout + v_bounty
+      SET pending_payout = pending_payout + v_fee
       WHERE id = NEW.user_id;
     END IF;
   END IF;
@@ -366,16 +366,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER trg_pay_assignment_bounty
+CREATE TRIGGER trg_pay_assignment_fee
   BEFORE UPDATE OF assignment_accepted ON public.reports
-  FOR EACH ROW EXECUTE FUNCTION pay_assignment_bounty();
+  FOR EACH ROW EXECUTE FUNCTION pay_assignment_fee();
 
 -- When additional funding is added to an assignment
 CREATE OR REPLACE FUNCTION update_assignment_pool()
 RETURNS TRIGGER AS $$
 BEGIN
   UPDATE public.assignments
-  SET bounty_pool_usd = bounty_pool_usd + NEW.amount_usd, updated_at = now()
+  SET assignment_fee_pool_usd = assignment_fee_pool_usd + NEW.amount_usd, updated_at = now()
   WHERE id = NEW.assignment_id;
   RETURN NEW;
 END;

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS earnings (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
   report_id UUID REFERENCES reports(id) ON DELETE SET NULL,
   amount DECIMAL(10,2) NOT NULL,
-  source TEXT NOT NULL CHECK (source IN ('ad_revenue','licensing','tip','bounty')),
+  source TEXT NOT NULL CHECK (source IN ('ad_revenue','licensing','tip','assignment_fee')),
   created_at TIMESTAMPTZ DEFAULT now(),
   hold_until TIMESTAMPTZ DEFAULT (now() + INTERVAL '7 days'),
   paid_out BOOLEAN DEFAULT false,

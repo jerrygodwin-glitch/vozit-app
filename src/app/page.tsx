@@ -127,7 +127,7 @@ export default function Landing() {
           {/* How it works */}
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>How VozIt! Works</div>
-            {[{ n: '1', t: 'Record', d: '90-second guided video with 5W prompts' }, { n: '2', t: 'Upload', d: 'AI analysis, moderation, watermark' }, { n: '3', t: 'Earn', d: '50-70% of ad revenue, licensing, bounties' }].map(s => (
+            {[{ n: '1', t: 'Record', d: '90-second guided video with 5W prompts' }, { n: '2', t: 'Upload', d: 'AI analysis, moderation, watermark' }, { n: '3', t: 'Earn', d: '50-70% of ad revenue, licensing, assignment fees' }].map(s => (
               <div key={s.n} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 14, background: '#FE3D07', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{s.n}</div>
                 <div><div style={{ fontSize: 13, fontWeight: 600 }}>{s.t}</div><div style={{ fontSize: 11, color: '#666' }}>{s.d}</div></div>
@@ -189,7 +189,7 @@ export default function Landing() {
             VozIt! is a citizen journalism platform that empowers eyewitnesses around the world to report breaking news, document human rights, and earn revenue from their footage. Every report goes through AI-powered 5W analysis, content moderation, and provenance verification before being published and distributed across social media platforms.
           </p>
           <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7 }}>
-            Reporters earn 50-70% of all revenue generated from their content — including ad revenue, media licensing fees, and assignment bounties. All payouts are screened for OFAC compliance with 8 payout providers covering 200+ countries.
+            Reporters earn 50-70% of all revenue generated from their content — including ad revenue, media licensing fees, and assignment fees. All payouts are screened for OFAC compliance with 8 payout providers covering 200+ countries.
           </p>
         </div>
       </div>
