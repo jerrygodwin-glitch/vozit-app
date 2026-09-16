@@ -6,7 +6,7 @@ import { BRAND } from '@/lib/logo'
 interface Props {
   videoBlob: Blob         // The uploaded silent video
   videoDuration: number   // Duration in seconds
-  onComplete: (mergedBlob: Blob, metadata: { hasVoiceOver: boolean }) => void
+  onComplete: (videoBlob: Blob, metadata: { hasVoiceOver: boolean; audioBlob?: Blob }) => void
   onSkip: () => void      // Skip voice-over, proceed without narration
 }
 
@@ -150,35 +150,12 @@ export function VoiceOverRecorder({ videoBlob, videoDuration, onComplete, onSkip
     setStep('preview')
   }
 
-  async function mergeAndSubmit() {
+  function mergeAndSubmit() {
     if (!audioBlob) { onSkip(); return }
-    setStep('merging')
-
-    // In a browser environment, we can't easily merge audio + video
-    // without FFmpeg (WASM). So we send both blobs to the server
-    // which merges them during the Mux upload pipeline.
-    //
-    // For now: create a combined payload that the upload handler
-    // can process. The server will use FFmpeg to merge.
-    //
-    // Alternative: use @ffmpeg/ffmpeg WASM for client-side merge
-    // but that's a 25MB download — better to do server-side.
-
-    // Pack both blobs into a single submission
-    // The upload API will detect the voice-over audio and merge
-    try {
-      onComplete(videoBlob, { hasVoiceOver: true })
-
-      // Also upload the audio track separately for server-side merge
-      const formData = new FormData()
-      formData.append('voice_over', audioBlob, 'voiceover.webm')
-      await fetch('/api/reports/voice-over', {
-        method: 'POST',
-        body: formData,
-      }) // Non-blocking
-    } catch {
-      onComplete(videoBlob, { hasVoiceOver: true })
-    }
+    // The report doesn't exist yet at this point, so the audio track can't
+    // be linked to it server-side. Hand it back to the parent, which uploads
+    // it (tagged with the report's id) once the report is actually created.
+    onComplete(videoBlob, { hasVoiceOver: true, audioBlob })
   }
 
   const timeStr = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`

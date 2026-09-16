@@ -26,6 +26,7 @@ const[videoBlob,setVideoBlob]=useState<Blob|null>(null)
 const[videoDuration,setVideoDuration]=useState(0)
 const[videoSource,setVideoSource]=useState<'live'|'upload'>('live')
 const[hasAudio,setHasAudio]=useState(true)
+const[audioBlob,setAudioBlob]=useState<Blob|null>(null)
 const[updateToReportId,setUpdateToReportId]=useState('')
 const[updateToTitle,setUpdateToTitle]=useState('')
 
@@ -44,6 +45,18 @@ useEffect(()=>{
   const id=params.get('update_to')
   if(id){setUpdateToReportId(id);setUpdateToTitle(params.get('update_to_title')||'')}
 },[])
+
+// Video captured or chosen — decide whether to offer a voice-over pass
+function handleVideoReady(blob:Blob,metadata:{duration:number;gps?:{lat:number;lng:number};hasAudio:boolean;source:'live'|'upload'}){
+  setVideoBlob(blob)
+  setVideoDuration(metadata.duration)
+  setVideoSource(metadata.source)
+  setHasAudio(metadata.hasAudio)
+  if(metadata.gps)setGps(metadata.gps)
+  // Live recordings are already narrated via the on-screen 5W prompts.
+  // Uploaded silent footage gets the option to add a voice-over pass.
+  setStep(metadata.source==='upload'?'voiceover':'mode')
+}
 
 // Request AI analysis
 async function requestAIAnalysis(){
@@ -81,6 +94,19 @@ async function submitReport(){
   try{
     const{data:{user}}=await sb.auth.getUser()
     if(!user)return
+
+    // Upload the captured video to Mux before creating the report, so the
+    // report can be linked to it from the moment it's created.
+    let mux_upload_id:string|undefined
+    if(videoBlob){
+      const upRes=await fetch('/api/reports/upload-url',{method:'POST'})
+      const upData=await upRes.json()
+      if(upData.uploadUrl){
+        await fetch(upData.uploadUrl,{method:'PUT',body:videoBlob,headers:{'Content-Type':videoBlob.type||'video/webm'}})
+        mux_upload_id=upData.uploadId
+      }
+    }
+
     const r=await fetch('/api/reports',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -90,10 +116,19 @@ async function submitReport(){
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
         update_to_report_id:updateToReportId||undefined,
+        mux_upload_id,
       }),
     })
     const d=await r.json()
-    if(d.report?.id)setReportId(d.report.id)
+    if(d.report?.id){
+      setReportId(d.report.id)
+      if(audioBlob){
+        const fd=new FormData()
+        fd.append('voice_over',audioBlob,'voiceover.webm')
+        fd.append('report_id',d.report.id)
+        fetch('/api/reports/voice-over',{method:'POST',body:fd}).catch(()=>{})
+      }
+    }
     setStep('done')
   }catch{setStep('review')}
 }
@@ -124,18 +159,7 @@ const sourceLabel=(s:string)=>({reporter:'You said this',transcript:'From audio'
 
 // ── RECORD STEP ──────────────────────────────────────────────
 if(step==='record')return(<div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
-<div style={{flex:1,background:'#000',display:'flex',flexDirection:'column'}}>
-<div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center'}}>
-<div style={{textAlign:'center',color:'rgba(255,255,255,0.15)'}}><div style={{fontSize:48}}>🎥</div><p style={{fontSize:12}}>Camera preview</p></div>
-</div>
-<div style={{display:'flex',justifyContent:'center',padding:'24px 0'}}>
-<div onClick={()=>setStep('mode')} style={{width:68,height:68,borderRadius:34,border:'3px solid #FE3D07',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
-<div style={{width:48,height:48,borderRadius:24,background:'#FE3D07'}}/>
-</div>
-</div>
-<div style={{textAlign:'center',padding:'4px 0 10px'}}><span style={{fontSize:10,color:'rgba(255,255,255,0.3)'}}>90 second maximum</span></div>
-{gps&&<div style={{textAlign:'center',padding:'0 0 10px'}}><span style={{fontSize:10,color:'rgba(255,255,255,0.25)'}}>📍 GPS captured</span></div>}
-</div>
+<CameraRecorder onVideoReady={handleVideoReady} maxDuration={90}/>
 <NavBar/>
 </div>)
 
@@ -155,6 +179,7 @@ if(step==='voiceover')return(<div style={{minHeight:'100vh',background:'#111'}}>
   onComplete={(blob,meta)=>{
     setVideoBlob(blob)
     setHasAudio(true)
+    if(meta.audioBlob)setAudioBlob(meta.audioBlob)
     setStep('mode')
   }}
   onSkip={()=>setStep('mode')}
