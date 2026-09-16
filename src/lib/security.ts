@@ -35,14 +35,17 @@ export async function rateLimit(
   if (supabase) {
     try {
       const windowStart = new Date(now - windowSeconds * 1000).toISOString()
-      const { count } = await supabase.rpc('check_rate_limit', {
+      const { data, error } = await supabase.rpc('check_rate_limit', {
         limit_key: key,
         window_start: windowStart,
         max_requests: maxRequests,
       })
+      // check_rate_limit() is a Postgres function returning TABLE(count BIGINT),
+      // so supabase-js hands back an array of rows in `data`, not a top-level count.
+      const count = !error && data?.[0]?.count != null ? Number(data[0].count) : null
       if (count !== null) {
-        const allowed = count < maxRequests
-        return { allowed, remaining: Math.max(0, maxRequests - count - 1), resetAt: now + windowSeconds * 1000 }
+        const allowed = count <= maxRequests
+        return { allowed, remaining: Math.max(0, maxRequests - count), resetAt: now + windowSeconds * 1000 }
       }
     } catch { /* Fall through to memory */ }
   }
@@ -380,12 +383,13 @@ export function getSecurityHeaders(): Record<string, string> {
     'X-Permitted-Cross-Domain-Policies': 'none',
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https://image.mux.com https://*.supabase.co blob:",
       "media-src 'self' https://stream.mux.com blob:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mux.com https://api.thehive.ai",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mux.com https://api.thehive.ai https://challenges.cloudflare.com",
+      "frame-src 'self' https://challenges.cloudflare.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

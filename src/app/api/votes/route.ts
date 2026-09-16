@@ -1,7 +1,9 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { getAuthedUser } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
+import { rateLimit, RATE_LIMITS } from '@/lib/security'
+import { captureError } from '@/lib/monitoring'
 
 // Tier-based vote weights
 const VOTE_WEIGHT: Record<string, number> = {
@@ -60,9 +62,13 @@ async function detectSybil(supabase: any, reportId: string, fingerprint: string,
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user, supabase } = await getAuthedUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const limit = await rateLimit(`vote:${user.id}`, RATE_LIMITS.vote.max, RATE_LIMITS.vote.window, supabase)
+    if (!limit.allowed) {
+      return NextResponse.json({ error: 'You are voting too quickly. Please slow down.' }, { status: 429 })
+    }
 
     const { report_id, value } = await req.json()
     if (!report_id || ![1, -1].includes(value)) {
@@ -145,6 +151,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, upvotes: Math.round(upvotes), downvotes: Math.round(downvotes), credibility })
   } catch (e: any) {
+    captureError(e, { route: 'POST /api/votes' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

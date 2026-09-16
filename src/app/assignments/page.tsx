@@ -1,7 +1,36 @@
-// @ts-nocheck
 'use client'
-import{useState}from'react'
-import{NavBar,TopBar}from'@/components/ui/NavBar'
-const A=[{id:'a1',t:'War in Ukraine \u2014 frontline and civilian impact',u:'critical',r:['Eastern Ukraine','Kherson'],c:34,rp:127,b:2400},{id:'a2',t:'Sudan conflict \u2014 humanitarian crisis',u:'critical',r:['Khartoum'],c:12,rp:48,b:3000},{id:'a3',t:'Venezuela \u2014 protests and migration',u:'high',r:['Caracas'],c:19,rp:67,b:1200},{id:'a4',t:'Pacific Islands \u2014 climate flooding',u:'medium',r:['Tuvalu','Fiji'],c:7,rp:28,b:800},{id:'a5',t:'Myanmar resistance',u:'high',r:['Yangon'],c:8,rp:31,b:1800}]
-const UC:Record<string,{bg:string,c:string,l:string}>={critical:{bg:'#FEF2F2',c:'#DC2626',l:'Critical'},high:{bg:'#FEF3E6',c:'#D97706',l:'High'},medium:{bg:'#FFF8E6',c:'#B8860B',l:'Ongoing'}}
-export default function P(){const[joined,setJoined]=useState<Record<string,boolean>>({});return(<div style={{minHeight:'100vh',display:'flex',flexDirection:'column',background:'#fff'}}><TopBar/><div style={{padding:'12px 16px',borderBottom:'1px solid #eee'}}><div style={{fontSize:16,fontWeight:700,color:'#1a1a1a'}}>Assignments</div><div style={{fontSize:12,color:'#888'}}>Ongoing missions</div></div><div style={{maxWidth:600,margin:'0 auto',width:'100%',padding:'12px 16px 60px'}}>{A.map(a=>{const u=UC[a.u];return(<div key={a.id} className='card' style={{marginBottom:8,borderLeft:'3px solid '+u.c,borderRadius:'0 10px 10px 0',padding:14}}><div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}><span style={{background:u.bg,color:u.c,fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:4}}>{u.l}</span>{a.r.map(r=>(<span key={r} style={{fontSize:10,color:'#888',background:'#f5f5f5',padding:'2px 6px',borderRadius:4}}>{r}</span>))}</div><div style={{fontSize:13,fontWeight:600,color:'#1a1a1a',marginBottom:6}}>{a.t}</div><div style={{fontSize:11,color:'#888',marginBottom:6}}>{a.c} reporters · {a.rp} reports</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontSize:14,fontWeight:700,color:'#085041'}}>${a.b.toLocaleString()}</span>{joined[a.id]?<span style={{fontSize:11,color:'#085041',background:'#ECFDF5',padding:'4px 12px',borderRadius:6,fontWeight:500}}>Joined</span>:<button onClick={()=>setJoined(j=>({...j,[a.id]:true}))} className='btn-primary' style={{fontSize:11,padding:'4px 12px'}}>Join</button>}</div></div>)})}</div><NavBar active='assignments'/></div>)}
+import { Nav, Top } from '@/lib/ui'
+const A = [
+  { t: 'Ukraine — frontline & civilian impact', u: 'critical', c: 34, rp: 127, b: 2400 },
+  { t: 'Sudan — humanitarian crisis', u: 'critical', c: 12, rp: 48, b: 3000 },
+  { t: 'Venezuela — protests', u: 'high', c: 19, rp: 67, b: 1200 },
+  { t: 'Pacific — climate flooding', u: 'medium', c: 7, rp: 28, b: 800 },
+  { t: 'Myanmar resistance', u: 'high', c: 8, rp: 31, b: 1800 },
+]
+const UC: any = { critical: { bg: '#FEF2F2', c: '#DC2626', l: 'Critical' }, high: { bg: '#FEF3E6', c: '#D97706', l: 'High' }, medium: { bg: '#FFF8E6', c: '#B8860B', l: 'Ongoing' } }
+
+export default function Assignments() {
+  return (
+    <div className="page" style={{ background: '#fff' }}>
+      <Top />
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee' }}>
+        <div style={{ fontSize: 20, fontWeight: 700 }}>Assignments</div>
+        <div style={{ fontSize: 13, color: '#666' }}>Bounty-based ongoing missions</div>
+      </div>
+      <div className="container" style={{ padding: '12px 16px' }}>
+        {A.map(a => { const u = UC[a.u]; return (
+          <div key={a.t} className="card" style={{ borderLeft: '3px solid ' + u.c, borderRadius: '0 12px 12px 0' }}>
+            <span style={{ background: u.bg, color: u.c, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{u.l}</span>
+            <div style={{ fontSize: 15, fontWeight: 600, margin: '6px 0' }}>{a.t}</div>
+            <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>{a.c} reporters · {a.rp} reports</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: '#065F46' }}>${a.b.toLocaleString()}</span>
+              <button className="btn btn-primary btn-sm">Join</button>
+            </div>
+          </div>
+        )})}
+      </div>
+      <Nav active="/assignments" />
+    </div>
+  )
+}

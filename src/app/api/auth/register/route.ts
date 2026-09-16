@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { validatePassword, sanitizeInput, sanitizeUsername, rateLimit, RATE_LIMITS } from '@/lib/security'
+import { captureError } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
@@ -55,6 +56,6 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, message: 'Account created. Check your email to verify.', requiresVerification: true })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) { captureError(e, { route: 'POST /api/auth/register' }); return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
 export const dynamic = 'force-dynamic'

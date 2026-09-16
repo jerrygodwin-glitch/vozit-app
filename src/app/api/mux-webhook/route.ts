@@ -8,6 +8,7 @@ import { generate5Ws, storeAnalysis } from '@/lib/ai-5w-analysis'
 import { assessGeoRisk } from '@/lib/security'
 import { processVideoWatermark } from '@/lib/watermark'
 import { autoDistributeToVozItChannels, logVozItDistribution } from '@/lib/auto-distribute'
+import { captureError, captureMessage } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,8 @@ export async function POST(req: NextRequest) {
       const { verifyMuxSignature } = await import('@/lib/security')
       const rawBody = JSON.stringify(body)
       const sig = req.headers.get('mux-signature')
-      if (!verifyMuxSignature(rawBody, sig, process.env.MUX_WEBHOOK_SECRET)) {
+      if (!(await verifyMuxSignature(rawBody, sig, process.env.MUX_WEBHOOK_SECRET))) {
+        captureMessage('Mux webhook signature verification failed', { type })
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
     }
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
       // Find the report linked to this Mux upload
       const { data: report } = await supabase
         .from('reports')
-        .select('id, user_id, title, who, what, why, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
+        .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
         .eq('mux_asset_id', assetId)
         .single()
 
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
         if (uploadId) {
           const { data: r2 } = await supabase
             .from('reports')
-            .select('id, user_id, title, who, what, why, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
+            .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
             .eq('mux_upload_id', uploadId)
             .single()
           if (!r2) return NextResponse.json({ ok: true })
@@ -61,12 +63,13 @@ export async function POST(req: NextRequest) {
       const rep = report as NonNullable<typeof report>
 
       // Update report with video details
-      await supabase.from('reports').update({
+      const { error: videoUpdateError } = await supabase.from('reports').update({
         mux_asset_id: assetId,
         playback_id: playbackId,
         thumbnail_url: thumbnailUrl,
-        duration: Math.round(duration),
+        duration_seconds: Math.round(duration),
       }).eq('id', report!.id)
+      if (videoUpdateError) captureError(videoUpdateError, { route: 'POST /api/mux-webhook', step: 'save video details', reportId: report!.id })
 
       // ═══ PHASE 3: MODERATION + C2PA PIPELINE ═══════════════════
 
@@ -138,11 +141,15 @@ export async function POST(req: NextRequest) {
         scannedAt: modResult.scannedAt,
       })
 
-      // 4. Apply auto-action from moderation
-      let reportStatus = 'published'
+      // 4. Apply auto-action from video moderation. The report's text (title/who/what/why)
+      // was already moderated when it was created (see /api/reports) — combine the two
+      // results by taking whichever is more severe, so a clean video scan can't un-flag
+      // or republish a report the text moderation already removed/flagged.
+      const STATUS_SEVERITY = { published: 0, flagged: 1, removed: 2 } as const
+      let videoStatus: 'published' | 'flagged' | 'removed' = 'published'
       switch (modResult.autoAction) {
         case 'auto_ban':
-          reportStatus = 'removed'
+          videoStatus = 'removed'
           // Ban the user
           await supabase.from('users').update({
             is_banned: true,
@@ -150,15 +157,17 @@ export async function POST(req: NextRequest) {
           }).eq('id', report.user_id)
           break
         case 'auto_remove':
-          reportStatus = 'removed'
+          videoStatus = 'removed'
           break
         case 'flag_review':
-          reportStatus = 'flagged'
+          videoStatus = 'flagged'
           break
         case 'publish':
-          reportStatus = 'published'
+          videoStatus = 'published'
           break
       }
+      const existingStatus = (report.status as keyof typeof STATUS_SEVERITY) || 'published'
+      const reportStatus = STATUS_SEVERITY[videoStatus] >= STATUS_SEVERITY[existingStatus] ? videoStatus : existingStatus
 
       // 5. Geo-risk tagging
       const country = (report.user as any)?.country || ''
@@ -229,7 +238,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
-    console.error('Mux webhook error:', e)
+    captureError(e, { route: 'POST /api/mux-webhook' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

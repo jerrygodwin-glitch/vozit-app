@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import Stripe from 'stripe'
+import { captureError } from '@/lib/monitoring'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-12-18.acacia' })
 
@@ -11,47 +12,52 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('stripe_account_id, display_name, username')
-    .eq('id', user.id)
-    .single()
-
-  let accountId = profile?.stripe_account_id
-
-  // Create Stripe Connect Express account if doesn't exist
-  if (!accountId) {
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'US', // Will be updated during onboarding
-      email: user.email!,
-      capabilities: {
-        transfers: { requested: true },
-      },
-      business_type: 'individual',
-      metadata: {
-        vozit_user_id: user.id,
-        vozit_username: profile?.username ?? '',
-      },
-    })
-    accountId = account.id
-
-    // Save to our database
-    await admin.from('users')
-      .update({ stripe_account_id: accountId })
+  try {
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('users')
+      .select('stripe_account_id, display_name, username')
       .eq('id', user.id)
+      .single()
+
+    let accountId = profile?.stripe_account_id
+
+    // Create Stripe Connect Express account if doesn't exist
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'US', // Will be updated during onboarding
+        email: user.email!,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_type: 'individual',
+        metadata: {
+          vozit_user_id: user.id,
+          vozit_username: profile?.username ?? '',
+        },
+      })
+      accountId = account.id
+
+      // Save to our database
+      await admin.from('users')
+        .update({ stripe_account_id: accountId })
+        .eq('id', user.id)
+    }
+
+    // Create onboarding link
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/profile?stripe=refresh`,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/profile?stripe=complete`,
+      type: 'account_onboarding',
+    })
+
+    return NextResponse.json({ url: accountLink.url, account_id: accountId })
+  } catch (e: any) {
+    captureError(e, { route: 'POST /api/stripe', userId: user.id })
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
-
-  // Create onboarding link
-  const accountLink = await stripe.accountLinks.create({
-    account: accountId,
-    refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/profile?stripe=refresh`,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/profile?stripe=complete`,
-    type: 'account_onboarding',
-  })
-
-  return NextResponse.json({ url: accountLink.url, account_id: accountId })
 }
 
 // GET /api/stripe — check account status
@@ -60,52 +66,57 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('stripe_account_id, total_earned, pending_payout')
-    .eq('id', user.id)
-    .single()
+  try {
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('users')
+      .select('stripe_account_id, total_earned, pending_payout')
+      .eq('id', user.id)
+      .single()
 
-  if (!profile?.stripe_account_id) {
+    if (!profile?.stripe_account_id) {
+      return NextResponse.json({
+        connected: false,
+        earnings: { total: profile?.total_earned ?? 0, pending: profile?.pending_payout ?? 0 },
+      })
+    }
+
+    // Check Stripe account status
+    const account = await stripe.accounts.retrieve(profile.stripe_account_id)
+
+    // Get pending payouts from our DB
+    const { data: pendingPayouts } = await admin
+      .from('payout_records')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .order('clears_at', { ascending: true })
+
+    // Get cleared payouts ready to transfer
+    const { data: clearedPayouts } = await admin
+      .from('payout_records')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'cleared')
+
+    const clearedTotal = clearedPayouts?.reduce((sum, p) => sum + Number(p.amount_usd), 0) ?? 0
+
     return NextResponse.json({
-      connected: false,
-      earnings: { total: profile?.total_earned ?? 0, pending: profile?.pending_payout ?? 0 },
+      connected: true,
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      details_submitted: account.details_submitted,
+      earnings: {
+        total: profile.total_earned,
+        pending: profile.pending_payout,
+        cleared: clearedTotal,
+        pending_payouts: pendingPayouts ?? [],
+      },
     })
+  } catch (e: any) {
+    captureError(e, { route: 'GET /api/stripe', userId: user.id })
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
-
-  // Check Stripe account status
-  const account = await stripe.accounts.retrieve(profile.stripe_account_id)
-
-  // Get pending payouts from our DB
-  const { data: pendingPayouts } = await admin
-    .from('payout_records')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'pending')
-    .order('clears_at', { ascending: true })
-
-  // Get cleared payouts ready to transfer
-  const { data: clearedPayouts } = await admin
-    .from('payout_records')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'cleared')
-
-  const clearedTotal = clearedPayouts?.reduce((sum, p) => sum + Number(p.amount_usd), 0) ?? 0
-
-  return NextResponse.json({
-    connected: true,
-    charges_enabled: account.charges_enabled,
-    payouts_enabled: account.payouts_enabled,
-    details_submitted: account.details_submitted,
-    earnings: {
-      total: profile.total_earned,
-      pending: profile.pending_payout,
-      cleared: clearedTotal,
-      pending_payouts: pendingPayouts ?? [],
-    },
-  })
 }
 
 // PATCH /api/stripe — trigger payout for cleared earnings
@@ -181,6 +192,7 @@ export async function PATCH(req: NextRequest) {
       payouts_cleared: cleared.length,
     })
   } catch (e: any) {
+    captureError(e, { route: 'PATCH /api/stripe', userId: user.id })
     // Mark payouts as failed
     await admin
       .from('payout_records')

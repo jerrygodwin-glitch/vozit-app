@@ -248,12 +248,21 @@ users, reports, votes, comments, earnings, payouts, assignments, assignment_repo
 - Region-grouped report cards with thumbnails, vote counts, credibility, tier badges
 - Bottom nav bar with camera button
 
-### All pages have:
-- <Top/> gradient header (except Upload and Auth pages)
+### All Pages
+/ (landing), /feed, /upload, /assignments, /search, /settings, /earnings, /payouts, /settings/social, /licensing, /auth/login, /auth/register, /auth/profile-setup, /auth/verify
+
+- All pages have a <Top/> gradient header (except Upload and Auth pages)
 - Consistent design tokens
 - Sub-pages have "← Settings" back navigation
 
-## 9. KNOWN ISSUES / PENDING WORK
+## 9. API ROUTES (19 endpoints)
+auth, reports, reports/upload-url, reports/voice-over, votes, assignments, assignments/image, payouts, licensing, social, ai-analyze, share, mux-webhook, stripe, tasks, admin/moderation, og
+
+## 10. HOW TO DEPLOY
+Edit files → `git add -A && git commit -m "description" && git push` → Vercel auto-deploys in ~30 seconds.
+(Jerry uses GitHub Desktop, not the command line, for this step.)
+
+## 11. KNOWN ISSUES / PENDING WORK
 
 ### Not Yet Built
 - [ ] Mobile apps (React Native/Expo)
@@ -273,7 +282,7 @@ users, reports, votes, comments, earnings, payouts, assignments, assignment_repo
 - Feed queries real Supabase data (Claude Code fixed this — was hardcoded sample data)
 - Bearer token auth added for mobile app API access
 
-## 10. OWNER NOTES
+## 12. OWNER NOTES
 - Jerry (jerry.godwin@gmail.com) is NOT a software developer
 - All technical explanations should be in plain language
 - Jerry uses GitHub Desktop (not command line git)

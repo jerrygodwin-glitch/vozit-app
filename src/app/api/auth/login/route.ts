@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { sanitizeInput, checkAccountLockout, recordFailedLogin, clearLoginAttempts, rateLimit, RATE_LIMITS } from '@/lib/security'
+import { captureError } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
@@ -30,6 +31,6 @@ export async function POST(req: NextRequest) {
     if (profile?.is_banned) { await supabase.auth.signOut(); return NextResponse.json({ error: `Account suspended: ${profile.ban_reason || 'Policy violation'}` }, { status: 403 }) }
 
     return NextResponse.json({ ok: true, user: { id: data.user.id, email: data.user.email }, requiresVerification: !data.user.email_confirmed_at })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) { captureError(e, { route: 'POST /api/auth/login' }); return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
 export const dynamic = 'force-dynamic'

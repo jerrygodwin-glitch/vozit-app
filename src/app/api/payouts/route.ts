@@ -4,6 +4,8 @@ import { createServerClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { PAYOUT_PROVIDERS, validatePayoutRequest, calculateAvailableBalance, executePayout, type PayoutProvider } from '@/lib/payouts'
 import { fullPayoutScreening, logScreeningResult, type ScreeningResult } from '@/lib/ofac-screening'
+import { rateLimit, RATE_LIMITS } from '@/lib/security'
+import { captureError } from '@/lib/monitoring'
 
 // GET — retrieve payout status, balance, and provider info
 export async function GET(req: NextRequest) {
@@ -55,6 +57,7 @@ export async function GET(req: NextRequest) {
       })),
     })
   } catch (e: any) {
+    captureError(e, { route: '/api/payouts' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
@@ -127,6 +130,11 @@ export async function POST(req: NextRequest) {
 
     // ─── REQUEST PAYOUT ──────────────────────────────────────────────
     if (action === 'payout' && amount) {
+      const limit = await rateLimit(`payout:${user.id}`, RATE_LIMITS.payout.max, RATE_LIMITS.payout.window, supabase)
+      if (!limit.allowed) {
+        return NextResponse.json({ error: 'Too many payout requests. Please try again tomorrow.' }, { status: 429 })
+      }
+
       const p = (provider || profile.payout_provider) as PayoutProvider
       if (!p) return NextResponse.json({ error: 'No payout provider configured' }, { status: 400 })
 
@@ -260,6 +268,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (e: any) {
+    captureError(e, { route: '/api/payouts' })
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

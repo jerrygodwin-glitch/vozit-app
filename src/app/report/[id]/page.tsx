@@ -41,8 +41,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     // Additional meta for other platforms
     other: {
-      'og:video': report.mux_playback_id
-        ? `https://stream.mux.com/${report.mux_playback_id}.m3u8`
+      'og:video': report.playback_id
+        ? `https://stream.mux.com/${report.playback_id}.m3u8`
         : undefined,
       'og:video:type': 'application/x-mpegURL',
       'article:author': `@${report.user?.username}`,
