@@ -125,8 +125,10 @@
 - Anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mYW5xa2JoZWd4cHB5aXR4dHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDc2NDYsImV4cCI6MjEwMzcyMzY0Nn0.83-3UqR1BH2uaVoTO7Gta0l3lxVlkh7qSZ0b20aszdw
 - Jerry's user ID: c1fda080-4c4d-4a51-bab8-ca210fce18b7
 
-### Database Schema (25 tables)
-users, reports, votes, comments, earnings, payouts, assignments, assignment_reporters, ofac_screenings, moderation_scans, provenance, social_accounts, social_distributions, social_analytics, licenses, embed_views, ai_analyses, admin_audit_log, rate_limits, login_attempts, categories, regions, report_categories, report_regions, tasks
+### Database Schema
+users, reports, votes, comments, earnings, payouts, payout_records, assignments, assignment_angles, assignment_contributors, assignment_funding, ofac_screenings, moderation_scans, provenance, social_accounts, social_distributions, social_analytics, licenses, embed_views, ai_analyses, admin_audit_log, rate_limits, login_attempts, tasks
+
+Note: `categories` does not exist in the live schema despite being listed here previously — confirmed via direct Supabase access on 2026-09-22. `regions` is not a table either; it's a `TEXT[]` column on `assignments`. `report_categories` and `report_regions` don't exist. The old table name `assignment_reporters` was also wrong — the real tables are `assignment_angles` and `assignment_contributors`. The rest of this list reflects what's defined in `supabase_schema.sql`/`supabase_schema_v2_additions.sql`, not an independent audit of the live database — worth a full pass now that Supabase access is connected.
 
 ### Environment Variables Needed in Vercel Dashboard
 | Variable | Service | Status |
