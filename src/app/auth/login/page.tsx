@@ -17,8 +17,10 @@ export default function Login() {
         body: JSON.stringify({ email, password: pw }),
       })
       const data = await res.json()
-      if (!res.ok) setMsg(data.error || 'Something went wrong. Please try again.')
-      else window.location.href = '/feed'
+      if (!res.ok) {
+        if (data.requiresVerification) window.location.href = `/auth/verify?email=${encodeURIComponent(data.email || email)}`
+        else setMsg(data.error || 'Something went wrong. Please try again.')
+      } else window.location.href = '/feed'
     } catch (e: any) { setMsg(e.message) }
     setLoading(false)
   }
@@ -33,7 +35,10 @@ export default function Login() {
         </div>
         {msg && <div style={{ background: '#FEF2F2', color: '#DC2626', padding: 12, borderRadius: 12, fontSize: 13, marginBottom: 16 }}>{msg}</div>}
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" style={{ marginBottom: 16 }} />
-        <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ marginBottom: 24 }} />
+        <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ marginBottom: 8 }} />
+        <p style={{ textAlign: 'right', fontSize: 12, marginBottom: 16 }}>
+          <a href="/auth/forgot-password" style={{ color: '#0a8fe8' }}>Forgot password?</a>
+        </p>
         <button onClick={go} disabled={loading || !email || !pw} className="btn btn-primary" style={{ width: '100%' }}>
           {loading ? 'Signing in...' : 'Sign in'}
         </button>

@@ -5,19 +5,62 @@ import { Top, Nav } from '@/lib/ui'
 export default function Licensing() {
   const [url, setUrl] = useState('')
   const [result, setResult] = useState<any>(null)
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
 
-  function handleSearch() {
+  const [showForm, setShowForm] = useState(false)
+  const [tier, setTier] = useState('digital')
+  const [licenseType, setLicenseType] = useState('standard')
+  const [org, setOrg] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [exclusive, setExclusive] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [licenseResult, setLicenseResult] = useState<any>(null)
+  const [licenseError, setLicenseError] = useState('')
+
+  function extractReportId(u: string) {
+    const m = u.trim().match(/\/report\/([a-zA-Z0-9-]+)/)
+    return m ? m[1] : u.trim() // allow pasting a bare id too
+  }
+
+  async function handleSearch() {
     if (!url.trim()) return
-    // Simulate finding a report from URL
-    setResult({
-      title: 'Shelling hits residential area in Saltivka',
-      reporter: '@olena_k',
-      tier: 'Platinum',
-      loc: 'Kharkiv, Ukraine',
-      dur: '1:07',
-      cred: 98,
-      date: 'Sep 10, 2026',
-    })
+    setSearching(true); setSearchError(''); setResult(null); setShowForm(false); setLicenseResult(null)
+    try {
+      const reportId = extractReportId(url)
+      const res = await fetch(`/api/licensing?report_id=${encodeURIComponent(reportId)}`)
+      const d = await res.json()
+      if (!res.ok) setSearchError(d.error || 'Report not found')
+      else setResult(d)
+    } catch (e: any) { setSearchError(e.message) }
+    setSearching(false)
+  }
+
+  const tierOptions = result?.pricing ? Object.keys(result.pricing) : []
+  const typeOptions = result?.pricing?.[tier]?.pricing ? Object.entries(result.pricing[tier].pricing as Record<string, number>) : []
+
+  async function submitLicense() {
+    if (!org.trim() || !contactEmail.trim()) return
+    setSubmitting(true); setLicenseError(''); setLicenseResult(null)
+    try {
+      const res = await fetch('/api/licensing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          report_id: result.report.id, tier, license_type: licenseType,
+          licensee_org: org, licensee_email: contactEmail, licensee_name: contactName || undefined,
+          exclusive,
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) setLicenseError(d.error || 'Could not create license request')
+      else setLicenseResult(d)
+    } catch (e: any) { setLicenseError(e.message) }
+    setSubmitting(false)
+  }
+
+  function copyEmbed() {
+    if (result?.embedCode) navigator.clipboard.writeText(result.embedCode)
   }
 
   const T = [
@@ -47,33 +90,68 @@ export default function Licensing() {
               onChange={e => setUrl(e.target.value)}
               placeholder="https://vozit-app-v2-voz-it.vercel.app/report/..."
               style={{ flex: 1, fontSize: 14 }}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
             />
-            <button onClick={handleSearch} className="btn btn-primary" style={{ padding: '12px 24px', flexShrink: 0 }}>
-              Look up
+            <button onClick={handleSearch} disabled={searching || !url.trim()} className="btn btn-primary" style={{ padding: '12px 24px', flexShrink: 0 }}>
+              {searching ? 'Looking up...' : 'Look up'}
             </button>
           </div>
 
+          {searchError && <div style={{ marginTop: 12, fontSize: 13, color: '#DC2626' }}>{searchError}</div>}
+
           {result && (
             <div style={{ marginTop: 16, padding: 16, background: '#f7f7f8', borderRadius: 12, display: 'flex', gap: 14 }}>
-              <div style={{ width: 120, height: 80, background: 'linear-gradient(135deg,#1a2a3a,#2a3a4a)', borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 120, height: 80, background: result.report.thumbnail ? `url(${result.report.thumbnail}) center/cover` : 'linear-gradient(135deg,#1a2a3a,#2a3a4a)', borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: 30, height: 30, borderRadius: 15, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ width: 0, height: 0, borderLeft: '10px solid #fff', borderTop: '6px solid transparent', borderBottom: '6px solid transparent', marginLeft: 2 }} />
                 </div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{result.title}</div>
-                <div style={{ fontSize: 12, color: '#0a8fe8', marginTop: 2 }}>{result.loc} · {result.date}</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{result.report.title}</div>
+                <div style={{ fontSize: 12, color: '#0a8fe8', marginTop: 2 }}>{result.report.location}{result.report.isBreaking && ' · 🔴 Breaking'}</div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: '#666' }}>
-                  <span>By <b>{result.reporter}</b></span>
-                  <span>{result.dur}</span>
-                  <span>{result.cred}% credibility</span>
-                  <span style={{ color: '#7C3AED', fontWeight: 600 }}>★ {result.tier}</span>
+                  <span>By <b>@{result.report.reporter}</b></span>
+                  {!result.report.exclusiveAvailable && <span style={{ color: '#DC2626' }}>Exclusive rights already licensed</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button className="btn btn-primary btn-sm">License this report</button>
-                  <button className="btn btn-outline">Get embed code</button>
+                  <button onClick={() => setShowForm(s => !s)} className="btn btn-primary btn-sm">License this report</button>
+                  <button onClick={copyEmbed} className="btn btn-outline">Get embed code</button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {showForm && result && (
+            <div style={{ marginTop: 16, padding: 16, borderRadius: 12, border: '1px solid #eee' }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <select value={tier} onChange={e => { setTier(e.target.value); setLicenseType('') }} style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }}>
+                  {tierOptions.map(t => <option key={t} value={t}>{result.pricing[t].name}</option>)}
+                </select>
+                <select value={licenseType} onChange={e => setLicenseType(e.target.value)} style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }}>
+                  <option value="">Select type...</option>
+                  {typeOptions.map(([k, v]) => <option key={k} value={k}>{k.replace(/_/g, ' ')} — ${v}</option>)}
+                </select>
+              </div>
+              <input value={org} onChange={e => setOrg(e.target.value)} placeholder="Organization name" style={{ marginBottom: 8, fontSize: 13 }} />
+              <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Contact email" type="email" style={{ marginBottom: 8, fontSize: 13 }} />
+              <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Contact name (optional)" style={{ marginBottom: 8, fontSize: 13 }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', marginBottom: 12 }}>
+                <input type="checkbox" checked={exclusive} onChange={e => setExclusive(e.target.checked)} disabled={!result.report.exclusiveAvailable} />
+                Request exclusive rights {!result.report.exclusiveAvailable && '(unavailable — already exclusively licensed)'}
+              </label>
+
+              {licenseError && <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 10 }}>{licenseError}</div>}
+              {licenseResult ? (
+                <div style={{ padding: 12, borderRadius: 8, background: '#ECFDF5', color: '#065F46', fontSize: 13 }}>
+                  {licenseResult.license.status === 'active'
+                    ? licenseResult.message
+                    : <>Request created — ${licenseResult.license.price} ({licenseResult.payment.note}). We'll follow up at <strong>{contactEmail}</strong> via {licenseResult.payment.contact} to complete payment.</>}
+                </div>
+              ) : (
+                <button onClick={submitLicense} disabled={submitting || !licenseType || !org.trim() || !contactEmail.trim()} className="btn btn-primary" style={{ width: '100%' }}>
+                  {submitting ? 'Submitting...' : 'Request license'}
+                </button>
+              )}
             </div>
           )}
         </div>

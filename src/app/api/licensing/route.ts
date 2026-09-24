@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { calculateReporterShare } from '@/lib/payouts'
 import type { ReporterTier } from '@/types'
@@ -97,8 +97,12 @@ export async function GET(req: NextRequest) {
     const hoursOld = (Date.now() - new Date(report.created_at).getTime()) / (1000 * 60 * 60)
     const isBreaking = hoursOld < 24
 
-    // Check existing licenses
-    const { data: licenses } = await supabase
+    // Check existing licenses — via admin client, since the "Reporters see
+    // own licenses" RLS policy means a licensee (not the reporter) reading
+    // this on the user-scoped client would always see zero rows and this
+    // exclusivity check would silently never trigger.
+    const admin = createAdminClient()
+    const { data: licenses } = await admin
       .from('licenses')
       .select('tier, license_type, licensee_org, exclusive, expires_at')
       .eq('report_id', reportId)
@@ -145,6 +149,7 @@ export async function POST(req: NextRequest) {
     if (price === undefined) return NextResponse.json({ error: 'Invalid license type for this tier' }, { status: 400 })
 
     const supabase = createServerClient()
+    const admin = createAdminClient()
 
     // Get report + reporter info for revenue split
     const { data: report } = await supabase
@@ -156,9 +161,9 @@ export async function POST(req: NextRequest) {
 
     if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
-    // Check exclusivity
+    // Check exclusivity — admin client, see note in GET above
     if (exclusive) {
-      const { data: existing } = await supabase
+      const { data: existing } = await admin
         .from('licenses')
         .select('id')
         .eq('report_id', report_id)

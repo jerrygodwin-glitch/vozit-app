@@ -27,10 +27,22 @@ export async function POST(req: NextRequest) {
 
     await clearLoginAttempts(emailClean, supabase)
 
+    // Previously this flag was computed and returned, but the login page
+    // ignored it and let unverified accounts straight into the app —
+    // actually enforce it here instead.
+    if (!data.user.email_confirmed_at) {
+      await supabase.auth.signOut()
+      return NextResponse.json({
+        error: 'Please verify your email before signing in. Check your inbox for the confirmation link.',
+        requiresVerification: true,
+        email: data.user.email,
+      }, { status: 403 })
+    }
+
     const { data: profile } = await supabase.from('users').select('is_banned, ban_reason').eq('id', data.user.id).single()
     if (profile?.is_banned) { await supabase.auth.signOut(); return NextResponse.json({ error: `Account suspended: ${profile.ban_reason || 'Policy violation'}` }, { status: 403 }) }
 
-    return NextResponse.json({ ok: true, user: { id: data.user.id, email: data.user.email }, requiresVerification: !data.user.email_confirmed_at })
+    return NextResponse.json({ ok: true, user: { id: data.user.id, email: data.user.email } })
   } catch (e: any) { captureError(e, { route: 'POST /api/auth/login' }); return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
 export const dynamic = 'force-dynamic'
