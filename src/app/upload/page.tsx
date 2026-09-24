@@ -6,10 +6,26 @@ import{NavBar}from'@/components/ui/NavBar'
 import{CameraRecorder}from'@/components/camera/CameraRecorder'
 import{VoiceOverRecorder}from'@/components/camera/VoiceOverRecorder'
 import{BRAND}from'@/lib/logo'
+import{saveDraftVideo,getDraftVideo,clearDraftVideo,saveDraftFields,getDraftFields,clearDraftFields}from'@/lib/draft-storage'
 
 type Step='record'|'voiceover'|'mode'|'quick'|'detailed'|'review'|'submitting'|'done'
 type FiveWs={who:string;what:string;where_text:string;when_happened:string;why:string}
 type AISuggestion={suggested:FiveWs;confidence:Record<string,number>;sources:Record<string,string>;summary:string;tags:string[]}
+
+// XHR (not fetch) is what actually exposes upload progress events, so a
+// large video on a slow mobile connection shows real percentage instead of
+// an indefinite spinner that looks frozen.
+function uploadWithProgress(url:string,blob:Blob,onProgress:(pct:number)=>void):Promise<void>{
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest()
+    xhr.open('PUT',url)
+    xhr.setRequestHeader('Content-Type',blob.type||'video/webm')
+    xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round((e.loaded/e.total)*100))}
+    xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300)resolve();else reject(new Error(`Upload failed (${xhr.status}). Check your connection and try again.`))}
+    xhr.onerror=()=>reject(new Error('Network error during upload. Check your connection and try again.'))
+    xhr.send(blob)
+  })
+}
 
 export default function UploadPage(){
 const sb=createBrowserClient()
@@ -29,6 +45,11 @@ const[hasAudio,setHasAudio]=useState(true)
 const[audioBlob,setAudioBlob]=useState<Blob|null>(null)
 const[updateToReportId,setUpdateToReportId]=useState('')
 const[updateToTitle,setUpdateToTitle]=useState('')
+const[uploadProgress,setUploadProgress]=useState(0)
+const[submitError,setSubmitError]=useState('')
+const[resumeDraft,setResumeDraft]=useState<{blob:Blob,meta:any,fields:any,savedAt:number}|null>(null)
+const[isOnline,setIsOnline]=useState(true)
+const submittingRef=useRef(false)
 
 // Get GPS on mount
 useEffect(()=>{
@@ -46,13 +67,49 @@ useEffect(()=>{
   if(id){setUpdateToReportId(id);setUpdateToTitle(params.get('update_to_title')||'')}
 },[])
 
+// A crash, refresh, or accidental tab close mid-recording previously lost
+// the video and all tagging progress with no way back. Check for a
+// recoverable draft (video in IndexedDB, text fields in localStorage) and
+// offer to resume it instead of silently discarding it.
+useEffect(()=>{
+  getDraftVideo().then(draft=>{
+    if(draft)setResumeDraft({blob:draft.blob,meta:draft.meta,fields:getDraftFields()||{},savedAt:draft.savedAt})
+  })
+},[])
+
+// Offline detection — mid-flow network loss should say so, not just hang.
+useEffect(()=>{
+  setIsOnline(navigator.onLine)
+  const on=()=>setIsOnline(true),off=()=>setIsOnline(false)
+  window.addEventListener('online',on);window.addEventListener('offline',off)
+  return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off)}
+},[])
+
+// Persist title/notes/5Ws as the reporter fills them in
+useEffect(()=>{
+  if(step==='quick'||step==='detailed'||step==='review')saveDraftFields({title,notes,fiveW})
+},[title,notes,fiveW,step])
+
+function resume(){
+  if(!resumeDraft)return
+  setFiveW(prev=>({...prev,...(resumeDraft.fields.fiveW||{})}))
+  setTitle(resumeDraft.fields.title||'')
+  setNotes(resumeDraft.fields.notes||'')
+  handleVideoReady(resumeDraft.blob,resumeDraft.meta,false)
+  setResumeDraft(null)
+}
+function discardDraft(){
+  clearDraftVideo();clearDraftFields();setResumeDraft(null)
+}
+
 // Video captured or chosen — decide whether to offer a voice-over pass
-function handleVideoReady(blob:Blob,metadata:{duration:number;gps?:{lat:number;lng:number};hasAudio:boolean;source:'live'|'upload'}){
+function handleVideoReady(blob:Blob,metadata:{duration:number;gps?:{lat:number;lng:number};hasAudio:boolean;source:'live'|'upload'},persist=true){
   setVideoBlob(blob)
   setVideoDuration(metadata.duration)
   setVideoSource(metadata.source)
   setHasAudio(metadata.hasAudio)
   if(metadata.gps)setGps(metadata.gps)
+  if(persist)saveDraftVideo(blob,metadata)
   // Live recordings are already narrated via the on-screen 5W prompts.
   // Uploaded silent footage gets the option to add a voice-over pass.
   setStep(metadata.source==='upload'?'voiceover':'mode')
@@ -90,10 +147,14 @@ async function requestAIAnalysis(){
 }
 
 async function submitReport(){
+  if(submittingRef.current)return // guard against a double-tap firing this twice
+  submittingRef.current=true
   setStep('submitting')
+  setUploadProgress(0)
+  setSubmitError('')
   try{
     const{data:{user}}=await sb.auth.getUser()
-    if(!user)return
+    if(!user){submittingRef.current=false;return}
 
     // Upload the captured video to Mux before creating the report, so the
     // report can be linked to it from the moment it's created.
@@ -101,10 +162,9 @@ async function submitReport(){
     if(videoBlob){
       const upRes=await fetch('/api/reports/upload-url',{method:'POST'})
       const upData=await upRes.json()
-      if(upData.uploadUrl){
-        await fetch(upData.uploadUrl,{method:'PUT',body:videoBlob,headers:{'Content-Type':videoBlob.type||'video/webm'}})
-        mux_upload_id=upData.uploadId
-      }
+      if(!upData.uploadUrl)throw new Error('Could not start the video upload. Please try again.')
+      await uploadWithProgress(upData.uploadUrl,videoBlob,setUploadProgress)
+      mux_upload_id=upData.uploadId
     }
 
     const r=await fetch('/api/reports',{
@@ -120,6 +180,7 @@ async function submitReport(){
       }),
     })
     const d=await r.json()
+    if(!r.ok)throw new Error(d.error||'Could not publish your report. Please try again.')
     if(d.report?.id){
       setReportId(d.report.id)
       if(audioBlob){
@@ -129,8 +190,17 @@ async function submitReport(){
         fetch('/api/reports/voice-over',{method:'POST',body:fd}).catch(()=>{})
       }
     }
+    clearDraftVideo();clearDraftFields()
+    submittingRef.current=false
     setStep('done')
-  }catch{setStep('review')}
+  }catch(e:any){
+    // The video blob, title, and 5Ws are all still in state (and still
+    // saved as a draft) — the reporter can just hit Publish again instead
+    // of losing everything and starting over from a failed upload.
+    submittingRef.current=false
+    setSubmitError(e.message||'Something went wrong. Please try again.')
+    setStep('review')
+  }
 }
 
 function toggleAccept(field:keyof FiveWs){
@@ -159,6 +229,15 @@ const sourceLabel=(s:string)=>({reporter:'You said this',transcript:'From audio'
 
 // ── RECORD STEP ──────────────────────────────────────────────
 if(step==='record')return(<div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
+{!isOnline&&<div style={{background:'#DC2626',color:'#fff',textAlign:'center',padding:'8px 12px',fontSize:12,fontWeight:600}}>⚠️ You're offline — recording still works, but you'll need a connection to publish</div>}
+{resumeDraft&&<div style={{background:'#FEF3E6',border:'1px solid #FED7AA',padding:12,margin:12,borderRadius:10}}>
+<div style={{fontSize:13,fontWeight:600,color:'#92400E',marginBottom:4}}>Unfinished report found</div>
+<div style={{fontSize:12,color:'#92400E',marginBottom:8}}>From {new Date(resumeDraft.savedAt).toLocaleString()} — pick up where you left off?</div>
+<div style={{display:'flex',gap:8}}>
+<button onClick={resume} style={{flex:1,padding:8,borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Resume</button>
+<button onClick={discardDraft} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #FED7AA',background:'transparent',color:'#92400E',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Discard</button>
+</div>
+</div>}
 <CameraRecorder onVideoReady={handleVideoReady} maxDuration={90}/>
 <NavBar/>
 </div>)
@@ -337,8 +416,10 @@ if(step==='review')return(<div style={{minHeight:'100vh',background:'#f5f5f5'}}>
 </div>
 )}
 
-<button onClick={submitReport} disabled={!title.trim()} style={{width:'100%',padding:14,borderRadius:10,border:'none',background:'#22C55E',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',marginTop:4}}>
-✓ Publish report
+{submitError&&<div style={{background:'#FEF2F2',color:'#DC2626',padding:12,borderRadius:10,fontSize:12,marginBottom:10}}>⚠️ {submitError}</div>}
+{!isOnline&&<div style={{background:'#FEF3E6',color:'#92400E',padding:10,borderRadius:10,fontSize:12,marginBottom:10}}>You're offline — reconnect to publish</div>}
+<button onClick={submitReport} disabled={!title.trim()||!isOnline} style={{width:'100%',padding:14,borderRadius:10,border:'none',background:'#22C55E',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',marginTop:4,opacity:(!title.trim()||!isOnline)?0.5:1}}>
+{submitError?'↻ Retry publish':'✓ Publish report'}
 </button>
 
 <button onClick={()=>setStep(aiSuggestion?'quick':'detailed')} style={{width:'100%',padding:10,borderRadius:10,border:'1px solid #eee',background:'#fff',color:'#888',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginTop:6}}>
@@ -350,7 +431,11 @@ if(step==='review')return(<div style={{minHeight:'100vh',background:'#f5f5f5'}}>
 
 // ── SUBMITTING ───────────────────────────────────────────────
 if(step==='submitting')return(<div style={{minHeight:'100vh',background:'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}>
-<div style={{textAlign:'center'}}><div style={{fontSize:40,marginBottom:8}}>🤖</div><div style={{color:'#888',fontSize:14}}>Submitting your report...</div></div>
+<div style={{textAlign:'center',width:220}}>
+<div style={{fontSize:40,marginBottom:8}}>{videoBlob&&uploadProgress<100?'📤':'🤖'}</div>
+<div style={{color:'#888',fontSize:14,marginBottom:10}}>{videoBlob&&uploadProgress<100?`Uploading video... ${uploadProgress}%`:'Publishing your report...'}</div>
+{videoBlob&&<div style={{height:6,borderRadius:3,background:'#eee',overflow:'hidden'}}><div style={{height:'100%',width:`${uploadProgress}%`,background:BRAND.orange,transition:'width 0.2s'}}/></div>}
+</div>
 <NavBar/>
 </div>)
 

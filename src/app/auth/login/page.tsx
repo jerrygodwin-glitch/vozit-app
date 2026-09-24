@@ -1,12 +1,18 @@
 'use client'
 import { useState } from 'react'
 import { LOGO } from '@/lib/ui'
+import { createBrowserClient } from '@/lib/supabase'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
+
+  function oauth(provider: 'google' | 'facebook') {
+    const sb = createBrowserClient()
+    sb.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback` } })
+  }
 
   async function go() {
     setLoading(true); setMsg('')
@@ -42,6 +48,19 @@ export default function Login() {
         <button onClick={go} disabled={loading || !email || !pw} className="btn btn-primary" style={{ width: '100%' }}>
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
+          <div style={{ flex: 1, height: 1, background: '#eee' }} />
+          <span style={{ fontSize: 11, color: '#999' }}>or</span>
+          <div style={{ flex: 1, height: 1, background: '#eee' }} />
+        </div>
+        <button onClick={() => oauth('google')} style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <img src="https://www.google.com/favicon.ico" alt="" style={{ width: 16, height: 16 }} /> Continue with Google
+        </button>
+        <button onClick={() => oauth('facebook')} style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ color: '#1877F2', fontWeight: 800 }}>f</span> Continue with Facebook
+        </button>
+
         <p style={{ textAlign: 'center', fontSize: 13, color: '#999', marginTop: 16 }}>
           No account? <a href="/auth/register" style={{ color: '#FE3D07', fontWeight: 600 }}>Sign up</a>
         </p>

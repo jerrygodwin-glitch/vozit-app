@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { validatePassword, sanitizeInput, sanitizeUsername, rateLimit, RATE_LIMITS } from '@/lib/security'
 import { captureError } from '@/lib/monitoring'
@@ -59,7 +59,17 @@ export async function POST(req: NextRequest) {
       })
       if (profileError) {
         captureError(profileError, { route: 'POST /api/auth/register (profile insert)', userId: authData.user.id })
-        return NextResponse.json({ error: 'Account created but profile setup failed. Please contact support.' }, { status: 500 })
+        // The username is DB-unique, so a race between the availability
+        // check above and this insert (two people submitting the same
+        // username at once) surfaces here as a 23505 violation. Clean up
+        // the auth user we just created so this isn't left as a dead,
+        // profile-less account blocking that email address forever.
+        const admin = createAdminClient()
+        await admin.auth.admin.deleteUser(authData.user.id).catch(() => {})
+        if (profileError.code === '23505') {
+          return NextResponse.json({ error: 'That username was just taken. Please choose another.' }, { status: 409 })
+        }
+        return NextResponse.json({ error: 'Account setup failed. Please try again.' }, { status: 500 })
       }
     }
 

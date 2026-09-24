@@ -176,7 +176,7 @@ export function calculateEmbedRevenue(embedViews: number, isLicensed: boolean): 
 // Calculate how much of social revenue goes to the reporter
 export function calculateReporterSocialRevenue(
   grossRevenue: number,
-  reporterTierShare: number, // e.g. 0.45 for starter, 0.70 for platinum
+  reporterTierShare: number, // e.g. 0.50 for starter, 0.70 for platinum
 ): { reporterShare: number; platformShare: number; vozitShare: number } {
   const afterPlatform = grossRevenue // Platform already took their cut
   const vozitCut = afterPlatform * VOZIT_PLATFORM_SHARE

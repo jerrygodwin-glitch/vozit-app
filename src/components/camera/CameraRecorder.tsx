@@ -152,6 +152,14 @@ export function CameraRecorder({ onVideoReady, maxDuration = 90 }: Props) {
     if (!file) return
     if (!file.type.startsWith('video/')) { alert('Please select a video file'); return }
 
+    // Fail fast on oversized files rather than letting a slow mobile-data
+    // upload time out with no useful explanation partway through.
+    const MAX_FILE_MB = 500
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      alert(`That file is ${(file.size / 1024 / 1024).toFixed(0)}MB — max is ${MAX_FILE_MB}MB. Try a lower-resolution export or trim it first.`)
+      return
+    }
+
     setUploading(true)
 
     // Get video duration

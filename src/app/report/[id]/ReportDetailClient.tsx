@@ -11,7 +11,17 @@ const isOwner=user?.id===r.user_id
 const otherParts=(seriesReports||[]).filter(sr=>sr.id!==r.id)
 async function vote(d:'up'|'down'){if(voted===d)return;setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}));fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})}).catch(()=>{})}
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
-{r.playback_id?<MuxPlayer playbackId={r.playback_id} streamType="on-demand" metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>:<div style={{height:200,background:'#0a1e30',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'rgba(255,255,255,0.2)'}}>Video processing...</span></div>}
+{r.playback_id?<div style={{position:'relative'}}>
+  <MuxPlayer playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
+  {/* Branded floating stamp — usernames are unique (enforced at signup), so
+      this always identifies exactly one reporter. Real server-side
+      burned-in watermarking would need its own video-processing
+      infrastructure; this overlay is what every in-app viewer sees today. */}
+  <div style={{position:'absolute',bottom:10,left:10,padding:'4px 10px',borderRadius:6,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',pointerEvents:'none',display:'flex',alignItems:'center',gap:5}}>
+    <span style={{fontSize:12,fontWeight:700,color:'#FE3D07'}}>VozIt!</span>
+    <span style={{fontSize:12,fontStyle:'italic',color:'#fff'}}>I was there... @{r.user?.username}</span>
+  </div>
+</div>:<div style={{height:200,background:'#0a1e30',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'rgba(255,255,255,0.2)'}}>Video processing...</span></div>}
 <div style={{maxWidth:600,margin:'0 auto',padding:'14px 16px 60px'}}><h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',lineHeight:1.4,marginBottom:4}}>{r.title}</h1><div style={{fontSize:12,color:'#00AACC',fontWeight:500,marginBottom:12}}>{r.location_name} · {new Date(r.created_at).toLocaleDateString()}</div>
 {r.description&&<p style={{fontSize:14,color:'#333',lineHeight:1.6,marginBottom:16}}>{r.description}</p>}
 <div style={{background:'#fafafa',borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>{[{l:'WHO',v:r.who,c:'#B53D0F'},{l:'WHAT',v:r.what,c:'#1565C0'},{l:'WHERE',v:r.where_text||r.location_name,c:'#085041'},{l:'WHEN',v:r.when_happened?new Date(r.when_happened).toLocaleString():'',c:'#854F0B'},{l:'WHY',v:r.why,c:'#993556'}].map(w=>w.v?(<div key={w.l} style={{display:'flex',gap:10,marginBottom:8}}><span style={{fontSize:10,fontWeight:700,color:w.c,width:40,flexShrink:0}}>{w.l}</span><span style={{fontSize:13,color:'#333',lineHeight:1.4}}>{w.v}</span></div>):null)}</div>
