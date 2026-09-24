@@ -7,7 +7,8 @@ import { captureError } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  const limit = await rateLimit(`register:${ip}`, RATE_LIMITS.register.max, RATE_LIMITS.register.window)
+  const supabase = createServerClient()
+  const limit = await rateLimit(`register:${ip}`, RATE_LIMITS.register.max, RATE_LIMITS.register.window, supabase)
   if (!limit.allowed) return NextResponse.json({ error: 'Too many registration attempts. Try again later.' }, { status: 429 })
 
   try {
@@ -34,7 +35,6 @@ export async function POST(req: NextRequest) {
       if (!captchaData.success) return NextResponse.json({ error: 'CAPTCHA failed. Please try again.' }, { status: 400 })
     }
 
-    const supabase = createServerClient()
     const { data: existing } = await supabase.from('users').select('id').eq('username', usernameCheck.cleaned).single()
     if (existing) return NextResponse.json({ error: 'Username already taken' }, { status: 409 })
 
@@ -48,11 +48,19 @@ export async function POST(req: NextRequest) {
     if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
     if (authData.user) {
-      await supabase.from('users').insert({
+      // Previously fire-and-forget (.then(() => {})), which swallowed
+      // errors — a failed profile insert (e.g. blocked by RLS) still
+      // returned {ok:true}, leaving an orphaned auth user with no usable
+      // profile and no indication anything went wrong.
+      const { error: profileError } = await supabase.from('users').insert({
         id: authData.user.id, email: emailClean, username: usernameCheck.cleaned,
         display_name: sanitizeInput(display_name || username, 50),
         tier: 'starter', report_count: 0, credibility_score: 0, total_earned: 0, is_admin: false, is_banned: false,
-      }).then(() => {})
+      })
+      if (profileError) {
+        captureError(profileError, { route: 'POST /api/auth/register (profile insert)', userId: authData.user.id })
+        return NextResponse.json({ error: 'Account created but profile setup failed. Please contact support.' }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ ok: true, message: 'Account created. Check your email to verify.', requiresVerification: true })

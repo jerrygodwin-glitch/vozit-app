@@ -210,7 +210,7 @@ CREATE TABLE public.payout_records (
   task_id             UUID REFERENCES public.tasks(id),
   assignment_id       UUID REFERENCES public.assignments(id),
   status              TEXT NOT NULL DEFAULT 'pending'
-                        CHECK (status IN ('pending','cleared','paid','failed')),
+                        CHECK (status IN ('pending','cleared','processing','paid','failed')),
   stripe_transfer_id  TEXT,
   clears_at           TIMESTAMPTZ NOT NULL,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()

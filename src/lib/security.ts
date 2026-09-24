@@ -208,9 +208,50 @@ export function validatePassword(password: string): { valid: boolean; errors: st
 }
 
 // ── 6. ACCOUNT LOCKOUT ───────────────────────────────────────
+// Persistent (backed by the `login_attempts` table) when a supabase client
+// is passed — this table already existed in the schema but nothing wrote
+// to it, so lockout was purely in-memory and reset on every cold start /
+// varied by which serverless instance handled the request. Falls back to
+// in-memory only if Supabase is unreachable.
 const loginAttempts = new Map<string, { count: number; lockedUntil: number }>()
 
-export function checkAccountLockout(identifier: string): { locked: boolean; minutesRemaining: number } {
+// Progressive lockout: 5 fails = 5 min, 10 fails = 30 min, 15+ = 2 hours
+function lockoutMsForCount(count: number): number {
+  if (count >= 15) return 2 * 60 * 60 * 1000
+  if (count >= 10) return 30 * 60 * 1000
+  if (count >= 5) return 5 * 60 * 1000
+  return 0
+}
+
+export async function checkAccountLockout(identifier: string, supabase?: any): Promise<{ locked: boolean; minutesRemaining: number }> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('login_attempts')
+        .select('success, created_at')
+        .eq('identifier', identifier)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (!error && data) {
+        let failCount = 0, lastFailedAt: string | null = null
+        for (const row of data) {
+          if (row.success) break
+          failCount++
+          if (!lastFailedAt) lastFailedAt = row.created_at
+        }
+        const lockMs = lockoutMsForCount(failCount)
+        if (lockMs > 0 && lastFailedAt) {
+          const lockedUntil = new Date(lastFailedAt).getTime() + lockMs
+          if (Date.now() < lockedUntil) {
+            return { locked: true, minutesRemaining: Math.ceil((lockedUntil - Date.now()) / 60000) }
+          }
+        }
+        return { locked: false, minutesRemaining: 0 }
+      }
+    } catch { /* Fall through to memory */ }
+  }
+
+  // In-memory fallback
   const entry = loginAttempts.get(identifier)
   if (!entry) return { locked: false, minutesRemaining: 0 }
   if (Date.now() > entry.lockedUntil) {
@@ -220,24 +261,40 @@ export function checkAccountLockout(identifier: string): { locked: boolean; minu
   return { locked: true, minutesRemaining: Math.ceil((entry.lockedUntil - Date.now()) / 60000) }
 }
 
-export function recordFailedLogin(identifier: string): { locked: boolean; attemptsRemaining: number } {
-  const entry = loginAttempts.get(identifier) || { count: 0, lockedUntil: 0 }
-  entry.count++
-
-  // Progressive lockout: 5 fails = 5 min, 10 fails = 30 min, 15+ = 2 hours
-  if (entry.count >= 15) {
-    entry.lockedUntil = Date.now() + 2 * 60 * 60 * 1000
-  } else if (entry.count >= 10) {
-    entry.lockedUntil = Date.now() + 30 * 60 * 1000
-  } else if (entry.count >= 5) {
-    entry.lockedUntil = Date.now() + 5 * 60 * 1000
+export async function recordFailedLogin(identifier: string, supabase?: any, ipAddress?: string): Promise<{ locked: boolean; attemptsRemaining: number }> {
+  if (supabase) {
+    try {
+      await supabase.from('login_attempts').insert({ identifier, ip_address: ipAddress || null, success: false })
+      const { data, error } = await supabase
+        .from('login_attempts')
+        .select('success, created_at')
+        .eq('identifier', identifier)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (!error && data) {
+        let failCount = 0
+        for (const row of data) { if (row.success) break; failCount++ }
+        return { locked: lockoutMsForCount(failCount) > 0, attemptsRemaining: Math.max(0, 5 - failCount) }
+      }
+    } catch { /* Fall through to memory */ }
   }
 
+  // In-memory fallback
+  const entry = loginAttempts.get(identifier) || { count: 0, lockedUntil: 0 }
+  entry.count++
+  const lockMs = lockoutMsForCount(entry.count)
+  if (lockMs > 0) entry.lockedUntil = Date.now() + lockMs
   loginAttempts.set(identifier, entry)
   return { locked: entry.lockedUntil > Date.now(), attemptsRemaining: Math.max(0, 5 - entry.count) }
 }
 
-export function clearLoginAttempts(identifier: string) {
+export async function clearLoginAttempts(identifier: string, supabase?: any) {
+  if (supabase) {
+    try {
+      await supabase.from('login_attempts').insert({ identifier, success: true })
+      return
+    } catch { /* Fall through to memory */ }
+  }
   loginAttempts.delete(identifier)
 }
 

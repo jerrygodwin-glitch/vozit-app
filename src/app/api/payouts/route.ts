@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { PAYOUT_PROVIDERS, validatePayoutRequest, calculateAvailableBalance, executePayout, type PayoutProvider } from '@/lib/payouts'
 import { fullPayoutScreening, logScreeningResult, type ScreeningResult } from '@/lib/ofac-screening'
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     // Get earnings for 7-day hold calculation
     const { data: earnings } = await supabase
       .from('earnings')
-      .select('amount, created_at, paid_out')
+      .select('id, amount, created_at, paid_out')
       .eq('user_id', user.id)
 
     const balance = calculateAvailableBalance(earnings || [])
@@ -68,6 +68,14 @@ export async function POST(req: NextRequest) {
     const supabase = createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // payouts/earnings only have SELECT RLS policies (a reporter can see
+    // their own rows, but nothing lets them write to them directly — by
+    // design, since letting a user's own session mark its own payout
+    // "completed" or its own earnings "paid_out" would be a real hole).
+    // Every write to those two tables below goes through the admin client,
+    // gated by this route's own auth check instead of RLS.
+    const admin = createAdminClient()
 
     const body = await req.json()
     const { action, provider, amount, account_details } = body
@@ -138,10 +146,23 @@ export async function POST(req: NextRequest) {
       const p = (provider || profile.payout_provider) as PayoutProvider
       if (!p) return NextResponse.json({ error: 'No payout provider configured' }, { status: 400 })
 
+      // Guard against double-submission: reject if this user already has a
+      // payout in flight instead of letting two concurrent requests both
+      // execute a real transfer.
+      const { data: inFlight } = await supabase
+        .from('payouts')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'processing'])
+        .limit(1)
+      if (inFlight && inFlight.length > 0) {
+        return NextResponse.json({ error: 'A payout is already in progress. Please wait for it to complete.' }, { status: 409 })
+      }
+
       // 1. Calculate available balance (7-day hold enforced)
       const { data: earnings } = await supabase
         .from('earnings')
-        .select('amount, created_at, paid_out')
+        .select('id, amount, created_at, paid_out')
         .eq('user_id', user.id)
       const balance = calculateAvailableBalance(earnings || [])
 
@@ -158,8 +179,8 @@ export async function POST(req: NextRequest) {
         amount,
       })
 
-      // Create payout record (pending)
-      const { data: payout } = await supabase.from('payouts').insert({
+      // Create payout record (pending) — via admin client, see note above
+      const { data: payout } = await admin.from('payouts').insert({
         user_id: user.id,
         amount,
         provider: p,
@@ -168,13 +189,13 @@ export async function POST(req: NextRequest) {
 
       // Log screening result for audit trail
       if (payout) {
-        await logScreeningResult(supabase, user.id, payout.id, screening)
+        await logScreeningResult(admin, user.id, payout.id, screening)
       }
 
       // BLOCKED — sanctions match
       if (screening.blocked) {
         if (payout) {
-          await supabase.from('payouts').update({
+          await admin.from('payouts').update({
             status: 'failed',
           }).eq('id', payout.id)
         }
@@ -189,7 +210,7 @@ export async function POST(req: NextRequest) {
       // MANUAL REVIEW REQUIRED — fuzzy match or enhanced country
       if (screening.requiresManualReview) {
         if (payout) {
-          await supabase.from('payouts').update({
+          await admin.from('payouts').update({
             status: 'pending', // Stays pending until manual review
           }).eq('id', payout.id)
         }
@@ -203,7 +224,7 @@ export async function POST(req: NextRequest) {
 
       // CLEARED — proceed with payout
       if (payout) {
-        await supabase.from('payouts').update({ status: 'processing' }).eq('id', payout.id)
+        await admin.from('payouts').update({ status: 'processing' }).eq('id', payout.id)
       }
 
       // Build account details for provider
@@ -222,29 +243,40 @@ export async function POST(req: NextRequest) {
         ...account_details,
       }
 
-      // Execute payout
-      const result = await executePayout(p, amount, acctDetails)
+      // Execute payout — payout.id doubles as the idempotency key/reference
+      // sent to the provider, so a retried request can't move money twice.
+      if (!payout) return NextResponse.json({ error: 'Failed to create payout record' }, { status: 500 })
+      const result = await executePayout(p, amount, acctDetails, payout.id)
 
       if (result.success) {
         // Mark payout as completed
-        if (payout) {
-          await supabase.from('payouts').update({
-            status: 'completed',
-            transaction_id: result.transactionId,
-            completed_at: new Date().toISOString(),
-          }).eq('id', payout.id)
-        }
+        await admin.from('payouts').update({
+          status: 'completed',
+          transaction_id: result.transactionId,
+          completed_at: new Date().toISOString(),
+        }).eq('id', payout.id)
 
-        // Mark earnings as paid out (oldest first, up to amount)
+        // Mark earnings as paid out (oldest first, up to amount) — this
+        // previously computed `remaining` but never persisted which
+        // earnings were covered, so paid earnings kept counting toward
+        // available balance indefinitely.
         let remaining = amount
         const unpaidEarnings = (earnings || [])
           .filter(e => !e.paid_out && new Date(e.created_at) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
           .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
+        const paidEarningIds: string[] = []
         for (const earning of unpaidEarnings) {
           if (remaining <= 0) break
-          // Would need earning IDs here — simplified
+          paidEarningIds.push(earning.id)
           remaining -= earning.amount
+        }
+        if (paidEarningIds.length > 0) {
+          await admin.from('earnings').update({
+            paid_out: true,
+            payout_id: payout.id,
+            payout_at: new Date().toISOString(),
+          }).in('id', paidEarningIds)
         }
 
         return NextResponse.json({
@@ -257,7 +289,7 @@ export async function POST(req: NextRequest) {
       } else {
         // Payout failed
         if (payout) {
-          await supabase.from('payouts').update({ status: 'failed' }).eq('id', payout.id)
+          await admin.from('payouts').update({ status: 'failed' }).eq('id', payout.id)
         }
         return NextResponse.json({
           error: 'Payout failed',

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import Stripe from 'stripe'
 import { captureError } from '@/lib/monitoring'
+import { fullPayoutScreening, logScreeningResult } from '@/lib/ofac-screening'
+import { createHash } from 'crypto'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-12-18.acacia' })
 
@@ -128,7 +130,7 @@ export async function PATCH(req: NextRequest) {
   const admin = createAdminClient()
   const { data: profile } = await admin
     .from('users')
-    .select('stripe_account_id, pending_payout')
+    .select('stripe_account_id, pending_payout, display_name, country')
     .eq('id', user.id)
     .single()
 
@@ -136,27 +138,75 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe not connected. Complete onboarding first.' }, { status: 400 })
   }
 
-  // Find all cleared payouts
-  const { data: cleared } = await admin
+  // Atomically claim cleared payouts by flipping them to 'processing'. Two
+  // concurrent PATCH calls can both SELECT the same 'cleared' rows, but the
+  // UPDATE...WHERE status='cleared' only lets one of them actually claim
+  // each row — the second claim affects zero rows for anything already
+  // taken, which prevents the same earnings being transferred twice.
+  const { data: claimed, error: claimError } = await admin
     .from('payout_records')
-    .select('*')
+    .update({ status: 'processing' })
     .eq('user_id', user.id)
     .eq('status', 'cleared')
+    .select()
 
-  if (!cleared || cleared.length === 0) {
+  if (claimError) {
+    captureError(claimError, { route: 'PATCH /api/stripe (claim)', userId: user.id })
+    return NextResponse.json({ error: claimError.message }, { status: 500 })
+  }
+
+  if (!claimed || claimed.length === 0) {
     return NextResponse.json({ error: 'No cleared earnings to pay out' }, { status: 400 })
   }
 
   const totalCents = Math.round(
-    cleared.reduce((sum, p) => sum + Number(p.amount_usd), 0) * 100
+    claimed.reduce((sum, p) => sum + Number(p.amount_usd), 0) * 100
   )
 
-  // Minimum payout threshold: $10
+  // Minimum payout threshold: $10 — release the claim so it doesn't get
+  // stuck in 'processing' forever if the total doesn't clear the minimum.
   if (totalCents < 1000) {
+    await admin.from('payout_records').update({ status: 'cleared' }).in('id', claimed.map(p => p.id))
     return NextResponse.json({
       error: 'Minimum payout is $10. Current cleared: $' + (totalCents / 100).toFixed(2),
     }, { status: 400 })
   }
+
+  // OFAC sanctions screening — mandatory before any real transfer. This was
+  // previously only enforced on the /api/payouts path; this route could
+  // move real money with zero compliance check.
+  const screening = await fullPayoutScreening({
+    fullName: profile.display_name || user.email || '',
+    countryCode: profile.country || 'US',
+    amount: totalCents / 100,
+  })
+  await logScreeningResult(admin, user.id, claimed[0].id, screening)
+
+  if (screening.blocked) {
+    await admin.from('payout_records').update({ status: 'failed' }).in('id', claimed.map(p => p.id))
+    return NextResponse.json({
+      error: 'Payout blocked by compliance screening.',
+      reason: screening.reason,
+      screeningId: screening.screeningId,
+    }, { status: 403 })
+  }
+
+  if (screening.requiresManualReview) {
+    await admin.from('payout_records').update({ status: 'cleared' }).in('id', claimed.map(p => p.id))
+    return NextResponse.json({
+      ok: true,
+      status: 'pending_review',
+      message: 'Your payout is pending compliance review. This usually takes 1-2 business days.',
+      screeningId: screening.screeningId,
+    })
+  }
+
+  // Idempotency key derived from the claimed payout_record ids — a client
+  // retry of the exact same claimed batch reuses the same key, so Stripe
+  // itself also refuses to execute the transfer twice.
+  const idempotencyKey = 'vz_stripe_' + createHash('sha256')
+    .update(claimed.map(p => p.id).sort().join(','))
+    .digest('hex').slice(0, 40)
 
   try {
     // Create transfer to connected account
@@ -166,22 +216,21 @@ export async function PATCH(req: NextRequest) {
       destination: profile.stripe_account_id,
       metadata: {
         vozit_user_id: user.id,
-        payout_ids: cleared.map(p => p.id).join(','),
+        payout_ids: claimed.map(p => p.id).join(','),
       },
-    })
+    }, { idempotencyKey })
 
     // Mark payouts as paid
     await admin
       .from('payout_records')
       .update({ status: 'paid', stripe_transfer_id: transfer.id })
-      .in('id', cleared.map(p => p.id))
+      .in('id', claimed.map(p => p.id))
 
     // Update user's pending_payout
     await admin
       .from('users')
       .update({
         pending_payout: Math.max(0, (profile.pending_payout ?? 0) - totalCents / 100),
-        total_earned: admin.rpc ? undefined : undefined, // total_earned stays
       })
       .eq('id', user.id)
 
@@ -189,15 +238,17 @@ export async function PATCH(req: NextRequest) {
       ok: true,
       amount_usd: totalCents / 100,
       transfer_id: transfer.id,
-      payouts_cleared: cleared.length,
+      payouts_cleared: claimed.length,
     })
   } catch (e: any) {
     captureError(e, { route: 'PATCH /api/stripe', userId: user.id })
-    // Mark payouts as failed
+    // Release the claim back to 'cleared' so the reporter can retry,
+    // rather than leaving these payouts permanently marked 'failed'
+    // for what may have been a transient Stripe error.
     await admin
       .from('payout_records')
-      .update({ status: 'failed' })
-      .in('id', cleared.map(p => p.id))
+      .update({ status: 'cleared' })
+      .in('id', claimed.map(p => p.id))
 
     return NextResponse.json({ error: 'Transfer failed: ' + e.message }, { status: 500 })
   }

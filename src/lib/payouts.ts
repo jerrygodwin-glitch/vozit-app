@@ -89,7 +89,7 @@ const REVENUE_SHARE: Record<ReporterTier, number> = {
 
 // 7-DAY HOLD: Calculate available balance
 export function calculateAvailableBalance(earnings: Array<{
-  amount: number; created_at: string; paid_out: boolean
+  id: string; amount: number; created_at: string; paid_out: boolean
 }>): { available: number; pending: number; total: number } {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   let available = 0, pending = 0, total = 0
@@ -103,7 +103,7 @@ export function calculateAvailableBalance(earnings: Array<{
 }
 
 export function calculateReporterShare(grossRevenue: number, tier: ReporterTier): number {
-  return Math.round(grossRevenue * (REVENUE_SHARE[tier] || 0.45) * 100) / 100
+  return Math.round(grossRevenue * (REVENUE_SHARE[tier] || 0.50) * 100) / 100
 }
 
 export function validatePayoutRequest(amount: number, provider: PayoutProvider, availableBalance: number): { valid: boolean; error?: string } {
@@ -115,8 +115,11 @@ export function validatePayoutRequest(amount: number, provider: PayoutProvider, 
 }
 
 // ── PROVIDER EXECUTION ───────────────────────────────────────────────
+// payoutId is OUR stable payout_records/payouts row id — used as the
+// idempotency key/reference with every provider so a retried or
+// double-submitted request can't move money twice for the same payout.
 export async function executePayout(
-  provider: PayoutProvider, amount: number, accountDetails: any
+  provider: PayoutProvider, amount: number, accountDetails: any, payoutId: string
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   switch (provider) {
 
@@ -129,7 +132,7 @@ export async function executePayout(
           amount: Math.round(amount * 100), currency: 'usd',
           destination: accountDetails.stripe_account_id,
           description: 'VozIt reporter payout',
-        })
+        }, { idempotencyKey: `vz_payout_${payoutId}` })
         return { success: true, transactionId: transfer.id }
       } catch (e: any) { return { success: false, error: e.message } }
     }
@@ -141,7 +144,7 @@ export async function executePayout(
         const res = await fetch(`https://api.payoneer.com/v4/programs/${process.env.PAYONEER_PROGRAM_ID}/payouts`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${process.env.PAYONEER_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payee_id: accountDetails.payoneer_id, amount, currency: 'USD', description: 'VozIt payout' }),
+          body: JSON.stringify({ payee_id: accountDetails.payoneer_id, amount, currency: 'USD', description: 'VozIt payout', client_reference_id: `VZ_${payoutId}` }),
         })
         const data = await res.json()
         return { success: res.ok, transactionId: data.payout_id, error: data.error }
@@ -159,7 +162,7 @@ export async function executePayout(
             account_bank: accountDetails.bank_code,
             account_number: accountDetails.account_number || accountDetails.mobile_number,
             amount, currency: accountDetails.currency || 'USD',
-            narration: 'VozIt payout', reference: `VZ_FW_${Date.now()}`,
+            narration: 'VozIt payout', reference: `VZ_FW_${payoutId}`,
           }),
         })
         const data = await res.json()
@@ -206,7 +209,7 @@ export async function executePayout(
           method: 'POST', headers,
           body: JSON.stringify({
             targetAccount: recipientId, quoteUuid: quote.id,
-            customerTransactionId: `VZ_WISE_${Date.now()}`,
+            customerTransactionId: `VZ_WISE_${payoutId}`,
             details: { reference: 'VozIt reporter payout' },
           }),
         })
@@ -244,7 +247,7 @@ export async function executePayout(
           headers: { 'Authorization': `Bearer ${auth.access_token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sender_batch_header: {
-              sender_batch_id: `VZ_PP_${Date.now()}`,
+              sender_batch_id: `VZ_PP_${payoutId}`,
               email_subject: 'VozIt Reporter Payout',
               email_message: 'Your VozIt earnings are here!',
             },
@@ -253,7 +256,7 @@ export async function executePayout(
               amount: { value: amount.toFixed(2), currency: 'USD' },
               receiver: accountDetails.paypal_email,
               note: 'VozIt reporter payout',
-              sender_item_id: `VZ_${Date.now()}`,
+              sender_item_id: `VZ_${payoutId}`,
             }],
           }),
         })
@@ -270,12 +273,16 @@ export async function executePayout(
     case 'crypto': {
       if (!process.env.CIRCLE_API_KEY) return { success: false, error: 'Crypto payouts not configured' }
       try {
-        // Circle Payouts API for USDC
-        const res = await fetch('https://payout-sandbox.circle.com/v1/payouts', {
+        // Circle Payouts API for USDC. Sandbox must be opted into explicitly —
+        // previously this always hit the sandbox regardless of environment,
+        // so a "successful" payout never actually moved real money.
+        const circleBaseUrl = process.env.CIRCLE_MODE === 'sandbox'
+          ? 'https://payout-sandbox.circle.com' : 'https://api.circle.com'
+        const res = await fetch(`${circleBaseUrl}/v1/payouts`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${process.env.CIRCLE_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            idempotencyKey: `VZ_CRYPTO_${Date.now()}`,
+            idempotencyKey: payoutId,
             source: { type: 'wallet', id: process.env.CIRCLE_WALLET_ID },
             destination: {
               type: 'blockchain',
@@ -302,7 +309,7 @@ export async function executePayout(
             recipient: accountDetails.chipper_tag || accountDetails.phone_number,
             amount, currency: accountDetails.currency || 'USD',
             narration: 'VozIt reporter payout',
-            reference: `VZ_CH_${Date.now()}`,
+            reference: `VZ_CH_${payoutId}`,
           }),
         })
         const data = await res.json()
@@ -328,7 +335,7 @@ export async function executePayout(
               mobile: accountDetails.phone_number,
               bankAccount: accountDetails.bank_account,
             },
-            reference: `VZ_WR_${Date.now()}`,
+            reference: `VZ_WR_${payoutId}`,
           }),
         })
         const data = await res.json()

@@ -4,7 +4,27 @@ import{useState}from'react'
 import Link from'next/link'
 const TC:Record<string,{c:string,bg:string,l:string}>={starter:{c:'#22C55E',bg:'#ECFDF5',l:'Starter'},silver:{c:'#94A3B8',bg:'#F0F4F8',l:'Silver'},gold:{c:'#EAB308',bg:'#FFF8E6',l:'Gold'},platinum:{c:'#8B5CF6',bg:'#F5F0FF',l:'Platinum'}}
 const REGIONS=['America','Europe','Middle East','Asia','Africa']
-export function FeedClient({reports}:{reports:any[]}){
+export function FeedClient({reports:initialReports,pageSize=30}:{reports:any[],pageSize?:number}){
+  const[reports,setReports]=useState(initialReports)
+  const[loading,setLoading]=useState(false)
+  const[hasMore,setHasMore]=useState(initialReports.length>=pageSize)
+
+  async function loadMore(){
+    if(loading)return
+    setLoading(true)
+    try{
+      const res=await fetch(`/api/reports?limit=${pageSize}&offset=${reports.length}`)
+      const data=await res.json()
+      const more=data.reports||[]
+      // New pages aren't run through the series-collapsing pass the initial
+      // server-rendered page does, so a multi-part story past the first
+      // page may show its individual updates instead of one collapsed card.
+      setReports(prev=>[...prev,...more])
+      if(more.length<pageSize)setHasMore(false)
+    }catch{setHasMore(false)}
+    setLoading(false)
+  }
+
   // Location text rarely spells out the continent name literally (e.g. "Kharkiv,
   // Ukraine" won't match "Europe"), so anything that doesn't match a region falls
   // into a catch-all instead of silently disappearing from the feed.
@@ -36,5 +56,10 @@ export function FeedClient({reports}:{reports:any[]}){
         </Link>
       )}):<div style={{padding:'16px 12px',fontSize:13,color:'#999',textAlign:'center'}}>No reports yet from this region</div>}
     </div>)})}
+    {hasMore&&<div style={{textAlign:'center',padding:'16px 12px'}}>
+      <button onClick={loadMore} disabled={loading} style={{padding:'10px 24px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#333',fontSize:13,fontWeight:600,cursor:loading?'default':'pointer',fontFamily:'inherit',opacity:loading?0.5:1}}>
+        {loading?'Loading...':'Load more'}
+      </button>
+    </div>}
   </div>)
 }

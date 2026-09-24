@@ -1,16 +1,23 @@
-export const dynamic = 'force-dynamic'
-import { createServerClient } from '@/lib/supabase-server'
+// Cache the feed for 30s instead of hitting Supabase on every single view —
+// this was previously force-dynamic AND used the cookie-bound server client,
+// and reading cookies makes Next.js skip caching entirely regardless of any
+// revalidate setting. The feed shows public, published reports only (no
+// per-user data), so it uses the plain non-cookie client below instead,
+// which is what actually makes the cache take effect.
+export const revalidate = 30
+import { supabase } from '@/lib/supabase'
 import { Top, Nav } from '@/lib/ui'
 import { FeedClient } from '@/components/feed/FeedClient'
 
+const FEED_PAGE_SIZE = 30
+
 export default async function Feed() {
-  const supabase = createServerClient()
   const { data } = await supabase
     .from('reports')
     .select('*, user:users(id, username, display_name, tier, credibility_score)')
     .eq('status', 'published')
     .order('created_at', { ascending: false })
-    .limit(100)
+    .limit(FEED_PAGE_SIZE)
 
   const reports = data || []
 
@@ -39,7 +46,7 @@ export default async function Feed() {
   return (
     <div className="page" style={{ background: '#fff' }}>
       <Top />
-      <FeedClient reports={collapsed} />
+      <FeedClient reports={collapsed} pageSize={FEED_PAGE_SIZE} />
       <Nav active="/feed" />
     </div>
   )
