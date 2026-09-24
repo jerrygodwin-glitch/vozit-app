@@ -1,8 +1,32 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Top } from '@/lib/ui'
+import { createBrowserClient } from '@/lib/supabase'
+
+// Compact country list grouped by which providers actually serve them —
+// enough to smart-default without building a full 195-country picker.
+// Matches PAYOUT_PROVIDERS' own `regions` arrays in src/lib/payouts.ts.
+const COUNTRIES = [
+  { code: 'US', label: 'United States' }, { code: 'CA', label: 'Canada' }, { code: 'GB', label: 'United Kingdom' },
+  { code: 'EU', label: 'European Union' }, { code: 'AU', label: 'Australia' }, { code: 'NZ', label: 'New Zealand' },
+  { code: 'JP', label: 'Japan' }, { code: 'SG', label: 'Singapore' }, { code: 'HK', label: 'Hong Kong' },
+  { code: 'NG', label: 'Nigeria' }, { code: 'KE', label: 'Kenya' }, { code: 'GH', label: 'Ghana' },
+  { code: 'ZA', label: 'South Africa' }, { code: 'TZ', label: 'Tanzania' }, { code: 'UG', label: 'Uganda' },
+  { code: 'RW', label: 'Rwanda' }, { code: 'CI', label: "Côte d'Ivoire" }, { code: 'SN', label: 'Senegal' },
+  { code: 'CM', label: 'Cameroon' }, { code: 'EG', label: 'Egypt' },
+  { code: 'IN', label: 'India' }, { code: 'BR', label: 'Brazil' }, { code: 'MX', label: 'Mexico' },
+  { code: 'PH', label: 'Philippines' }, { code: 'ID', label: 'Indonesia' }, { code: 'UA', label: 'Ukraine' },
+  { code: 'other', label: 'Other / not listed' },
+]
+
+function suggestProviderIds(country: string): string[] {
+  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK'].includes(country)) return ['stripe', 'paypal', 'wise']
+  if (['NG', 'KE', 'GH', 'ZA', 'TZ', 'UG', 'RW', 'CI', 'SN', 'CM', 'EG'].includes(country)) return ['flutterwave', 'chipper', 'worldremit']
+  return ['wise', 'paypal', 'crypto']
+}
 
 export default function Payouts() {
+  const sb = createBrowserClient()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [connecting, setConnecting] = useState<string | null>(null)
@@ -11,6 +35,8 @@ export default function Payouts() {
   const [amount, setAmount] = useState('')
   const [payoutMsg, setPayoutMsg] = useState('')
   const [payoutLoading, setPayoutLoading] = useState(false)
+  const [showAllProviders, setShowAllProviders] = useState(false)
+  const [settingCountry, setSettingCountry] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -22,6 +48,15 @@ export default function Payouts() {
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  async function setCountry(country: string) {
+    setSettingCountry(true)
+    try {
+      const { data: { user } } = await sb.auth.getUser()
+      if (user) await sb.from('users').update({ country }).eq('id', user.id)
+      await load()
+    } finally { setSettingCountry(false) }
+  }
 
   async function connect(providerId: string) {
     setConnectMsg('')
@@ -76,6 +111,11 @@ export default function Payouts() {
 
   const providers = data?.availableProviders || []
   const connectedProvider = data?.provider
+  const country = data?.country
+  const suggestedIds = country ? suggestProviderIds(country) : []
+  const suggested = providers.filter((p: any) => suggestedIds.includes(p.id))
+  const others = providers.filter((p: any) => !suggestedIds.includes(p.id))
+  const providersToShow = country && !showAllProviders ? suggested : providers
 
   return (
     <div className="page"><Top />
@@ -107,9 +147,25 @@ export default function Payouts() {
           </div>
         )}
 
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Payout providers</div>
+        {!country && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Where are you located?</div>
+            <div style={{ fontSize: 11, color: '#666', marginBottom: 10 }}>So we can show the payout methods that actually work where you are.</div>
+            <select onChange={e => e.target.value && setCountry(e.target.value)} disabled={settingCountry} defaultValue="" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }}>
+              <option value="" disabled>Select your country...</option>
+              {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{country && !showAllProviders ? 'Recommended for you' : 'Payout providers'}</div>
+          {country && suggested.length > 0 && others.length > 0 && (
+            <span onClick={() => setShowAllProviders(s => !s)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>{showAllProviders ? 'Show recommended only' : 'Show all methods'}</span>
+          )}
+        </div>
         {connectMsg && <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 10 }}>{connectMsg}</div>}
-        {providers.map((p: any) => (
+        {providersToShow.map((p: any) => (
           <div key={p.id} className="card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 28, width: 36, textAlign: 'center' }}>{p.icon}</span>

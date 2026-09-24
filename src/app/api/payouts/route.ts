@@ -47,13 +47,14 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       provider: profile?.payout_provider || null,
+      country: profile?.country || null,
       balance,
       tier: profile?.tier || 'starter',
       payouts: payouts || [],
       lastScreening: lastScreening || null,
       availableProviders: Object.entries(PAYOUT_PROVIDERS).map(([id, p]) => ({
         id, name: p.name, icon: p.icon, description: p.description,
-        minPayout: p.minPayout, methods: p.methods,
+        minPayout: p.minPayout, methods: p.methods, regions: p.regions,
       })),
     })
   } catch (e: any) {
