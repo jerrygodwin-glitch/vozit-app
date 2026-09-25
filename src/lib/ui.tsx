@@ -1,5 +1,8 @@
 'use client'
 import { createClient } from '@supabase/supabase-js'
+import { useAuth } from '@/hooks/useAuth'
+
+const TIER_COLOR: Record<string, string> = { starter: '#22C55E', silver: '#64748B', gold: '#CA8A04', platinum: '#7C3AED' }
 
 export const sb = createClient(
   'https://mfanqkbhegxppyitxtye.supabase.co',
@@ -48,6 +51,7 @@ export function Nav({ active }: { active?: string }) {
 }
 
 export function Top() {
+  const { user, loading } = useAuth()
   return (
     <header style={{
       background: 'linear-gradient(to right, #70b8e0, #50b0e8 30%, #18a0e8 60%, #0a3ff1)',
@@ -59,11 +63,26 @@ export function Top() {
         <span style={{ color: '#fff', fontSize: 20, fontWeight: 700 }}>VozIt!</span>
         <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontStyle: 'italic' }}>I was there...</span>
       </a>
-      <a href="/auth/login" className="btn btn-sm" style={{
-        background: 'rgba(255,255,255,0.2)', color: '#fff',
-        border: '1px solid rgba(255,255,255,0.3)',
-        fontSize: 13, fontWeight: 600, padding: '6px 16px',
-      }}>Sign in</a>
+      {loading ? null : user ? (
+        <a href="/settings" style={{
+          display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+          background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)',
+          borderRadius: 20, padding: '4px 12px 4px 4px',
+        }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: 11, background: TIER_COLOR[user.tier || 'starter'] || TIER_COLOR.starter,
+            color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{(user.display_name || user.username || '?').slice(0, 2).toUpperCase()}</span>
+          <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>@{user.username}</span>
+          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, textTransform: 'capitalize' }}>{user.tier || 'starter'}</span>
+        </a>
+      ) : (
+        <a href="/auth/login" className="btn btn-sm" style={{
+          background: 'rgba(255,255,255,0.2)', color: '#fff',
+          border: '1px solid rgba(255,255,255,0.3)',
+          fontSize: 13, fontWeight: 600, padding: '6px 16px',
+        }}>Sign in</a>
+      )}
     </header>
   )
 }

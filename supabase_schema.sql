@@ -74,6 +74,8 @@ CREATE TABLE public.reports (
   share_count       INT NOT NULL DEFAULT 0,
   is_ai_flagged     BOOLEAN NOT NULL DEFAULT false,
   gps_verified      BOOLEAN NOT NULL DEFAULT false,
+  category          TEXT NOT NULL DEFAULT 'other'
+                      CHECK (category IN ('justice','politics','economy','environment','entertainment','other')),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -82,6 +84,7 @@ CREATE INDEX idx_reports_status ON public.reports(status, created_at DESC);
 CREATE INDEX idx_reports_user ON public.reports(user_id);
 CREATE INDEX idx_reports_series ON public.reports(series_id);
 CREATE INDEX idx_reports_assignment ON public.reports(assignment_id);
+CREATE INDEX idx_reports_category ON public.reports(category);
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- VOTES

@@ -33,6 +33,7 @@ const[step,setStep]=useState<Step>('record')
 const[title,setTitle]=useState('')
 const[notes,setNotes]=useState('')
 const[fiveW,setFiveW]=useState<FiveWs>({who:'',what:'',where_text:'',when_happened:'',why:''})
+const[category,setCategory]=useState('other')
 const[gps,setGps]=useState<{lat:number;lng:number}|null>(null)
 const[aiSuggestion,setAiSuggestion]=useState<AISuggestion|null>(null)
 const[analyzing,setAnalyzing]=useState(false)
@@ -172,6 +173,7 @@ async function submitReport(){
       body:JSON.stringify({
         title,
         ...fiveW,
+        category,
         location_lat:gps?.lat,location_lng:gps?.lng,
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
@@ -379,6 +381,18 @@ if(step==='review')return(<div style={{minHeight:'100vh',background:'#f5f5f5'}}>
 <div style={{fontSize:16,fontWeight:600,color:'#1a1a1a'}}>{title}</div>
 </div>
 
+<div style={{background:'#fff',borderRadius:12,padding:16,border:'1px solid #eee',marginBottom:12}}>
+<div style={{fontSize:11,color:'#888',marginBottom:6}}>Category</div>
+<select value={category} onChange={e=>setCategory(e.target.value)} style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #ddd',fontSize:13,outline:'none',fontFamily:'inherit',background:'#fff'}}>
+<option value="justice">Justice</option>
+<option value="politics">Politics</option>
+<option value="economy">Economy</option>
+<option value="environment">Environment</option>
+<option value="entertainment">Entertainment</option>
+<option value="other">Other</option>
+</select>
+</div>
+
 {wConfig.map(w=>{
   const hasAI=aiSuggestion&&aiSuggestion.suggested[w.key]
   const conf=aiSuggestion?.confidence[w.key]||0
@@ -449,7 +463,7 @@ return(<div style={{minHeight:'100vh',background:'#fff',display:'flex',alignItem
 <a href={`/upload?update_to=${reportId}&update_to_title=${encodeURIComponent(title)}`} style={{display:'inline-block',padding:'10px 20px',borderRadius:8,border:'1px solid #FED7AA',background:'#FEF3E6',color:'#B53D0F',fontSize:13,fontWeight:600,textDecoration:'none',fontFamily:'inherit'}}>🔴 Still unfolding? Post an update</a>
 </div>}
 <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
+<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setCategory('other');setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
 <a href="/feed" style={{padding:'10px 20px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#666',fontSize:13,fontWeight:500,textDecoration:'none',fontFamily:'inherit'}}>Go to feed</a>
 </div>
 </div>

@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const supabase = createServerClient()
     const url = new URL(req.url)
     const region = url.searchParams.get('region')
+    const category = url.searchParams.get('category')
     const sort = url.searchParams.get('sort') || 'recent' // recent | trending | top | credible
     const limit = parseInt(url.searchParams.get('limit') || '20')
     const offset = parseInt(url.searchParams.get('offset') || '0')
@@ -29,6 +30,10 @@ export async function GET(req: NextRequest) {
 
     if (region) {
       query = query.ilike('location_name', `%${region}%`)
+    }
+
+    if (category && category !== 'all') {
+      query = query.eq('category', category)
     }
 
     if (q) {
@@ -71,9 +76,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id } = body
+    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category } = body
 
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 })
+
+    const CATEGORIES = ['justice', 'politics', 'economy', 'environment', 'entertainment', 'other']
+    const categoryClean = CATEGORIES.includes(category) ? category : 'other'
 
     // Posting an update to an earlier report — link them via series_id/series_part
     // so the feed and report page can show them as one unfolding story instead of
@@ -151,6 +159,7 @@ export async function POST(req: NextRequest) {
       location_name: locationNameClean,
       location_lat: location_lat || null,
       location_lng: location_lng || null,
+      category: categoryClean,
       mux_upload_id: mux_upload_id || null,
       content_hash: content_hash || null,
       series_id: seriesId,

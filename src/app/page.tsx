@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { LOGO } from '@/lib/ui'
 
 const G = 'https://www.google.com/s2/favicons?domain=DOMAIN&sz=128'
@@ -13,17 +14,21 @@ const TABS = [
   { l: 'About', h: '#about' },
 ]
 const REPORTS = [
-  { id: '1', t: 'Shelling hits residential area in Saltivka', loc: 'Kharkiv, Ukraine', u: 'olena_k', tier: 'platinum', up: 847, cred: 98, dur: 67, time: '2h ago', region: 'Europe' },
-  { id: '2', t: 'Protesters block main highway', loc: 'Caracas, Venezuela', u: 'maria_vzla', tier: 'gold', up: 412, cred: 93, dur: 45, time: '4h ago', region: 'Americas' },
-  { id: '3', t: 'Flash flooding destroys bridge', loc: 'Bihar, India', u: 'ravi_reports', tier: 'silver', up: 234, cred: 89, dur: 52, time: '6h ago', region: 'Asia' },
-  { id: '6', t: 'Aid convoy blocked at border crossing', loc: 'Rafah, Gaza', u: 'ahmad_gz', tier: 'gold', up: 1203, cred: 96, dur: 88, time: '1h ago', region: 'Middle East' },
-  { id: '4', t: 'Police teargas at student march', loc: 'Nairobi, Kenya', u: 'chidi_nbo', tier: 'starter', up: 156, cred: 85, dur: 38, time: '8h ago', region: 'Africa' },
-  { id: '5', t: 'Wildfire approaches residential zone', loc: 'Valparaiso, Chile', u: 'pablo_cl', tier: 'silver', up: 198, cred: 91, dur: 72, time: '12h ago', region: 'Americas' },
+  { id: '1', t: 'Shelling hits residential area in Saltivka', loc: 'Kharkiv, Ukraine', u: 'olena_k', tier: 'platinum', up: 847, cred: 98, dur: 67, time: '2h ago', region: 'Europe', category: 'Politics' },
+  { id: '2', t: 'Protesters block main highway', loc: 'Caracas, Venezuela', u: 'maria_vzla', tier: 'gold', up: 412, cred: 93, dur: 45, time: '4h ago', region: 'Americas', category: 'Politics' },
+  { id: '3', t: 'Flash flooding destroys bridge', loc: 'Bihar, India', u: 'ravi_reports', tier: 'silver', up: 234, cred: 89, dur: 52, time: '6h ago', region: 'Asia', category: 'Environment' },
+  { id: '6', t: 'Aid convoy blocked at border crossing', loc: 'Rafah, Gaza', u: 'ahmad_gz', tier: 'gold', up: 1203, cred: 96, dur: 88, time: '1h ago', region: 'Middle East', category: 'Politics' },
+  { id: '4', t: 'Police teargas at student march', loc: 'Nairobi, Kenya', u: 'chidi_nbo', tier: 'starter', up: 156, cred: 85, dur: 38, time: '8h ago', region: 'Africa', category: 'Justice' },
+  { id: '5', t: 'Wildfire approaches residential zone', loc: 'Valparaiso, Chile', u: 'pablo_cl', tier: 'silver', up: 198, cred: 91, dur: 72, time: '12h ago', region: 'Americas', category: 'Environment' },
 ]
 const TC: any = { starter: { c: '#22C55E', l: 'Starter' }, silver: { c: '#64748B', l: 'Silver' }, gold: { c: '#CA8A04', l: 'Gold' }, platinum: { c: '#7C3AED', l: 'Platinum' } }
 const REGIONS = ['Americas', 'Europe', 'Middle East', 'Africa', 'Asia']
+const CATEGORIES = ['Justice', 'Politics', 'Economy', 'Environment', 'Entertainment']
 
 export default function Landing() {
+  const [groupBy, setGroupBy] = useState<'location' | 'category'>('location')
+  const groups = groupBy === 'location' ? REGIONS : CATEGORIES
+  const groupKey = groupBy === 'location' ? 'region' : 'category'
   return (
     <div style={{ minHeight: '100vh', background: '#fff' }}>
       {/* TOP BAR */}
@@ -73,21 +78,21 @@ export default function Landing() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700 }}>Latest Reports</h2>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-sm" style={{ background: '#FE3D07', color: '#fff', border: 'none', fontSize: 11 }}>by Location</button>
-              <button className="btn btn-sm" style={{ background: '#fff', color: '#0a8fe8', border: '1px solid #eee', fontSize: 11 }}>by Category</button>
+              <button onClick={() => setGroupBy('location')} className="btn btn-sm" style={groupBy === 'location' ? { background: '#FE3D07', color: '#fff', border: 'none', fontSize: 11 } : { background: '#fff', color: '#0a8fe8', border: '1px solid #eee', fontSize: 11 }}>by Location</button>
+              <button onClick={() => setGroupBy('category')} className="btn btn-sm" style={groupBy === 'category' ? { background: '#FE3D07', color: '#fff', border: 'none', fontSize: 11 } : { background: '#fff', color: '#0a8fe8', border: '1px solid #eee', fontSize: 11 }}>by Category</button>
             </div>
           </div>
 
-          {REGIONS.map(region => {
-            const regionReports = REPORTS.filter(r => r.region === region)
-            if (!regionReports.length) return null
+          {groups.map(group => {
+            const groupReports = REPORTS.filter(r => (r as any)[groupKey] === group)
+            if (!groupReports.length) return null
             return (
-              <div key={region} style={{ marginBottom: 20 }}>
+              <div key={group} style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px 0 14px', background: '#D63006', borderRadius: 6, height: 32, marginBottom: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{region}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{group}</span>
                   <a href="/upload" className="btn btn-sm" style={{ background: '#fff', color: '#0a8fe8', border: 'none', fontSize: 10, fontWeight: 700 }}>Contribute</a>
                 </div>
-                {regionReports.map(r => {
+                {groupReports.map(r => {
                   const t = TC[r.tier]
                   return (
                     <div key={r.id} style={{ display: 'flex', borderBottom: '1px solid #f0f0f0', marginBottom: 4 }}>
