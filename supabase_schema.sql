@@ -113,6 +113,8 @@ CREATE TABLE public.tasks (
   claimed_by               UUID REFERENCES public.users(id),
   report_id                UUID REFERENCES public.reports(id),
   stripe_payment_intent_id TEXT,
+  review_feedback          TEXT,
+  reviewed_at              TIMESTAMPTZ,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

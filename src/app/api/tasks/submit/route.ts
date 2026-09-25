@@ -4,13 +4,8 @@ import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { captureError } from '@/lib/monitoring'
 
 // POST /api/tasks/submit — a reporter attaches their published report to a
-// task they claimed. Fully automated by design (per how this was scoped):
-// there's no manual review step here — submitting immediately marks the
-// task completed and pays the reward. The tradeoff is real: nothing here
-// checks that the footage actually satisfies the request beyond it being a
-// real, published (already-moderated) report. If abuse becomes an issue,
-// the natural fix is a review step between 'submitted' and 'completed'
-// rather than paying out the instant a report is attached.
+// task they claimed. Moves the task to 'submitted' for the creator to
+// review (see /api/tasks/review) — payment only fires once they approve it.
 export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    const { data: task } = await admin.from('tasks').select('id, claimed_by, status, reward_usd').eq('id', task_id).single()
+    const { data: task } = await admin.from('tasks').select('id, claimed_by, status').eq('id', task_id).single()
     if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     if (task.claimed_by !== user.id) return NextResponse.json({ error: 'You have not claimed this task' }, { status: 403 })
     if (task.status !== 'claimed') return NextResponse.json({ error: `This task is ${task.status}, not claimed` }, { status: 400 })
@@ -32,29 +27,19 @@ export async function POST(req: NextRequest) {
     if (report.user_id !== user.id) return NextResponse.json({ error: 'That report is not yours' }, { status: 403 })
     if (report.status !== 'published') return NextResponse.json({ error: 'That report has not published yet' }, { status: 400 })
 
-    // Claim-then-complete in one conditional update — if this task somehow
-    // got completed between the check above and here, this update matches
-    // zero rows instead of paying out twice.
-    const { data: completed, error } = await admin
+    // Conditional update — if this task somehow changed state between the
+    // check above and here, this matches zero rows instead of clobbering it.
+    const { data: submitted, error } = await admin
       .from('tasks')
-      .update({ status: 'completed', report_id })
+      .update({ status: 'submitted', report_id, review_feedback: null })
       .eq('id', task_id)
       .eq('status', 'claimed')
       .select()
       .single()
 
-    if (error || !completed) return NextResponse.json({ error: 'This task is no longer available to submit' }, { status: 409 })
+    if (error || !submitted) return NextResponse.json({ error: 'This task is no longer available to submit' }, { status: 409 })
 
-    await admin.from('payout_records').insert({
-      user_id: user.id,
-      amount_usd: task.reward_usd,
-      source: 'task_reward',
-      report_id,
-      task_id,
-      clears_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    })
-
-    return NextResponse.json({ ok: true, reward: task.reward_usd })
+    return NextResponse.json({ ok: true })
   } catch (e: any) {
     captureError(e, { route: 'POST /api/tasks/submit', userId: user.id })
     return NextResponse.json({ error: e.message }, { status: 500 })

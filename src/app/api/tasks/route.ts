@@ -9,7 +9,17 @@ export async function GET(req: NextRequest) {
   if (mine === 'claimed') {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const { data } = await supabase.from('tasks').select('*').eq('claimed_by', user.id).eq('status', 'claimed').order('created_at', { ascending: false })
+    // Includes 'submitted' (awaiting the creator's review) so a reporter
+    // can see that state, and a rejected submission naturally reappears
+    // here too since review sends it back to 'claimed' with feedback.
+    const { data } = await supabase.from('tasks').select('*').eq('claimed_by', user.id).in('status', ['claimed', 'submitted']).order('created_at', { ascending: false })
+    return NextResponse.json({ tasks: data })
+  }
+
+  if (mine === 'review') {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data } = await supabase.from('tasks').select('*, claimer:users!claimed_by(id, username, display_name)').eq('created_by', user.id).eq('status', 'submitted').order('created_at', { ascending: false })
     return NextResponse.json({ tasks: data })
   }
 

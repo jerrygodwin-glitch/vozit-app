@@ -22,6 +22,7 @@ function Tasks() {
   const params = useSearchParams()
   const [tasks, setTasks] = useState<any[]>([])
   const [claimedTasks, setClaimedTasks] = useState<any[]>([])
+  const [reviewTasks, setReviewTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [claiming, setClaiming] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
@@ -31,6 +32,9 @@ function Tasks() {
   const [postErr, setPostErr] = useState('')
   const [submitInput, setSubmitInput] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState<string | null>(null)
+  const [rejectInput, setRejectInput] = useState<Record<string, string>>({})
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [reviewing, setReviewing] = useState<string | null>(null)
 
   useEffect(() => {
     if (params.get('paid')) setMsg('✓ Payment received — your task will appear below shortly.')
@@ -40,14 +44,17 @@ function Tasks() {
   async function load() {
     setLoading(true)
     try {
-      const [openRes, claimedRes] = await Promise.all([
+      const [openRes, claimedRes, reviewRes] = await Promise.all([
         fetch('/api/tasks'),
         fetch('/api/tasks?mine=claimed'),
+        fetch('/api/tasks?mine=review'),
       ])
       const openData = await openRes.json()
       const claimedData = await claimedRes.json()
+      const reviewData = await reviewRes.json()
       setTasks(openData.tasks || [])
       setClaimedTasks(claimedData.tasks || [])
+      setReviewTasks(reviewData.tasks || [])
     } catch {}
     setLoading(false)
   }
@@ -88,9 +95,28 @@ function Tasks() {
       })
       const d = await res.json()
       if (!res.ok) setMsg(d.error || 'Could not submit')
-      else { setMsg(`✓ Submitted — $${Number(d.reward).toFixed(2)} credited to your earnings (7-day hold).`); await load() }
+      else { setMsg('✓ Submitted — the task creator will review it before the reward is paid.'); await load() }
     } catch (e: any) { setMsg(e.message) }
     setSubmitting(null)
+  }
+
+  async function review(taskId: string, decision: 'approve' | 'reject') {
+    if (decision === 'reject' && !rejectInput[taskId]?.trim()) { setRejecting(taskId); return }
+    setReviewing(taskId); setMsg('')
+    try {
+      const res = await fetch('/api/tasks/review', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId, decision, feedback: rejectInput[taskId] }),
+      })
+      const d = await res.json()
+      if (!res.ok) setMsg(d.error || 'Could not submit review')
+      else {
+        setMsg(decision === 'approve' ? '✓ Approved — reward credited to the reporter.' : '✓ Sent back to the reporter with your feedback.')
+        setRejecting(null)
+        await load()
+      }
+    } catch (e: any) { setMsg(e.message) }
+    setReviewing(null)
   }
 
   async function postTask() {
@@ -142,19 +168,55 @@ function Tasks() {
 
         {msg && <div style={{ fontSize: 12, color: msg.startsWith('✓') ? '#065F46' : '#DC2626', marginBottom: 12, padding: 10, borderRadius: 8, background: msg.startsWith('✓') ? '#ECFDF5' : '#FEF2F2' }}>{msg}</div>}
 
+        {reviewTasks.length > 0 && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Submissions to review</div>
+            {reviewTasks.map(task => (
+              <div key={task.id} className="card" style={{ padding: 14, marginBottom: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{task.title} — ${Number(task.reward_usd).toFixed(0)}</div>
+                <div style={{ fontSize: 11, color: '#1e40af', marginBottom: 8 }}>Submitted by @{task.claimer?.username || 'reporter'}</div>
+                <a href={`/report/${task.report_id}`} target="_blank" rel="noopener" style={{ fontSize: 12, color: '#0a8fe8', display: 'block', marginBottom: 10 }}>▶ View submitted report</a>
+                {rejecting === task.id ? (
+                  <div>
+                    <textarea value={rejectInput[task.id] || ''} onChange={e => setRejectInput({ ...rejectInput, [task.id]: e.target.value })} placeholder="Explain why this isn't being accepted..." rows={2} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12, fontFamily: 'inherit', marginBottom: 8, resize: 'vertical' }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => review(task.id, 'reject')} disabled={reviewing === task.id} style={{ flex: 1, padding: 8, borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Send back with feedback</button>
+                      <button onClick={() => setRejecting(null)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#666', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => review(task.id, 'approve')} disabled={reviewing === task.id} style={{ flex: 1, padding: 8, borderRadius: 8, border: 'none', background: '#22C55E', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{reviewing === task.id ? '...' : '✓ Approve & pay'}</button>
+                    <button onClick={() => setRejecting(task.id)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #DC2626', background: '#fff', color: '#DC2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Not accepted</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+
         {claimedTasks.length > 0 && (
           <>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Your claimed tasks</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', margin: '16px 0 8px' }}>Your claimed tasks</div>
             {claimedTasks.map(task => (
               <div key={task.id} className="card" style={{ padding: 14, marginBottom: 8, border: '1px solid #FED7AA', background: '#FEF3E6' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{task.title} — ${Number(task.reward_usd).toFixed(0)}</div>
                 <div style={{ fontSize: 11, color: '#92400E', marginBottom: 8 }}>{timeLeft(task.deadline)}</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={submitInput[task.id] || ''} onChange={e => setSubmitInput({ ...submitInput, [task.id]: e.target.value })} placeholder="Paste your published report's URL" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12, fontFamily: 'inherit' }} />
-                  <button onClick={() => submit(task.id)} disabled={submitting === task.id} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#22C55E', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    {submitting === task.id ? '...' : 'Submit'}
-                  </button>
-                </div>
+                {task.status === 'submitted' ? (
+                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>⏳ Submitted — awaiting the creator's review</div>
+                ) : (
+                  <>
+                    {task.review_feedback && (
+                      <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 8, padding: 8, borderRadius: 6, background: '#FEF2F2' }}>⚠️ Not accepted: {task.review_feedback}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input value={submitInput[task.id] || ''} onChange={e => setSubmitInput({ ...submitInput, [task.id]: e.target.value })} placeholder="Paste your published report's URL" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12, fontFamily: 'inherit' }} />
+                      <button onClick={() => submit(task.id)} disabled={submitting === task.id} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#22C55E', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {submitting === task.id ? '...' : task.review_feedback ? 'Resubmit' : 'Submit'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </>
