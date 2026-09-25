@@ -8,6 +8,7 @@ const SOURCE_LABELS: Record<string, { l: string; c: string }> = {
   licensing: { l: 'Licensing', c: '#7C3AED' },
   tip: { l: 'Tips', c: '#CA8A04' },
   assignment_fee: { l: 'Assignment fees', c: '#22C55E' },
+  task_reward: { l: 'Task rewards', c: '#EC4899' },
   other: { l: 'Other', c: '#888' },
 }
 

@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { NavBar, TopBar } from '@/components/ui/NavBar'
 
 function timeLeft(deadline: string) {
@@ -12,8 +13,15 @@ function timeLeft(deadline: string) {
   return `${Math.floor(hours / 24)}d left`
 }
 
-export default function P() {
+function extractReportId(u: string) {
+  const m = u.trim().match(/\/report\/([a-zA-Z0-9-]+)/)
+  return m ? m[1] : u.trim()
+}
+
+function Tasks() {
+  const params = useSearchParams()
   const [tasks, setTasks] = useState<any[]>([])
+  const [claimedTasks, setClaimedTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [claiming, setClaiming] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
@@ -21,17 +29,39 @@ export default function P() {
   const [form, setForm] = useState({ title: '', description: '', location_name: '', reward_usd: '', deadline: '' })
   const [posting, setPosting] = useState(false)
   const [postErr, setPostErr] = useState('')
+  const [submitInput, setSubmitInput] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (params.get('paid')) setMsg('✓ Payment received — your task will appear below shortly.')
+    if (params.get('canceled')) setMsg('Payment canceled — no charge was made.')
+  }, [])
 
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch('/api/tasks')
-      const d = await res.json()
-      setTasks(d.tasks || [])
+      const [openRes, claimedRes] = await Promise.all([
+        fetch('/api/tasks'),
+        fetch('/api/tasks?mine=claimed'),
+      ])
+      const openData = await openRes.json()
+      const claimedData = await claimedRes.json()
+      setTasks(openData.tasks || [])
+      setClaimedTasks(claimedData.tasks || [])
     } catch {}
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // The new task only appears after the webhook processes the payment,
+    // which can land a beat after the redirect back — retry a couple of
+    // times rather than making the reporter manually refresh.
+    if (params.get('paid')) {
+      const t1 = setTimeout(load, 2000)
+      const t2 = setTimeout(load, 5000)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
+    }
+  }, [])
 
   async function claim(taskId: string) {
     setClaiming(taskId); setMsg('')
@@ -42,9 +72,25 @@ export default function P() {
       })
       const d = await res.json()
       if (!res.ok) setMsg(d.error || 'Could not claim task')
-      else { setMsg('✓ Task claimed — go record and submit your report before the deadline.'); await load() }
+      else { setMsg('✓ Task claimed — attach your report below once it\'s published.'); await load() }
     } catch (e: any) { setMsg(e.message) }
     setClaiming(null)
+  }
+
+  async function submit(taskId: string) {
+    const input = submitInput[taskId]
+    if (!input?.trim()) return
+    setSubmitting(taskId); setMsg('')
+    try {
+      const res = await fetch('/api/tasks/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId, report_id: extractReportId(input) }),
+      })
+      const d = await res.json()
+      if (!res.ok) setMsg(d.error || 'Could not submit')
+      else { setMsg(`✓ Submitted — $${Number(d.reward).toFixed(2)} credited to your earnings (7-day hold).`); await load() }
+    } catch (e: any) { setMsg(e.message) }
+    setSubmitting(null)
   }
 
   async function postTask() {
@@ -60,9 +106,7 @@ export default function P() {
       })
       const d = await res.json()
       if (!res.ok) { setPostErr(d.error || 'Could not post task'); return }
-      setForm({ title: '', description: '', location_name: '', reward_usd: '', deadline: '' })
-      setShowForm(false)
-      await load()
+      if (d.checkoutUrl) { window.location.href = d.checkoutUrl; return }
     } catch (e: any) { setPostErr(e.message) }
     setPosting(false)
   }
@@ -81,6 +125,7 @@ export default function P() {
       <div style={{ maxWidth: 600, margin: '0 auto', width: '100%', padding: '12px 16px 60px' }}>
         {showForm && (
           <div className="card" style={{ padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>You'll pay the reward now via Stripe — it's held until a reporter completes the task.</div>
             <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="What do you need covered?" style={{ marginBottom: 8, fontSize: 13 }} />
             <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Details" rows={2} style={{ width: '100%', marginBottom: 8, fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontFamily: 'inherit', resize: 'vertical' }} />
             <input value={form.location_name} onChange={e => setForm({ ...form, location_name: e.target.value })} placeholder="Location" style={{ marginBottom: 8, fontSize: 13 }} />
@@ -90,13 +135,32 @@ export default function P() {
             </div>
             {postErr && <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 8 }}>{postErr}</div>}
             <button onClick={postTask} disabled={posting} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', background: '#22C55E', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: posting ? 0.6 : 1 }}>
-              {posting ? 'Posting...' : 'Post task'}
+              {posting ? 'Redirecting to payment...' : `Pay & post task`}
             </button>
           </div>
         )}
 
         {msg && <div style={{ fontSize: 12, color: msg.startsWith('✓') ? '#065F46' : '#DC2626', marginBottom: 12, padding: 10, borderRadius: 8, background: msg.startsWith('✓') ? '#ECFDF5' : '#FEF2F2' }}>{msg}</div>}
 
+        {claimedTasks.length > 0 && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Your claimed tasks</div>
+            {claimedTasks.map(task => (
+              <div key={task.id} className="card" style={{ padding: 14, marginBottom: 8, border: '1px solid #FED7AA', background: '#FEF3E6' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{task.title} — ${Number(task.reward_usd).toFixed(0)}</div>
+                <div style={{ fontSize: 11, color: '#92400E', marginBottom: 8 }}>{timeLeft(task.deadline)}</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={submitInput[task.id] || ''} onChange={e => setSubmitInput({ ...submitInput, [task.id]: e.target.value })} placeholder="Paste your published report's URL" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12, fontFamily: 'inherit' }} />
+                  <button onClick={() => submit(task.id)} disabled={submitting === task.id} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#22C55E', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {submitting === task.id ? '...' : 'Submit'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', margin: '16px 0 8px' }}>Open tasks</div>
         {loading ? (
           <p style={{ color: '#999', textAlign: 'center', padding: 40, fontSize: 13 }}>Loading...</p>
         ) : tasks.length === 0 ? (
@@ -120,4 +184,8 @@ export default function P() {
       <NavBar active="tasks" />
     </div>
   )
+}
+
+export default function P() {
+  return <Suspense><Tasks /></Suspense>
 }

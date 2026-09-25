@@ -27,6 +27,30 @@ export async function POST(req: NextRequest) {
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object
+
+      // Task-reward payment — the task row itself is only created once
+      // payment actually clears, so someone can't post an unfunded "reward"
+      // that a reporter later claims and completes for nothing.
+      if (session.metadata?.purpose === 'task_creation') {
+        const paymentRef = session.payment_intent || session.id
+        // Idempotency — Stripe can redeliver the same event.
+        const { data: existing } = await admin.from('tasks').select('id').eq('stripe_payment_intent_id', paymentRef).single()
+        if (existing) return NextResponse.json({ ok: true, already: true })
+
+        const m = session.metadata
+        await admin.from('tasks').insert({
+          created_by: m.created_by,
+          title: m.title,
+          description: m.description || '',
+          location_name: m.location_name,
+          reward_usd: Number(m.reward_usd),
+          deadline: m.deadline,
+          status: 'open',
+          stripe_payment_intent_id: paymentRef,
+        })
+        return NextResponse.json({ ok: true })
+      }
+
       const licenseId = session.metadata?.license_id
       if (!licenseId) return NextResponse.json({ ok: true }) // not one of ours
 

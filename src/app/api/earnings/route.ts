@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       ...(payoutRows || []).map(p => ({ id: p.id, amount: Number(p.amount_usd), source: p.source, created_at: p.created_at, origin: 'payout_records' })),
     ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-    const bySource: Record<string, number> = { ad_revenue: 0, licensing: 0, tip: 0, assignment_fee: 0, other: 0 }
+    const bySource: Record<string, number> = { ad_revenue: 0, licensing: 0, tip: 0, assignment_fee: 0, task_reward: 0, other: 0 }
     let total = 0
     for (const e of entries) {
       total += e.amount
