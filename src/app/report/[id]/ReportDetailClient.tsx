@@ -1,26 +1,78 @@
 // @ts-nocheck
 'use client'
-import{useState}from'react'
+import{useState,useRef,useEffect}from'react'
 import{useRouter}from'next/navigation'
 import{ShareButton}from'@/components/share/ShareButton'
 import{useAuth}from'@/hooks/useAuth'
 import MuxPlayer from'@mux/mux-player-react'
 const TC:Record<string,{c:string,bg:string,l:string}>={starter:{c:'#22C55E',bg:'#ECFDF5',l:'Starter'},silver:{c:'#94A3B8',bg:'#F0F4F8',l:'Silver'},gold:{c:'#EAB308',bg:'#FFF8E6',l:'Gold'},platinum:{c:'#8B5CF6',bg:'#F5F0FF',l:'Platinum'}}
+
+// Same 7-position drift pattern + 3-layer design already specced out for
+// the server-side burned-in pipeline in src/lib/watermark.ts (which never
+// actually runs — see processVideoWatermark). Reproduced here as a live
+// playback overlay so viewers get the identical visual experience without
+// needing that infrastructure.
+const FLOAT_POSITIONS=[
+  {left:'8%',top:'15%'},{right:'10%',top:'22%'},{left:'15%',top:'40%'},
+  {right:'6%',top:'45%'},{left:'40%',top:'12%'},{left:'30%',top:'38%'},{right:'22%',top:'18%'},
+]
+
 export function ReportDetailClient({report:r,seriesReports}:{report:any,seriesReports:any[]}){const router=useRouter();const{user}=useAuth();const[voted,setVoted]=useState<'up'|'down'|null>(null);const[votes,setVotes]=useState({up:r.upvotes,down:r.downvotes});const t=TC[r.user?.tier||'starter']||TC.starter
+const playerRef=useRef<any>(null)
+const[currentTime,setCurrentTime]=useState(0)
+const[duration,setDuration]=useState(0)
+const[showEndCard,setShowEndCard]=useState(false)
+useEffect(()=>{
+  const el=playerRef.current
+  if(!el)return
+  const onTime=()=>{
+    const ct=el.currentTime||0,dur=el.duration||0
+    setCurrentTime(ct)
+    if(dur)setDuration(dur)
+    setShowEndCard(dur>0&&ct>=dur-1.5)
+  }
+  const onEnded=()=>setShowEndCard(true)
+  el.addEventListener('timeupdate',onTime)
+  el.addEventListener('loadedmetadata',onTime)
+  el.addEventListener('ended',onEnded)
+  return()=>{
+    el.removeEventListener('timeupdate',onTime)
+    el.removeEventListener('loadedmetadata',onTime)
+    el.removeEventListener('ended',onEnded)
+  }
+},[r.playback_id])
+const floatPos=FLOAT_POSITIONS[Math.floor(currentTime/4)%FLOAT_POSITIONS.length]
 const isOwner=user?.id===r.user_id
 const otherParts=(seriesReports||[]).filter(sr=>sr.id!==r.id)
 async function vote(d:'up'|'down'){if(voted===d)return;setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}));fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})}).catch(()=>{})}
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
-{r.playback_id?<div style={{position:'relative'}}>
-  <MuxPlayer playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
-  {/* Branded floating stamp — usernames are unique (enforced at signup), so
-      this always identifies exactly one reporter. Real server-side
-      burned-in watermarking would need its own video-processing
-      infrastructure; this overlay is what every in-app viewer sees today. */}
-  <div style={{position:'absolute',bottom:10,left:10,padding:'4px 10px',borderRadius:6,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)',pointerEvents:'none',display:'flex',alignItems:'center',gap:5}}>
+{r.playback_id?<div style={{position:'relative',overflow:'hidden'}}>
+  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
+
+  {/* Layer 1 — persistent bottom bar */}
+  <div style={{position:'absolute',bottom:0,left:0,right:0,height:'8%',minHeight:28,background:'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',display:'flex',alignItems:'center',padding:'0 10px',pointerEvents:'none'}}>
     <span style={{fontSize:12,fontWeight:700,color:'#FE3D07'}}>VozIt!</span>
-    <span style={{fontSize:12,fontStyle:'italic',color:'#fff'}}>I was there... @{r.user?.username}</span>
+    <span style={{fontSize:11,color:'rgba(255,255,255,0.85)',marginLeft:6}}>· @{r.user?.username} · I was there...</span>
+    <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:'#fff'}}>{'★'} {t.l}</span>
   </div>
+
+  {/* Layer 2 — floating stamp, drifts to a new position every 4s
+      (anti-scraping: hard to crop out consistently) */}
+  {!showEndCard&&<div style={{position:'absolute',...floatPos,padding:'3px 8px',borderRadius:4,background:'rgba(254,61,7,0.18)',pointerEvents:'none',transition:'top 0.6s ease,left 0.6s ease,right 0.6s ease'}}>
+    <span style={{fontSize:11,color:'rgba(255,255,255,0.5)',textShadow:'0 1px 2px rgba(0,0,0,0.5)'}}>VozIt! — I was there...</span>
+  </div>}
+
+  {/* Layer 3 — end card bumper, last 1.5s */}
+  {showEndCard&&<div style={{position:'absolute',inset:0,background:'#FE3D07',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',animation:'vzEndCardIn 0.4s ease',pointerEvents:'none'}}>
+    <div style={{fontSize:32,fontWeight:800,color:'#fff',animation:'vzEndCardScale 0.5s ease'}}>VozIt!</div>
+    <div style={{fontSize:15,fontStyle:'italic',color:'rgba(255,255,255,0.92)',marginTop:6,animation:'vzEndCardFade 0.6s ease 0.2s both'}}>I was there...</div>
+    <div style={{fontSize:11,color:'rgba(255,255,255,0.4)',marginTop:10,animation:'vzEndCardFade 0.6s ease 0.35s both'}}>vozit.app</div>
+  </div>}
+  <style>{`
+    @keyframes vzEndCardIn{from{opacity:0}to{opacity:1}}
+    @keyframes vzEndCardScale{from{transform:scale(0.6);opacity:0}to{transform:scale(1);opacity:1}}
+    @keyframes vzEndCardFade{from{opacity:0}to{opacity:1}}
+  `}</style>
 </div>:<div style={{height:200,background:'#0a1e30',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'rgba(255,255,255,0.2)'}}>Video processing...</span></div>}
 <div style={{maxWidth:600,margin:'0 auto',padding:'14px 16px 60px'}}><h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',lineHeight:1.4,marginBottom:4}}>{r.title}</h1><div style={{fontSize:12,color:'#00AACC',fontWeight:500,marginBottom:12}}>{r.location_name} · {new Date(r.created_at).toLocaleDateString()}</div>
 {r.description&&<p style={{fontSize:14,color:'#333',lineHeight:1.6,marginBottom:16}}>{r.description}</p>}
