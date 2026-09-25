@@ -51,6 +51,37 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // Assignment fee-pool payment — the assignment itself is only
+      // created once the initial pool is actually funded, so reporters who
+      // join and file reports can always actually be paid.
+      if (session.metadata?.purpose === 'assignment_creation') {
+        const paymentRef = session.payment_intent || session.id
+        const { data: existing } = await admin.from('assignments').select('id').eq('stripe_payment_intent_id', paymentRef).single()
+        if (existing) return NextResponse.json({ ok: true, already: true })
+
+        const m = session.metadata
+        const { data: assignment, error } = await admin.from('assignments').insert({
+          created_by: m.created_by,
+          title: m.title,
+          description: m.description,
+          urgency: m.urgency,
+          regions: JSON.parse(m.regions || '[]'),
+          assignment_fee_pool_usd: Number(m.assignment_fee_pool_usd),
+          assignment_fee_per_report_usd: Number(m.assignment_fee_per_report_usd),
+          safety_notes: m.safety_notes || null,
+          allows_anonymous: m.allows_anonymous === '1',
+          status: 'active',
+          stripe_payment_intent_id: paymentRef,
+        }).select().single()
+        if (error || !assignment) { captureError(error || new Error('assignment insert returned no row'), { route: 'stripe-licensing webhook (assignment_creation)' }); return NextResponse.json({ ok: true }) }
+
+        const angles = JSON.parse(m.angles || '[]')
+        if (angles.length) await admin.from('assignment_angles').insert(angles.map((t: string) => ({ assignment_id: assignment.id, title: t })))
+        await admin.from('assignment_contributors').insert({ assignment_id: assignment.id, user_id: m.created_by })
+
+        return NextResponse.json({ ok: true })
+      }
+
       const licenseId = session.metadata?.license_id
       if (!licenseId) return NextResponse.json({ ok: true }) // not one of ours
 

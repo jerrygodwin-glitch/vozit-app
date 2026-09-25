@@ -11,6 +11,7 @@ export const LOGO = 'data:image/webp;base64,UklGRsgFAABXRUJQVlA4ILwFAACwHwCdASpA
 const NAV_ITEMS = [
   { h: '/feed', l: 'Feed', i: '📰' },
   { h: '/assignments', l: 'Assign', i: '📋' },
+  { h: '/tasks', l: 'Tasks', i: '🙋' },
   { h: '/upload', l: '', i: '🎥', c: true },
   { h: '/search', l: 'Search', i: '🔍' },
   { h: '/settings', l: 'More', i: '⚙️' },

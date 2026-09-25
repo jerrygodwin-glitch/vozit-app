@@ -8,6 +8,7 @@ const TABS = [
   { l: 'Dashboard', h: '/settings' },
   { l: 'Contribute', h: '/upload' },
   { l: 'Assignments', h: '/assignments' },
+  { l: 'Tasks', h: '/tasks' },
   { l: 'Licensing', h: '/licensing' },
   { l: 'About', h: '#about' },
 ]

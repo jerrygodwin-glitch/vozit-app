@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { NavBar, TopBar } from '@/components/ui/NavBar'
+import { Nav, Top } from '@/lib/ui'
 
 function timeLeft(deadline: string) {
   const ms = new Date(deadline).getTime() - Date.now()
@@ -139,7 +139,7 @@ function Tasks() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
-      <TopBar />
+      <Top />
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>Tasks</div>
@@ -243,7 +243,7 @@ function Tasks() {
           </div>
         ))}
       </div>
-      <NavBar active="tasks" />
+      <Nav active="/tasks" />
     </div>
   )
 }
