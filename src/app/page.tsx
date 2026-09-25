@@ -14,16 +14,16 @@ const TABS = [
   { l: 'About', h: '#about' },
 ]
 const REPORTS = [
-  { id: '1', t: 'Shelling hits residential area in Saltivka', loc: 'Kharkiv, Ukraine', u: 'olena_k', tier: 'platinum', up: 847, cred: 98, dur: 67, time: '2h ago', region: 'Europe', category: 'Politics' },
+  { id: '1', t: 'Shelling hits residential area in Saltivka', loc: 'Kharkiv, Ukraine', u: 'olena_k', tier: 'platinum', up: 847, cred: 98, dur: 67, time: '2h ago', region: 'Europe', category: 'Conflict/Crisis' },
   { id: '2', t: 'Protesters block main highway', loc: 'Caracas, Venezuela', u: 'maria_vzla', tier: 'gold', up: 412, cred: 93, dur: 45, time: '4h ago', region: 'Americas', category: 'Politics' },
   { id: '3', t: 'Flash flooding destroys bridge', loc: 'Bihar, India', u: 'ravi_reports', tier: 'silver', up: 234, cred: 89, dur: 52, time: '6h ago', region: 'Asia', category: 'Environment' },
-  { id: '6', t: 'Aid convoy blocked at border crossing', loc: 'Rafah, Gaza', u: 'ahmad_gz', tier: 'gold', up: 1203, cred: 96, dur: 88, time: '1h ago', region: 'Middle East', category: 'Politics' },
+  { id: '6', t: 'Aid convoy blocked at border crossing', loc: 'Rafah, Gaza', u: 'ahmad_gz', tier: 'gold', up: 1203, cred: 96, dur: 88, time: '1h ago', region: 'Middle East', category: 'Conflict/Crisis' },
   { id: '4', t: 'Police teargas at student march', loc: 'Nairobi, Kenya', u: 'chidi_nbo', tier: 'starter', up: 156, cred: 85, dur: 38, time: '8h ago', region: 'Africa', category: 'Justice' },
   { id: '5', t: 'Wildfire approaches residential zone', loc: 'Valparaiso, Chile', u: 'pablo_cl', tier: 'silver', up: 198, cred: 91, dur: 72, time: '12h ago', region: 'Americas', category: 'Environment' },
 ]
 const TC: any = { starter: { c: '#22C55E', l: 'Starter' }, silver: { c: '#64748B', l: 'Silver' }, gold: { c: '#CA8A04', l: 'Gold' }, platinum: { c: '#7C3AED', l: 'Platinum' } }
 const REGIONS = ['Americas', 'Europe', 'Middle East', 'Africa', 'Asia']
-const CATEGORIES = ['Justice', 'Politics', 'Economy', 'Environment', 'Entertainment']
+const CATEGORIES = ['Justice', 'Politics', 'Economy', 'Environment', 'Conflict/Crisis', 'Entertainment', 'Sports']
 
 export default function Landing() {
   const [groupBy, setGroupBy] = useState<'location' | 'category'>('location')

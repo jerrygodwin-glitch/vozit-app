@@ -388,7 +388,9 @@ if(step==='review')return(<div style={{minHeight:'100vh',background:'#f5f5f5'}}>
 <option value="politics">Politics</option>
 <option value="economy">Economy</option>
 <option value="environment">Environment</option>
+<option value="crisis">Conflict/Crisis</option>
 <option value="entertainment">Entertainment</option>
+<option value="sports">Sports</option>
 <option value="other">Other</option>
 </select>
 </div>

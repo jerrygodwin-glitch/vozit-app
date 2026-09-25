@@ -75,7 +75,7 @@ CREATE TABLE public.reports (
   is_ai_flagged     BOOLEAN NOT NULL DEFAULT false,
   gps_verified      BOOLEAN NOT NULL DEFAULT false,
   category          TEXT NOT NULL DEFAULT 'other'
-                      CHECK (category IN ('justice','politics','economy','environment','entertainment','other')),
+                      CHECK (category IN ('justice','politics','economy','environment','crisis','entertainment','sports','other')),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

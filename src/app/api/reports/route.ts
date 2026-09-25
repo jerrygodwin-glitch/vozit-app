@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
-    const CATEGORIES = ['justice', 'politics', 'economy', 'environment', 'entertainment', 'other']
+    const CATEGORIES = ['justice', 'politics', 'economy', 'environment', 'crisis', 'entertainment', 'sports', 'other']
     const categoryClean = CATEGORIES.includes(category) ? category : 'other'
 
     // Posting an update to an earlier report — link them via series_id/series_part
