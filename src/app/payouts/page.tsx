@@ -51,10 +51,18 @@ export default function Payouts() {
 
   async function setCountry(country: string) {
     setSettingCountry(true)
+    // Update the screen immediately rather than waiting on a save-then-
+    // refetch round trip — if that persist step has any hiccup, the
+    // provider list should still show right away instead of the page
+    // just sitting there with nothing visible.
+    setData((prev: any) => ({ ...prev, country }))
     try {
       const { data: { user } } = await sb.auth.getUser()
-      if (user) await sb.from('users').update({ country }).eq('id', user.id)
-      await load()
+      if (!user) { setConnectMsg('Not signed in — please refresh and try again.'); return }
+      const { error } = await sb.from('users').update({ country }).eq('id', user.id)
+      if (error) setConnectMsg(`Could not save your country: ${error.message}`)
+    } catch (e: any) {
+      setConnectMsg(`Could not save your country: ${e.message}`)
     } finally { setSettingCountry(false) }
   }
 
@@ -115,7 +123,10 @@ export default function Payouts() {
   const suggestedIds = country ? suggestProviderIds(country) : []
   const suggested = providers.filter((p: any) => suggestedIds.includes(p.id))
   const others = providers.filter((p: any) => !suggestedIds.includes(p.id))
-  const providersToShow = country && !showAllProviders ? suggested : providers
+  // Fall back to showing everything if the "recommended for this country"
+  // filter would otherwise leave nothing on screen — better to show all 8
+  // than to show zero.
+  const providersToShow = country && !showAllProviders && suggested.length > 0 ? suggested : providers
 
   return (
     <div className="page"><Top />

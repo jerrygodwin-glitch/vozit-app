@@ -1,19 +1,28 @@
 'use client'
 import { Nav, Top } from '@/lib/ui'
+import { useAuth } from '@/hooks/useAuth'
+
+const TC: Record<string, { c: string; rate: string }> = { starter: { c: '#22C55E', rate: '50%' }, silver: { c: '#64748B', rate: '55%' }, gold: { c: '#CA8A04', rate: '65%' }, platinum: { c: '#7C3AED', rate: '70%' } }
 
 export default function Settings() {
+  const { user, loading } = useAuth()
+  const t = TC[user?.tier || 'starter'] || TC.starter
   return (
     <div className="page">
       <Top />
       <div className="container">
         <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 24 }}>Settings</h1>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 26, background: 'linear-gradient(135deg,#22C55E,#22C55E88)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 700 }}>J</div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>@jerry</div>
-            <div style={{ fontSize: 13, color: '#22C55E' }}>★ Starter — 50% revenue</div>
+        {loading ? (
+          <div className="card" style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 13 }}>Loading...</div>
+        ) : (
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 26, background: `linear-gradient(135deg,${t.c},${t.c}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 700 }}>{(user?.display_name || '?').slice(0, 2).toUpperCase()}</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>@{user?.username || '...'}</div>
+              <div style={{ fontSize: 13, color: t.c }}>★ {(user?.tier || 'starter').charAt(0).toUpperCase() + (user?.tier || 'starter').slice(1)} — {t.rate} revenue</div>
+            </div>
           </div>
-        </div>
+        )}
         <div className="card">
           <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>TIER PROGRESSION</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>

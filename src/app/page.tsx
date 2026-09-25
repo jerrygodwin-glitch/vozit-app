@@ -5,6 +5,7 @@ const G = 'https://www.google.com/s2/favicons?domain=DOMAIN&sz=128'
 const TABS = [
   { l: 'Home', h: '/' },
   { l: 'Feed', h: '/feed' },
+  { l: 'Dashboard', h: '/settings' },
   { l: 'Contribute', h: '/upload' },
   { l: 'Assignments', h: '/assignments' },
   { l: 'Licensing', h: '/licensing' },
