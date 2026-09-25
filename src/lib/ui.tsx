@@ -53,11 +53,11 @@ export function Top() {
       padding: '10px 14px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', cursor: 'pointer' }} aria-label="VozIt home">
         <img src={LOGO} style={{ height: 36, width: 36, borderRadius: 8 }} alt="VozIt logo" />
         <span style={{ color: '#fff', fontSize: 20, fontWeight: 700 }}>VozIt!</span>
         <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontStyle: 'italic' }}>I was there...</span>
-      </div>
+      </a>
       <a href="/auth/login" className="btn btn-sm" style={{
         background: 'rgba(255,255,255,0.2)', color: '#fff',
         border: '1px solid rgba(255,255,255,0.3)',
