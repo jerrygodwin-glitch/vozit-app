@@ -276,7 +276,12 @@ export function buildFullWatermarkPipeline(params: {
 }
 
 // ── WORKER ENTRY POINT ───────────────────────────────────────
-// Called by background worker after Mux finishes transcoding
+// Calls the real watermark-worker service (see /watermark-worker in this
+// repo — a separate small deployment, since burning pixels into a video
+// needs actual sustained compute that doesn't fit Vercel's serverless
+// functions). This previously just returned a fake success object with
+// made-up URLs pointing at files that were never created — every report
+// was marked "watermark_applied: true" despite nothing having run.
 export async function processVideoWatermark(params: {
   playbackId: string
   reportId: string
@@ -287,64 +292,41 @@ export async function processVideoWatermark(params: {
   height?: number
 }): Promise<{
   watermarkedUrl: string
-  cleanUrl: string
   success: boolean
   error?: string
 }> {
-  const downloadUrl = `https://stream.mux.com/${params.playbackId}/high.mp4`
+  if (!process.env.WATERMARK_WORKER_URL || !process.env.WATERMARK_WORKER_SECRET) {
+    return { watermarkedUrl: '', success: false, error: 'Watermark worker not configured' }
+  }
 
   try {
-    // In production worker environment:
-    // 1. Download video from Mux
-    //    wget -O /tmp/{reportId}/input.mp4 {downloadUrl}
-    //
-    // 2. Copy logo to working directory
-    //    cp /app/public/brand/vozit-icon-96.png /tmp/{reportId}/logo.png
-    //
-    // 3. Get video dimensions if not provided
-    //    ffprobe -v error -select_streams v:0 \
-    //      -show_entries stream=width,height \
-    //      -of csv=p=0 /tmp/{reportId}/input.mp4
-    //
-    // 4. Build and execute pipeline
-    const config: WatermarkConfig = {
-      username: params.username,
-      tier: params.tier,
-      logoPath: '/tmp/logo.png',
-      videoDuration: params.duration,
-      videoWidth: params.width || 1920,
-      videoHeight: params.height || 1080,
-    }
-
-    const pipeline = buildFullWatermarkPipeline({
-      inputPath: `/tmp/${params.reportId}/input.mp4`,
-      outputDir: `/tmp/${params.reportId}`,
-      config,
+    const res = await fetch(`${process.env.WATERMARK_WORKER_URL}/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-worker-secret': process.env.WATERMARK_WORKER_SECRET,
+      },
+      body: JSON.stringify({
+        reportId: params.reportId,
+        playbackId: params.playbackId,
+        username: params.username,
+        tier: params.tier,
+        duration: params.duration,
+        width: params.width || 1920,
+        height: params.height || 1080,
+      }),
+      // Burning in a ~90s clip takes real time — give it room rather than
+      // timing out a legitimately-still-running job.
+      signal: AbortSignal.timeout(280_000),
     })
 
-    // Execute steps in sequence:
-    // exec(pipeline.step1_endcard)   // Generate end card
-    // exec(pipeline.step2_watermark) // Apply layers + concat
-    // exec(pipeline.step3_clean)     // Clean copy
-
-    // 5. Upload both versions to storage
-    //    - watermarked.mp4 → Supabase Storage (public bucket)
-    //    - clean.mp4 → Supabase Storage (private bucket, license-gated)
-    //
-    // 6. Update reports table with video URLs
-    //    UPDATE reports SET
-    //      watermarked_url = '...',
-    //      clean_url = '...',
-    //      watermark_applied = true
-    //    WHERE id = reportId
-
-    return {
-      watermarkedUrl: `${params.reportId}/watermarked.mp4`,
-      cleanUrl: `${params.reportId}/clean.mp4`,
-      success: true,
+    const data = await res.json()
+    if (!res.ok || !data.watermarkedUrl) {
+      return { watermarkedUrl: '', success: false, error: data.error || `Worker returned ${res.status}` }
     }
+    return { watermarkedUrl: data.watermarkedUrl, success: true }
   } catch (e: any) {
-    return { watermarkedUrl: '', cleanUrl: '', success: false, error: e.message }
+    return { watermarkedUrl: '', success: false, error: e.message }
   }
 }
 

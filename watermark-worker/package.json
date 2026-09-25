@@ -1,0 +1,17 @@
+{
+  "name": "vozit-watermark-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Burns the 3-layer VozIt watermark (bottom bar, drifting stamp, end-card bumper) into published videos. Separate deployment from the main Next.js app since this needs FFmpeg and sustained compute time that Vercel's serverless functions don't provide.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,8 +1,35 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Top, Nav } from '@/lib/ui'
 
-export default function Licensing() {
+function Licensing() {
+  const params = useSearchParams()
+  const [checkoutStatus, setCheckoutStatus] = useState<any>(null)
+  useEffect(() => {
+    const licenseId = params.get('license_id')
+    if (!licenseId) return
+    if (params.get('canceled')) { setCheckoutStatus({ state: 'canceled' }); return }
+    if (!params.get('paid')) return
+
+    // The webhook that flips a license to 'active' can land a second or
+    // two after Stripe redirects back here — poll briefly instead of
+    // showing a false "still pending" if we just check once.
+    let attempts = 0
+    const poll = async () => {
+      attempts++
+      try {
+        const res = await fetch(`/api/licensing/status?license_id=${licenseId}`)
+        const d = await res.json()
+        if (d.status === 'active') { setCheckoutStatus({ state: 'active', licenseId, email: d.email }); return }
+        if (attempts < 10) setTimeout(poll, 1500)
+        else setCheckoutStatus({ state: 'pending', licenseId, email: d.email })
+      } catch { if (attempts < 10) setTimeout(poll, 1500) }
+    }
+    setCheckoutStatus({ state: 'checking' })
+    poll()
+  }, [])
+
   const [url, setUrl] = useState('')
   const [result, setResult] = useState<any>(null)
   const [searching, setSearching] = useState(false)
@@ -54,6 +81,7 @@ export default function Licensing() {
       })
       const d = await res.json()
       if (!res.ok) setLicenseError(d.error || 'Could not create license request')
+      else if (d.checkoutUrl) { window.location.href = d.checkoutUrl; return }
       else setLicenseResult(d)
     } catch (e: any) { setLicenseError(e.message) }
     setSubmitting(false)
@@ -79,6 +107,20 @@ export default function Licensing() {
           <p style={{ fontSize: 15, color: '#666', marginTop: 4 }}>License citizen journalism footage for your newsroom</p>
           <p style={{ fontSize: 13, color: '#0a8fe8', marginTop: 4 }}>Revenue shared with the reporter</p>
         </div>
+
+        {checkoutStatus && (
+          <div className="card card-lg" style={{ marginBottom: 24, textAlign: 'center' }}>
+            {checkoutStatus.state === 'checking' && <p style={{ fontSize: 13, color: '#666' }}>Confirming your payment...</p>}
+            {checkoutStatus.state === 'canceled' && <p style={{ fontSize: 13, color: '#DC2626' }}>Payment was canceled — no charge was made.</p>}
+            {checkoutStatus.state === 'pending' && <p style={{ fontSize: 13, color: '#CA8A04' }}>Payment received — still confirming on our end. Refresh in a moment.</p>}
+            {checkoutStatus.state === 'active' && (
+              <>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#065F46', marginBottom: 8 }}>✓ Payment confirmed</p>
+                <a href={`/api/licensing/download?license_id=${checkoutStatus.licenseId}&email=${encodeURIComponent(checkoutStatus.email)}`} className="btn btn-primary">Download your licensed footage</a>
+              </>
+            )}
+          </div>
+        )}
 
         {/* URL PASTE BAR */}
         <div className="card card-lg" style={{ marginBottom: 24, border: '2px solid #0a8fe8' }}>
@@ -191,4 +233,8 @@ export default function Licensing() {
       <Nav active="/licensing" />
     </div>
   )
+}
+
+export default function LicensingPage() {
+  return <Suspense><Licensing /></Suspense>
 }

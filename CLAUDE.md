@@ -137,7 +137,9 @@ Note: `categories` does not exist in the live schema despite being listed here p
 | MUX_TOKEN_SECRET | Mux video | Needs setup |
 | MUX_WEBHOOK_SECRET | Mux video | Needs setup |
 | STRIPE_SECRET_KEY | Stripe payments | Needs setup |
-| STRIPE_WEBHOOK_SECRET | Stripe payments | Needs setup |
+| STRIPE_WEBHOOK_SECRET | Stripe payments — used by both /api/stripe and the new /api/webhooks/stripe-licensing (register the latter's URL as a webhook endpoint in the Stripe dashboard listening for checkout.session.completed, then use that endpoint's own signing secret here) | Needs setup |
+| WATERMARK_WORKER_URL | Watermark worker (see /watermark-worker) — e.g. https://vozit-watermark-worker.fly.dev | Needs setup |
+| WATERMARK_WORKER_SECRET | Watermark worker — must match the same value set as a Fly.io secret on the worker | Needs setup |
 | ANTHROPIC_API_KEY | Claude AI 5W analysis | Needs setup |
 | TURNSTILE_SECRET_KEY | Cloudflare CAPTCHA | Needs setup |
 | HIVE_API_KEY | Content moderation | Needs setup |
@@ -268,11 +270,20 @@ Edit files → `git add -A && git commit -m "description" && git push` → Verce
 
 ### Not Yet Built
 - [ ] Mobile apps (React Native/Expo)
-- [ ] Background worker for FFmpeg watermark processing
+- [x] Background worker for FFmpeg watermark processing — code complete in
+      /watermark-worker (Fly.io), but needs to actually be deployed +
+      WATERMARK_WORKER_URL/SECRET set in Vercel before it does anything;
+      also needs a public Supabase Storage bucket named `videos` created
 - [ ] Post-recording voice-over server-side audio merge
 - [ ] Appeals process for banned reporters
-- [ ] Supabase Storage buckets (uploads public, voice-overs private)
+- [ ] Supabase Storage buckets (uploads public, voice-overs private, plus
+      `videos` for the watermark worker's output — none of these confirmed
+      to actually exist yet; the voice-over upload route has been assuming
+      an `uploads` bucket exists this whole time with no confirmation)
 - [ ] Custom domain (vozit.com or similar)
+- [ ] Notification system (reporters aren't told when a report publishes,
+      gets flagged, or a license sells) and a site-wide toast/success
+      message system — deliberately deferred, not forgotten
 
 ### API Keys Still Needed
 - Mux, Stripe, Anthropic, Turnstile, Hive (see env vars table above)

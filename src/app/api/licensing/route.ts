@@ -8,7 +8,7 @@ import type { ReporterTier } from '@/types'
 // ── LICENSING TIERS ──────────────────────────────────────────────────
 // What news organizations pay to use VozIt footage
 
-const LICENSE_TIERS = {
+export const LICENSE_TIERS = {
   // Tier 1: Embed only — iframe player on their site, VozIt branded
   embed: {
     name: 'Embed License',
@@ -214,7 +214,41 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // For paid licenses, return payment instructions
+    // For paid licenses, create a real Stripe Checkout session instead of
+    // just returning "we'll invoice you" — the license stays pending_payment
+    // until the webhook below confirms payment actually cleared.
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({
+        ok: true,
+        license: { id: license.id, status: 'pending_payment', tier, type: license_type, price, expires: expiresAt.toISOString() },
+        payment: { method: 'Invoice', contact: 'licensing@vozit.app', note: 'Online payment is not configured yet — we\'ll follow up to invoice you.' },
+      })
+    }
+
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      customer_email: licensee_email,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `VozIt! ${tierConfig.name} — ${report.title}`,
+            description: `${license_type.replace(/_/g, ' ')} · ${licensee_org}`,
+          },
+          unit_amount: Math.round(price * 100),
+        },
+        quantity: 1,
+      }],
+      success_url: `${appUrl}/licensing?license_id=${license.id}&paid=1`,
+      cancel_url: `${appUrl}/licensing?license_id=${license.id}&canceled=1`,
+      metadata: { license_id: license.id },
+    })
+
+    await admin.from('licenses').update({ payment_id: session.id }).eq('id', license.id)
+
     return NextResponse.json({
       ok: true,
       license: {
@@ -229,11 +263,7 @@ export async function POST(req: NextRequest) {
         expires: expiresAt.toISOString(),
         rights: tierConfig.rights,
       },
-      payment: {
-        method: 'Invoice or Stripe checkout',
-        contact: 'licensing@vozit.app',
-        note: `$${reporterShare} of this license fee goes directly to the citizen reporter who captured this footage.`,
-      },
+      checkoutUrl: session.url,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

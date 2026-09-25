@@ -62,12 +62,16 @@ export async function POST(req: NextRequest) {
       // At this point report is guaranteed non-null
       const rep = report as NonNullable<typeof report>
 
-      // Update report with video details
+      // Update report with video details. clean_url for licensing is just
+      // the original Mux master — nothing was ever burned into it, so
+      // there's no processing to wait on; only the watermarked (public)
+      // copy needs the worker, set separately once that finishes below.
       const { error: videoUpdateError } = await supabase.from('reports').update({
         mux_asset_id: assetId,
         playback_id: playbackId,
         thumbnail_url: thumbnailUrl,
         duration_seconds: Math.round(duration),
+        clean_url: `https://stream.mux.com/${playbackId}/high.mp4`,
       }).eq('id', report!.id)
       if (videoUpdateError) captureError(videoUpdateError, { route: 'POST /api/mux-webhook', step: 'save video details', reportId: report!.id })
 
@@ -182,25 +186,11 @@ export async function POST(req: NextRequest) {
 
 
 
-      // ═══ AUTO-DISTRIBUTE TO VozIt's SOCIAL CHANNELS ═══════════
-      if (reportStatus === 'published' && playbackId) {
-        // Non-blocking: distribute to VozIt's YouTube, TikTok, IG, FB, X
-        autoDistributeToVozItChannels({
-          reportId: report.id,
-          title: report.title,
-          description: report.what || report.title,
-          playbackId,
-          locationName: report.location_name,
-          location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined,
-          reporterUsername: (report.user as any)?.username || 'reporter',
-          reporterTier: (report.user as any)?.tier || 'starter',
-        }).then(dist => {
-          logVozItDistribution(supabase, report.id, dist.results)
-        }) // Non-blocking — don't fail the webhook
-      }
-
-
-      // ═══ THREE-LAYER WATERMARK PROCESSING ═════════════════════
+      // ═══ THREE-LAYER WATERMARK PROCESSING, THEN AUTO-DISTRIBUTE ═══
+      // Auto-distribution now waits for the real watermarked copy instead
+      // of firing immediately — it previously ran before watermarking even
+      // started, so every post to VozIt's own YouTube/TikTok/IG/FB/X went
+      // out with the raw, unbranded master and zero visible credit.
       if (reportStatus === 'published' && playbackId) {
         // Non-blocking: process watermark in background
         processVideoWatermark({
@@ -213,10 +203,26 @@ export async function POST(req: NextRequest) {
           if (result.success) {
             supabase.from('reports').update({
               watermarked_url: result.watermarkedUrl,
-              clean_url: result.cleanUrl,
               watermark_applied: true,
             }).eq('id', report!.id)
           }
+
+          // Distribute to VozIt's own channels either way — with the
+          // branded copy if watermarking succeeded, falling back to the
+          // raw master (still better than never posting) if it failed.
+          autoDistributeToVozItChannels({
+            reportId: report.id,
+            title: report.title,
+            description: report.what || report.title,
+            playbackId,
+            watermarkedUrl: result.success ? result.watermarkedUrl : undefined,
+            locationName: report.location_name,
+            location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined,
+            reporterUsername: (report.user as any)?.username || 'reporter',
+            reporterTier: (report.user as any)?.tier || 'starter',
+          }).then(dist => {
+            logVozItDistribution(supabase, report.id, dist.results)
+          })
         }) // Non-blocking
       }
 
