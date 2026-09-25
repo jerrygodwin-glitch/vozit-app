@@ -13,9 +13,14 @@ export async function GET(req: NextRequest) {
     const supabase = createServerClient()
     const url = new URL(req.url)
     const region = url.searchParams.get('region')
-    const sort = url.searchParams.get('sort') || 'recent' // recent | trending | top
+    const sort = url.searchParams.get('sort') || 'recent' // recent | trending | top | credible
     const limit = parseInt(url.searchParams.get('limit') || '20')
     const offset = parseInt(url.searchParams.get('offset') || '0')
+
+    // Strip characters that would break PostgREST's .or() filter syntax
+    // (commas/parens are filter-string delimiters, not literal search text)
+    const qRaw = url.searchParams.get('q')
+    const q = qRaw ? qRaw.replace(/[,()]/g, '').trim().slice(0, 100) : ''
 
     let query = supabase
       .from('reports')
@@ -26,13 +31,20 @@ export async function GET(req: NextRequest) {
       query = query.ilike('location_name', `%${region}%`)
     }
 
-    // Sort by trending score, recency, or total votes
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,who.ilike.%${q}%,what.ilike.%${q}%,why.ilike.%${q}%,location_name.ilike.%${q}%`)
+    }
+
+    // Sort by trending score, recency, votes, or credibility
     switch (sort) {
       case 'trending':
         query = query.order('trending_score', { ascending: false })
         break
       case 'top':
         query = query.order('upvotes', { ascending: false })
+        break
+      case 'credible':
+        query = query.order('credibility_pct', { ascending: false })
         break
       default:
         query = query.order('created_at', { ascending: false })
