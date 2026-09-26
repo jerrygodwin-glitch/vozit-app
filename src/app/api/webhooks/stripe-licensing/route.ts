@@ -82,6 +82,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // Topping up an existing assignment's pool — anyone can do this,
+      // including turning a $0 coverage request into a funded one. The
+      // update_assignment_pool() DB trigger adds this straight into
+      // assignment_fee_pool_usd once the row is inserted below.
+      if (session.metadata?.purpose === 'assignment_funding') {
+        const paymentRef = session.payment_intent || session.id
+        const { data: existing } = await admin.from('assignment_funding').select('id').eq('stripe_payment_intent_id', paymentRef).single()
+        if (existing) return NextResponse.json({ ok: true, already: true })
+
+        const m = session.metadata
+        const { error } = await admin.from('assignment_funding').insert({
+          assignment_id: m.assignment_id,
+          funded_by: m.funded_by,
+          amount_usd: Number(m.amount_usd),
+          stripe_payment_intent_id: paymentRef,
+        })
+        if (error) captureError(error, { route: 'stripe-licensing webhook (assignment_funding)' })
+
+        return NextResponse.json({ ok: true })
+      }
+
       const licenseId = session.metadata?.license_id
       if (!licenseId) return NextResponse.json({ ok: true }) // not one of ours
 

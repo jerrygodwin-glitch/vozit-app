@@ -63,6 +63,7 @@ CREATE TABLE public.reports (
   assignment_angle_id UUID,
   assignment_accepted BOOLEAN DEFAULT false,
   assignment_fee_paid BOOLEAN DEFAULT false,
+  assignment_review_feedback TEXT,
   --
   status            TEXT NOT NULL DEFAULT 'processing'
                       CHECK (status IN ('processing','published','flagged','removed')),
@@ -149,6 +150,7 @@ CREATE TABLE public.assignments (
   contributor_count        INT NOT NULL DEFAULT 0,
   report_count             INT NOT NULL DEFAULT 0,
   total_views              INT NOT NULL DEFAULT 0,
+  interest_count           INT NOT NULL DEFAULT 0,
   -- Payment
   stripe_payment_intent_id TEXT,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -192,6 +194,19 @@ CREATE TABLE public.assignment_funding (
   stripe_payment_intent_id TEXT,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Community "interest" votes on an assignment itself (before any report is
+-- filed) — a $0 coverage request's only signal of demand, and a hint to
+-- anyone deciding whether to fund it.
+CREATE TABLE public.assignment_votes (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  assignment_id  UUID NOT NULL REFERENCES public.assignments(id) ON DELETE CASCADE,
+  user_id        UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (assignment_id, user_id)
+);
+
+CREATE INDEX idx_assignment_votes_assignment ON public.assignment_votes(assignment_id);
 
 -- Now add FK from reports to assignments
 ALTER TABLE public.reports
@@ -390,6 +405,24 @@ CREATE TRIGGER trg_assignment_funding
   AFTER INSERT ON public.assignment_funding
   FOR EACH ROW EXECUTE FUNCTION update_assignment_pool();
 
+-- Keep interest_count in sync with assignment_votes
+CREATE OR REPLACE FUNCTION update_assignment_interest_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.assignments
+  SET interest_count = (
+    SELECT COUNT(*) FROM public.assignment_votes
+    WHERE assignment_id = COALESCE(NEW.assignment_id, OLD.assignment_id)
+  )
+  WHERE id = COALESCE(NEW.assignment_id, OLD.assignment_id);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trg_assignment_interest_count
+  AFTER INSERT OR DELETE ON public.assignment_votes
+  FOR EACH ROW EXECUTE FUNCTION update_assignment_interest_count();
+
 -- ══════════════════════════════════════════════════════════════════════════
 -- AUTO-CREATE USER PROFILE ON SIGNUP
 -- ══════════════════════════════════════════════════════════════════════════
@@ -421,6 +454,7 @@ ALTER TABLE public.assignments            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assignment_angles      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assignment_contributors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assignment_funding     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assignment_votes       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payout_records         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.share_events          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.moderation_log        ENABLE ROW LEVEL SECURITY;
@@ -465,6 +499,11 @@ CREATE POLICY "Self join"           ON public.assignment_contributors FOR INSERT
 CREATE POLICY "Public funding"     ON public.assignment_funding FOR SELECT USING (true);
 CREATE POLICY "Auth fund"          ON public.assignment_funding FOR INSERT
   WITH CHECK (auth.uid() = funded_by);
+
+-- Assignment votes — public read, self vote/unvote
+CREATE POLICY "Public assignment votes" ON public.assignment_votes FOR SELECT USING (true);
+CREATE POLICY "Self vote"               ON public.assignment_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Self unvote"             ON public.assignment_votes FOR DELETE USING (auth.uid() = user_id);
 
 -- Payouts
 CREATE POLICY "Own payouts"        ON public.payout_records FOR SELECT USING (auth.uid() = user_id);

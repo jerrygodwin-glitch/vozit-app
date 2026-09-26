@@ -34,6 +34,8 @@ const[title,setTitle]=useState('')
 const[notes,setNotes]=useState('')
 const[fiveW,setFiveW]=useState<FiveWs>({who:'',what:'',where_text:'',when_happened:'',why:''})
 const[category,setCategory]=useState('other')
+const[assignmentId,setAssignmentId]=useState('')
+const[activeAssignments,setActiveAssignments]=useState<any[]>([])
 const[gps,setGps]=useState<{lat:number;lng:number}|null>(null)
 const[aiSuggestion,setAiSuggestion]=useState<AISuggestion|null>(null)
 const[analyzing,setAnalyzing]=useState(false)
@@ -66,6 +68,13 @@ useEffect(()=>{
   const params=new URLSearchParams(window.location.search)
   const id=params.get('update_to')
   if(id){setUpdateToReportId(id);setUpdateToTitle(params.get('update_to_title')||'')}
+},[])
+
+// Active assignments a reporter could optionally tag this report to —
+// tagging never gates publishing, it's just extra metadata used later by
+// the assignment's creator to decide whether this draws a fee from their pool.
+useEffect(()=>{
+  fetch('/api/assignments').then(r=>r.json()).then(d=>setActiveAssignments(d.assignments||[])).catch(()=>{})
 },[])
 
 // A crash, refresh, or accidental tab close mid-recording previously lost
@@ -174,6 +183,7 @@ async function submitReport(){
         title,
         ...fiveW,
         category,
+        assignment_id:assignmentId||undefined,
         location_lat:gps?.lat,location_lng:gps?.lng,
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
@@ -395,6 +405,18 @@ if(step==='review')return(<div style={{minHeight:'100vh',background:'#f5f5f5'}}>
 </select>
 </div>
 
+{activeAssignments.length>0&&(
+<div style={{background:'#fff',borderRadius:12,padding:16,border:'1px solid #eee',marginBottom:12}}>
+<div style={{fontSize:11,color:'#888',marginBottom:6}}>Responding to an assignment? <span style={{fontWeight:400,color:'#aaa'}}>(optional)</span></div>
+<select value={assignmentId} onChange={e=>setAssignmentId(e.target.value)} style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #ddd',fontSize:13,outline:'none',fontFamily:'inherit',background:'#fff'}}>
+<option value="">Not for an assignment</option>
+{activeAssignments.map(a=>(
+  <option key={a.id} value={a.id}>{a.title}{Number(a.assignment_fee_pool_usd)>0?` — $${a.assignment_fee_per_report_usd}/report`:' — coverage request, no funded reward'}</option>
+))}
+</select>
+</div>
+)}
+
 {wConfig.map(w=>{
   const hasAI=aiSuggestion&&aiSuggestion.suggested[w.key]
   const conf=aiSuggestion?.confidence[w.key]||0
@@ -465,7 +487,7 @@ return(<div style={{minHeight:'100vh',background:'#fff',display:'flex',alignItem
 <a href={`/upload?update_to=${reportId}&update_to_title=${encodeURIComponent(title)}`} style={{display:'inline-block',padding:'10px 20px',borderRadius:8,border:'1px solid #FED7AA',background:'#FEF3E6',color:'#B53D0F',fontSize:13,fontWeight:600,textDecoration:'none',fontFamily:'inherit'}}>🔴 Still unfolding? Post an update</a>
 </div>}
 <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setCategory('other');setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
+<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setCategory('other');setAssignmentId('');setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
 <a href="/feed" style={{padding:'10px 20px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#666',fontSize:13,fontWeight:500,textDecoration:'none',fontFamily:'inherit'}}>Go to feed</a>
 </div>
 </div>

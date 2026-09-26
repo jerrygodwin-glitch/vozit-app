@@ -76,12 +76,23 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category } = body
+    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category, assignment_id } = body
 
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
     const CATEGORIES = ['justice', 'politics', 'economy', 'environment', 'crisis', 'entertainment', 'sports', 'other']
     const categoryClean = CATEGORIES.includes(category) ? category : 'other'
+
+    // Tagging a report to an assignment happens as part of the same, normal
+    // publish flow — it never gates whether the report gets published. It
+    // only ever affects whether that report is later eligible to draw a fee
+    // from that assignment's pool, decided separately by the assignment's
+    // creator (see /api/assignments/review).
+    let assignmentIdClean: string | null = null
+    if (assignment_id) {
+      const { data: assignment } = await supabase.from('assignments').select('id, status').eq('id', assignment_id).single()
+      if (assignment?.status === 'active') assignmentIdClean = assignment.id
+    }
 
     // Posting an update to an earlier report — link them via series_id/series_part
     // so the feed and report page can show them as one unfolding story instead of
@@ -160,6 +171,7 @@ export async function POST(req: NextRequest) {
       location_lat: location_lat || null,
       location_lng: location_lng || null,
       category: categoryClean,
+      assignment_id: assignmentIdClean,
       mux_upload_id: mux_upload_id || null,
       content_hash: content_hash || null,
       series_id: seriesId,
@@ -172,6 +184,16 @@ export async function POST(req: NextRequest) {
     }).select().single()
 
     if (error) throw error
+
+    // Make sure a contributor row exists so the assignment payout trigger's
+    // "credit contributor" step has something to update once/if this report
+    // is later accepted — tagging a report to an assignment implicitly joins it.
+    if (assignmentIdClean) {
+      await supabase.from('assignment_contributors').upsert(
+        { assignment_id: assignmentIdClean, user_id: user.id },
+        { onConflict: 'assignment_id,user_id', ignoreDuplicates: true }
+      )
+    }
 
     await logModerationResult(supabase, report.id, textModeration)
 
