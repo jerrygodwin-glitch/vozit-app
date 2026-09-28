@@ -79,6 +79,8 @@ CREATE TABLE public.reports (
                       CHECK (category IN ('justice','politics','economy','environment','crisis','entertainment','sports','other')),
   bearing_degrees   NUMERIC(5,1),
   altitude_meters   NUMERIC(7,1),
+  tilt_degrees      NUMERIC(5,1),
+  roll_degrees      NUMERIC(5,1),
   weather_data      JSONB,
   transcript        TEXT,
   flag_count        INT NOT NULL DEFAULT 0,

@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category, assignment_id, bearing_degrees, altitude_meters, transcript } = body
+    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category, assignment_id, bearing_degrees, altitude_meters, tilt_degrees, roll_degrees, transcript } = body
 
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
@@ -182,6 +182,8 @@ export async function POST(req: NextRequest) {
       assignment_id: assignmentIdClean,
       bearing_degrees: bearing_degrees ?? null,
       altitude_meters: altitude_meters ?? null,
+      tilt_degrees: tilt_degrees ?? null,
+      roll_degrees: roll_degrees ?? null,
       weather_data: weatherData,
       transcript: transcript ? sanitizeInput(transcript, 5000) : null,
       mux_upload_id: mux_upload_id || null,

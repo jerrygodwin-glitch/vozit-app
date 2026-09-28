@@ -42,6 +42,8 @@ const[activeAssignments,setActiveAssignments]=useState<any[]>([])
 const[gps,setGps]=useState<{lat:number;lng:number}|null>(null)
 const[altitude,setAltitude]=useState<number|null>(null)
 const[bearing,setBearing]=useState<number|null>(null)
+const[tilt,setTilt]=useState<number|null>(null)
+const[roll,setRoll]=useState<number|null>(null)
 const[aiSuggestion,setAiSuggestion]=useState<AISuggestion|null>(null)
 const[analyzing,setAnalyzing]=useState(false)
 const[accepted,setAccepted]=useState<Record<string,boolean>>({who:false,what:false,where_text:false,when_happened:false,why:false})
@@ -78,6 +80,10 @@ useEffect(()=>{
   function onOrientation(e:any){
     const heading=e.webkitCompassHeading??(e.alpha!=null?360-e.alpha:null)
     if(heading!=null)setBearing(Math.round(heading))
+    // beta = front-back tilt (-180..180), gamma = left-right roll (-90..90) —
+    // the rest of the "compass & gyroscope vector" picture alongside bearing.
+    if(e.beta!=null)setTilt(Math.round(e.beta))
+    if(e.gamma!=null)setRoll(Math.round(e.gamma))
   }
   const DOE:any=(window as any).DeviceOrientationEvent
   if(DOE&&typeof DOE.requestPermission==='function'){
@@ -240,6 +246,7 @@ async function submitReport(){
         assignment_id:assignmentId||undefined,
         location_lat:gps?.lat,location_lng:gps?.lng,
         bearing_degrees:bearing??undefined,altitude_meters:altitude??undefined,
+        tilt_degrees:tilt??undefined,roll_degrees:roll??undefined,
         content_hash,transcript:transcript||undefined,
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
