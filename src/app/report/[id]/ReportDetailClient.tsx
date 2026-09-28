@@ -19,9 +19,20 @@ const FLOAT_POSITIONS=[
 
 export function ReportDetailClient({report:r,seriesReports}:{report:any,seriesReports:any[]}){const router=useRouter();const{user}=useAuth();const[voted,setVoted]=useState<'up'|'down'|null>(null);const[votes,setVotes]=useState({up:r.upvotes,down:r.downvotes});const t=TC[r.user?.tier||'starter']||TC.starter
 const playerRef=useRef<any>(null)
+const adVideoRef=useRef<HTMLVideoElement>(null)
 const[currentTime,setCurrentTime]=useState(0)
 const[duration,setDuration]=useState(0)
 const[showEndCard,setShowEndCard]=useState(false)
+
+// Mid-roll ad break at ~45s — client-side insertion (not full server-side
+// ad insertion), since VozIt's video runs on Mux, not an AWS-based stack.
+// Only fetched/shown for clips long enough that a break makes sense.
+const[adUrl,setAdUrl]=useState<string|null>(null)
+const[adState,setAdState]=useState<'idle'|'playing'|'done'>('idle')
+useEffect(()=>{
+  fetch('/api/ads/get-ad').then(res=>res.json()).then(d=>{if(d.ad?.videoUrl)setAdUrl(d.ad.videoUrl)}).catch(()=>{})
+},[])
+
 useEffect(()=>{
   const el=playerRef.current
   if(!el)return
@@ -30,6 +41,10 @@ useEffect(()=>{
     setCurrentTime(ct)
     if(dur)setDuration(dur)
     setShowEndCard(dur>0&&ct>=dur-1.5)
+    if(adState==='idle'&&adUrl&&dur>50&&ct>=45){
+      setAdState('playing')
+      el.pause()
+    }
   }
   const onEnded=()=>setShowEndCard(true)
   el.addEventListener('timeupdate',onTime)
@@ -40,7 +55,13 @@ useEffect(()=>{
     el.removeEventListener('loadedmetadata',onTime)
     el.removeEventListener('ended',onEnded)
   }
-},[r.playback_id])
+},[r.playback_id,adUrl,adState])
+
+function onAdEnded(){
+  fetch('/api/ads/impression',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,ad_network:'configured',completed:true})}).catch(()=>{})
+  setAdState('done')
+  playerRef.current?.play?.()
+}
 const floatPos=FLOAT_POSITIONS[Math.floor(currentTime/4)%FLOAT_POSITIONS.length]
 const isOwner=user?.id===r.user_id
 const otherParts=(seriesReports||[]).filter(sr=>sr.id!==r.id)
@@ -67,6 +88,13 @@ async function flag(reason:string){
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div style={{position:'relative',overflow:'hidden'}}>
   <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
+
+  {/* Mid-roll ad break — pauses the report at ~45s, plays a short ad,
+      then resumes. Non-skippable by design at this length. */}
+  {adState==='playing'&&adUrl&&<div style={{position:'absolute',inset:0,background:'#000',display:'flex',flexDirection:'column'}}>
+    <video ref={adVideoRef} src={adUrl} autoPlay playsInline onEnded={onAdEnded} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+    <span style={{position:'absolute',top:8,right:10,fontSize:10,color:'rgba(255,255,255,0.6)',background:'rgba(0,0,0,0.4)',padding:'2px 8px',borderRadius:4}}>Ad</span>
+  </div>}
 
   {/* Layer 1 — persistent bottom bar */}
   <div style={{position:'absolute',bottom:0,left:0,right:0,height:'8%',minHeight:28,background:'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',display:'flex',alignItems:'center',padding:'0 10px',pointerEvents:'none'}}>
