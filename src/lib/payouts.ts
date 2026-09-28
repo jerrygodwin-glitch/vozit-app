@@ -81,10 +81,10 @@ export type PayoutProvider = keyof typeof PAYOUT_PROVIDERS
 
 // Revenue share by tier
 const REVENUE_SHARE: Record<ReporterTier, number> = {
-  starter: 0.50,
-  silver: 0.55,
-  gold: 0.65,
-  platinum: 0.70,
+  starter: 0.40,
+  silver: 0.45,
+  gold: 0.50,
+  platinum: 0.55,
 }
 
 // 7-DAY HOLD: Calculate available balance
@@ -103,7 +103,7 @@ export function calculateAvailableBalance(earnings: Array<{
 }
 
 export function calculateReporterShare(grossRevenue: number, tier: ReporterTier): number {
-  return Math.round(grossRevenue * (REVENUE_SHARE[tier] || 0.50) * 100) / 100
+  return Math.round(grossRevenue * (REVENUE_SHARE[tier] || 0.40) * 100) / 100
 }
 
 export function validatePayoutRequest(amount: number, provider: PayoutProvider, availableBalance: number): { valid: boolean; error?: string } {

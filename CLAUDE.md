@@ -38,10 +38,10 @@
 ### Reporter Tiers
 | Tier | Revenue Share | Requirements |
 |------|--------------|--------------|
-| Starter | 50% | 0-25 reports |
-| Silver | 55% | 26-100 reports, 80%+ credibility |
-| Gold | 65% | 101-499 reports, 90%+ credibility |
-| Platinum | 70% | 500+ reports, 95%+ credibility |
+| Starter | 40% | 0-25 reports |
+| Silver | 45% | 26-100 reports, 80%+ credibility |
+| Gold | 50% | 101-499 reports, 90%+ credibility |
+| Platinum | 55% | 500+ reports, 95%+ credibility |
 
 ### Licensing Fees (paid by media organizations to use footage)
 **Embed:**

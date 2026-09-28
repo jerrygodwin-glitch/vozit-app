@@ -9,10 +9,10 @@ const TIERS: Array<{
   revenueShare: number
   color: string
 }> = [
-  { tier: 'starter',  minReports: 0,   minCredibility: 0,  revenueShare: 0.50, color: '#22C55E' },
-  { tier: 'silver',   minReports: 26,  minCredibility: 80, revenueShare: 0.55, color: '#94A3B8' },
-  { tier: 'gold',     minReports: 101, minCredibility: 90, revenueShare: 0.65, color: '#EAB308' },
-  { tier: 'platinum', minReports: 500, minCredibility: 95, revenueShare: 0.70, color: '#8B5CF6' },
+  { tier: 'starter',  minReports: 0,   minCredibility: 0,  revenueShare: 0.40, color: '#22C55E' },
+  { tier: 'silver',   minReports: 26,  minCredibility: 80, revenueShare: 0.45, color: '#94A3B8' },
+  { tier: 'gold',     minReports: 101, minCredibility: 90, revenueShare: 0.50, color: '#EAB308' },
+  { tier: 'platinum', minReports: 500, minCredibility: 95, revenueShare: 0.55, color: '#8B5CF6' },
 ]
 
 // Calculate what tier a reporter qualifies for

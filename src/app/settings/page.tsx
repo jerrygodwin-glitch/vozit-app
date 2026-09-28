@@ -2,7 +2,7 @@
 import { Nav, Top } from '@/lib/ui'
 import { useAuth } from '@/hooks/useAuth'
 
-const TC: Record<string, { c: string; rate: string }> = { starter: { c: '#22C55E', rate: '50%' }, silver: { c: '#64748B', rate: '55%' }, gold: { c: '#CA8A04', rate: '65%' }, platinum: { c: '#7C3AED', rate: '70%' } }
+const TC: Record<string, { c: string; rate: string }> = { starter: { c: '#22C55E', rate: '40%' }, silver: { c: '#64748B', rate: '45%' }, gold: { c: '#CA8A04', rate: '50%' }, platinum: { c: '#7C3AED', rate: '55%' } }
 
 export default function Settings() {
   const { user, loading } = useAuth()
@@ -26,7 +26,7 @@ export default function Settings() {
         <div className="card">
           <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>TIER PROGRESSION</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            {[{ l: 'Starter', s: '50%', r: '0-25', c: '#22C55E' }, { l: 'Silver', s: '55%', r: '26-100', c: '#64748B' }, { l: 'Gold', s: '65%', r: '101-499', c: '#CA8A04' }, { l: 'Platinum', s: '70%', r: '500+', c: '#7C3AED' }].map(t => (
+            {[{ l: 'Starter', s: '40%', r: '0-25', c: '#22C55E' }, { l: 'Silver', s: '45%', r: '26-100', c: '#64748B' }, { l: 'Gold', s: '50%', r: '101-499', c: '#CA8A04' }, { l: 'Platinum', s: '55%', r: '500+', c: '#7C3AED' }].map(t => (
               <div key={t.l} style={{ padding: 10, borderRadius: 12, background: t.c + '10', border: '1px solid ' + t.c + '25' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: t.c }}>★ {t.l}</div>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>{t.s}</div>
