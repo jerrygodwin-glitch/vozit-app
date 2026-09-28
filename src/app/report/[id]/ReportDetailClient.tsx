@@ -45,6 +45,25 @@ const floatPos=FLOAT_POSITIONS[Math.floor(currentTime/4)%FLOAT_POSITIONS.length]
 const isOwner=user?.id===r.user_id
 const otherParts=(seriesReports||[]).filter(sr=>sr.id!==r.id)
 async function vote(d:'up'|'down'){if(voted===d)return;setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}));fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})}).catch(()=>{})}
+
+// Multi-reporter corroboration — independent reports near the same place/time
+const[corroboration,setCorroboration]=useState<{count:number,corroborating:any[]}>({count:0,corroborating:[]})
+useEffect(()=>{
+  fetch(`/api/reports/corroboration?report_id=${r.id}`).then(res=>res.json()).then(d=>setCorroboration({count:d.count||0,corroborating:d.corroborating||[]})).catch(()=>{})
+},[r.id])
+
+// Community "flag as fake/misleading" — separate from up/downvotes
+const[showFlagMenu,setShowFlagMenu]=useState(false)
+const[flagged,setFlagged]=useState(false)
+const[flagMsg,setFlagMsg]=useState('')
+async function flag(reason:string){
+  try{
+    const res=await fetch('/api/reports/flag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,reason})})
+    const d=await res.json()
+    if(!res.ok){setFlagMsg(d.error||'Could not flag this report');return}
+    setFlagged(true);setShowFlagMenu(false);setFlagMsg('Thanks — this has been sent for review.')
+  }catch(e:any){setFlagMsg(e.message)}
+}
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div style={{position:'relative',overflow:'hidden'}}>
   <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
@@ -78,6 +97,11 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 {r.description&&<p style={{fontSize:14,color:'#333',lineHeight:1.6,marginBottom:16}}>{r.description}</p>}
 <div style={{background:'#fafafa',borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>{[{l:'WHO',v:r.who,c:'#B53D0F'},{l:'WHAT',v:r.what,c:'#1565C0'},{l:'WHERE',v:r.where_text||r.location_name,c:'#085041'},{l:'WHEN',v:r.when_happened?new Date(r.when_happened).toLocaleString():'',c:'#854F0B'},{l:'WHY',v:r.why,c:'#993556'}].map(w=>w.v?(<div key={w.l} style={{display:'flex',gap:10,marginBottom:8}}><span style={{fontSize:10,fontWeight:700,color:w.c,width:40,flexShrink:0}}>{w.l}</span><span style={{fontSize:13,color:'#333',lineHeight:1.4}}>{w.v}</span></div>):null)}</div>
 
+{corroboration.count>0&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:16,background:'#ECFDF5',border:'1px solid #A7F3D0'}}>
+<div style={{fontSize:12,fontWeight:700,color:'#065F46',marginBottom:corroboration.count?4:0}}>✓ Corroborated by {corroboration.count} other report{corroboration.count===1?'':'s'}</div>
+<div style={{fontSize:11,color:'#065F46'}}>Independent reporters filed video near this same place and time.</div>
+</div>}
+
 {(otherParts.length>0||isOwner)&&<div style={{borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>
 <div style={{fontSize:11,fontWeight:700,color:'#888',marginBottom:otherParts.length?8:0,textTransform:'uppercase',letterSpacing:0.5}}>{otherParts.length>0?`Ongoing story · ${seriesReports.length} updates`:'Ongoing story'}</div>
 {seriesReports.map(sr=>(
@@ -97,4 +121,18 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 <button onClick={()=>vote('down')} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #eee',cursor:'pointer',fontSize:13,fontWeight:600,background:voted==='down'?'#FEF2F2':'#fff',color:voted==='down'?'#DC2626':'#333',fontFamily:'inherit'}}>{'\u25bc'} {votes.down}</button>
 </div>
 <div style={{marginBottom:14}}><ShareButton reportId={r.id} title={r.title} location={r.location_name} username={r.user?.username}/></div>
+
+<div style={{marginBottom:20}}>
+{flagged||flagMsg?<div style={{fontSize:12,color:'#666',textAlign:'center'}}>{flagMsg}</div>:showFlagMenu?(
+<div style={{border:'1px solid #eee',borderRadius:10,padding:12}}>
+<div style={{fontSize:12,fontWeight:600,color:'#1a1a1a',marginBottom:8}}>Why does this look fake or misleading?</div>
+{[{v:'fake_or_ai_generated',l:'Looks AI-generated / deepfake'},{v:'recycled_footage',l:'Old footage passed off as new'},{v:'wrong_location_or_time',l:'Wrong location or time'},{v:'other',l:'Other'}].map(o=>(
+<button key={o.v} onClick={()=>flag(o.v)} style={{display:'block',width:'100%',textAlign:'left',padding:'8px 10px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#333',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginBottom:6}}>{o.l}</button>
+))}
+<button onClick={()=>setShowFlagMenu(false)} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+</div>
+):(
+<button onClick={()=>setShowFlagMenu(true)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>🚩 Flag as fake or misleading</button>
+)}
+</div>
 </div></div>)}

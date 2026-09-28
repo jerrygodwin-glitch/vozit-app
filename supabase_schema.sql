@@ -77,6 +77,11 @@ CREATE TABLE public.reports (
   gps_verified      BOOLEAN NOT NULL DEFAULT false,
   category          TEXT NOT NULL DEFAULT 'other'
                       CHECK (category IN ('justice','politics','economy','environment','crisis','entertainment','sports','other')),
+  bearing_degrees   NUMERIC(5,1),
+  altitude_meters   NUMERIC(7,1),
+  weather_data      JSONB,
+  transcript        TEXT,
+  flag_count        INT NOT NULL DEFAULT 0,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

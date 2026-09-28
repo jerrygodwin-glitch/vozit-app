@@ -150,7 +150,11 @@ export async function POST(req: NextRequest) {
     // Pre-publish text moderation — the video itself is scanned separately once
     // Mux finishes processing it (see /api/mux-webhook). This catches abusive
     // titles/descriptions before they ever reach the public feed.
-    const textModeration = await moderateContent({ title: titleClean, who: whoClean, what: whatClean, why: whyClean })
+    const textModeration = await moderateContent({
+      title: titleClean, who: whoClean, what: whatClean, why: whyClean,
+      whenHappened: when_happened || null, locationName: locationNameClean,
+      locationLat: location_lat ?? null, locationLng: location_lng ?? null,
+    })
     let status: 'published' | 'flagged' | 'removed' = 'published'
     if (textModeration.autoAction === 'auto_remove' || textModeration.autoAction === 'auto_ban') {
       status = 'removed'

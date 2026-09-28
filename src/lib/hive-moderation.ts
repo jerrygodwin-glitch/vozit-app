@@ -10,7 +10,8 @@ export type ModerationCategory =
   | 'hate_symbol' | 'hate_speech'
   | 'drugs' | 'self_harm'
   | 'spam' | 'misleading'
-  | 'ai_generated'
+  | 'ai_generated' | 'ai_generated_audio'
+  | 'metadata_mismatch' | 'duplicate_content'
 
 export type ModerationSeverity = 'safe' | 'low' | 'medium' | 'high' | 'critical'
 
@@ -57,6 +58,8 @@ const THRESHOLDS = {
     self_harm: 0.60,
     misleading: 0.70,
     ai_generated: 0.50,    // Lower-confidence AI-generated signal — don't auto-remove, but a human should look
+    ai_generated_audio: 0.50, // Possible voice clone / synthetic narration
+    metadata_mismatch: 0.50,  // GPS/timestamp inconsistency — see checkMetadataConsistency()
   },
 }
 
@@ -187,6 +190,118 @@ export async function scanAIGeneratedContent(videoUrl: string): Promise<Moderati
   }
 }
 
+// Scan the video's audio track for synthetic/cloned voice content — a
+// separate signal from the visual deepfake scan above, since a narration
+// track can be AI-generated even when the footage itself is real.
+//
+// VERIFY BEFORE RELYING ON THIS: same caveat as scanAIGeneratedContent —
+// the exact model key/response shape was not confirmed against Hive's
+// live, authenticated API reference. Check against your account's actual
+// API docs before treating this as verified in production.
+export async function scanAIGeneratedAudio(videoUrl: string): Promise<ModerationFlag[]> {
+  if (!process.env.HIVE_API_KEY) {
+    console.warn('Hive API key not configured — skipping AI-generated audio scan')
+    return []
+  }
+
+  try {
+    const res = await fetch('https://api.thehive.ai/api/v2/task/sync', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${process.env.HIVE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: videoUrl,
+        models: { 'audio_deepfake_detection': {} },
+      }),
+      signal: AbortSignal.timeout(60000),
+    })
+
+    if (!res.ok) {
+      console.error('Hive audio deepfake detection API error:', res.status)
+      return []
+    }
+
+    const data = await res.json()
+    const flags: ModerationFlag[] = []
+    const results = data.status?.[0]?.response?.output || []
+
+    for (const frame of results) {
+      const classes = frame.classes || []
+      for (const cls of classes) {
+        if ((cls.class === 'synthetic_voice' || cls.class === 'voice_clone' || cls.class === 'ai_generated') && cls.score > 0.3) {
+          flags.push({
+            category: 'ai_generated_audio',
+            confidence: cls.score,
+            severity: scoreSeverity(cls.score),
+            timestamp: frame.time,
+            description: `Possible synthetic/cloned voice: ${(cls.score * 100).toFixed(1)}% confidence`,
+          })
+        }
+      }
+    }
+
+    return flags
+  } catch (e: any) {
+    console.error('Hive audio deepfake scan failed:', e.message)
+    return []
+  }
+}
+
+// Cross-checks a report's own claimed details against each other — catches
+// sloppy fakes and recycled footage without needing any external API.
+// Pure, synchronous, no network calls.
+export function checkMetadataConsistency(params: {
+  whenHappened?: string | null
+  locationName?: string | null
+  locationLat?: number | null
+  locationLng?: number | null
+  createdAt?: string
+}): ModerationFlag[] {
+  const flags: ModerationFlag[] = []
+  const now = params.createdAt ? new Date(params.createdAt) : new Date()
+
+  if (params.whenHappened) {
+    const claimed = new Date(params.whenHappened)
+    const hoursDiff = (now.getTime() - claimed.getTime()) / (1000 * 60 * 60)
+
+    // Claiming an event happened in the future
+    if (hoursDiff < -1) {
+      flags.push({
+        category: 'metadata_mismatch',
+        confidence: 0.9,
+        severity: 'high',
+        description: `Claimed event time (${params.whenHappened}) is in the future relative to upload time`,
+      })
+    }
+    // Claiming "breaking news" timing on footage that's actually weeks old —
+    // not disqualifying (old footage can be legitimate follow-up/archival),
+    // but worth a human glance rather than auto-treating it as fresh.
+    else if (hoursDiff > 24 * 14) {
+      flags.push({
+        category: 'metadata_mismatch',
+        confidence: 0.5,
+        severity: 'low',
+        description: `Claimed event time is ${Math.round(hoursDiff / 24)} days before upload — verify this isn't recycled footage`,
+      })
+    }
+  }
+
+  // A named location with no coordinates at all is a weaker report — not
+  // inherently suspicious (GPS can be denied/unavailable), just noted.
+  if (params.locationName && (params.locationLat == null || params.locationLng == null)) {
+    flags.push({
+      category: 'metadata_mismatch',
+      confidence: 0.35,
+      severity: 'low',
+      description: 'Location named but no GPS coordinates captured',
+    })
+  }
+
+  return flags
+}
+
 // Scan text content (title, description, 5Ws) for hate speech / misleading
 export async function scanText(text: string): Promise<ModerationFlag[]> {
   if (!process.env.HIVE_API_KEY || !text.trim()) return []
@@ -306,16 +421,22 @@ export async function moderateContent(params: {
   who?: string
   what?: string
   why?: string
+  whenHappened?: string | null
+  locationName?: string | null
+  locationLat?: number | null
+  locationLng?: number | null
 }): Promise<ModerationResult> {
   const startTime = Date.now()
   const allFlags: ModerationFlag[] = []
 
-  // 1. Scan video frames (if URL available)
+  // 1. Scan video frames + audio (if URL available)
   if (params.videoUrl) {
     const videoFlags = await scanVideoFrames(params.videoUrl)
     allFlags.push(...videoFlags)
     const aiGenFlags = await scanAIGeneratedContent(params.videoUrl)
     allFlags.push(...aiGenFlags)
+    const audioFlags = await scanAIGeneratedAudio(params.videoUrl)
+    allFlags.push(...audioFlags)
   }
 
   // 2. Scan text content
@@ -326,7 +447,16 @@ export async function moderateContent(params: {
     allFlags.push(...textFlags)
   }
 
-  // 3. Determine action
+  // 3. Cross-check the report's own claimed details against each other —
+  // no external API, always runs.
+  allFlags.push(...checkMetadataConsistency({
+    whenHappened: params.whenHappened,
+    locationName: params.locationName,
+    locationLat: params.locationLat,
+    locationLng: params.locationLng,
+  }))
+
+  // 4. Determine action
   const autoAction = determineAction(allFlags)
   const highestSeverity = allFlags.reduce<ModerationSeverity>((max, f) => {
     const order: ModerationSeverity[] = ['safe', 'low', 'medium', 'high', 'critical']

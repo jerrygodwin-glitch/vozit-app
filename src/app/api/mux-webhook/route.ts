@@ -132,6 +132,10 @@ export async function POST(req: NextRequest) {
         who: report.who,
         what: report.what,
         why: report.why,
+        whenHappened: report.when_happened,
+        locationName: report.location_name,
+        locationLat: report.location_lat,
+        locationLng: report.location_lng,
       })
 
       // Log moderation result
