@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import{useState,useEffect,useRef}from'react'
+import*as UpChunk from'@mux/upchunk'
 import{createBrowserClient}from'@/lib/supabase'
 import{NavBar}from'@/components/ui/NavBar'
 import{CameraRecorder}from'@/components/camera/CameraRecorder'
@@ -12,18 +13,19 @@ type Step='record'|'voiceover'|'mode'|'quick'|'detailed'|'review'|'submitting'|'
 type FiveWs={who:string;what:string;where_text:string;when_happened:string;why:string}
 type AISuggestion={suggested:FiveWs;confidence:Record<string,number>;sources:Record<string,string>;summary:string;tags:string[]}
 
-// XHR (not fetch) is what actually exposes upload progress events, so a
-// large video on a slow mobile connection shows real percentage instead of
-// an indefinite spinner that looks frozen.
+// Chunked, resumable upload (Mux's own recommended client for their direct-
+// upload URLs) instead of one giant PUT. On a dropped connection mid-upload,
+// UpChunk automatically retries the chunk that failed — the whole file
+// doesn't restart from byte zero. It won't survive fully closing the app
+// mid-upload (that would need a native background task), but it fixes the
+// much more common case: a spotty connection dropping and picking back up
+// while the reporter stays on the page.
 function uploadWithProgress(url:string,blob:Blob,onProgress:(pct:number)=>void):Promise<void>{
   return new Promise((resolve,reject)=>{
-    const xhr=new XMLHttpRequest()
-    xhr.open('PUT',url)
-    xhr.setRequestHeader('Content-Type',blob.type||'video/webm')
-    xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round((e.loaded/e.total)*100))}
-    xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300)resolve();else reject(new Error(`Upload failed (${xhr.status}). Check your connection and try again.`))}
-    xhr.onerror=()=>reject(new Error('Network error during upload. Check your connection and try again.'))
-    xhr.send(blob)
+    const upload=UpChunk.createUpload({endpoint:url,file:blob,chunkSize:5120})
+    upload.on('progress',(e:any)=>onProgress(Math.round(e.detail)))
+    upload.on('success',()=>resolve())
+    upload.on('error',(e:any)=>reject(new Error(e.detail?.message||'Upload failed. Check your connection and try again.')))
   })
 }
 
