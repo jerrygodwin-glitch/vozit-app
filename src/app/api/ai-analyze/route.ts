@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await req.json()
-    const { report_id, title, notes, who, what, where_text, when_happened, why, gps, playback_id, duration, captured_at } = body
+    const { report_id, title, notes, who, what, where_text, when_happened, why, gps, playback_id, duration, captured_at, transcript } = body
 
     if (!report_id && !title) return NextResponse.json({ error: 'report_id or title required' }, { status: 400 })
 
@@ -42,6 +42,10 @@ export async function POST(req: NextRequest) {
       duration: duration || reportData?.duration || 0,
       capturedAt: captured_at || reportData?.created_at || new Date().toISOString(),
       gps: gps || (reportData?.location_lat ? { lat: reportData.location_lat, lng: reportData.location_lng } : undefined),
+      // Transcribed client-side from the local video before Mux ever sees
+      // it (see /api/ai-transcribe) — this is what actually makes the
+      // Quick-mode "analyzes your video audio" claim true.
+      transcript: transcript || '',
     }
 
     // Run AI analysis

@@ -35,6 +35,7 @@ const[notes,setNotes]=useState('')
 const[fiveW,setFiveW]=useState<FiveWs>({who:'',what:'',where_text:'',when_happened:'',why:''})
 const[category,setCategory]=useState('other')
 const[assignmentId,setAssignmentId]=useState('')
+const[transcript,setTranscript]=useState('')
 const[activeAssignments,setActiveAssignments]=useState<any[]>([])
 const[gps,setGps]=useState<{lat:number;lng:number}|null>(null)
 const[altitude,setAltitude]=useState<number|null>(null)
@@ -153,6 +154,19 @@ function handleVideoReady(blob:Blob,metadata:{duration:number;gps?:{lat:number;l
 async function requestAIAnalysis(){
   setAnalyzing(true)
   try{
+    // Transcribe the reporter's own spoken narration from the local video —
+    // this is what actually makes "AI analyzes your video audio" true,
+    // rather than only ever reading the typed title/notes.
+    let transcriptText=transcript
+    if(!transcriptText&&videoBlob&&hasAudio){
+      try{
+        const fd=new FormData()
+        fd.append('video',videoBlob,'clip.webm')
+        const tr=await fetch('/api/ai-transcribe',{method:'POST',body:fd})
+        const td=await tr.json()
+        if(td.transcript){transcriptText=td.transcript;setTranscript(td.transcript)}
+      }catch{}
+    }
     const r=await fetch('/api/ai-analyze',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -160,6 +174,7 @@ async function requestAIAnalysis(){
         title, notes,
         ...fiveW,
         gps, captured_at:new Date().toISOString(),
+        transcript:transcriptText,
       }),
     })
     const d=await r.json()
@@ -223,7 +238,7 @@ async function submitReport(){
         assignment_id:assignmentId||undefined,
         location_lat:gps?.lat,location_lng:gps?.lng,
         bearing_degrees:bearing??undefined,altitude_meters:altitude??undefined,
-        content_hash,
+        content_hash,transcript:transcript||undefined,
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
         update_to_report_id:updateToReportId||undefined,
@@ -526,7 +541,7 @@ return(<div style={{minHeight:'100vh',background:'#fff',display:'flex',alignItem
 <a href={`/upload?update_to=${reportId}&update_to_title=${encodeURIComponent(title)}`} style={{display:'inline-block',padding:'10px 20px',borderRadius:8,border:'1px solid #FED7AA',background:'#FEF3E6',color:'#B53D0F',fontSize:13,fontWeight:600,textDecoration:'none',fontFamily:'inherit'}}>🔴 Still unfolding? Post an update</a>
 </div>}
 <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setCategory('other');setAssignmentId('');setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
+<button onClick={()=>{setStep('record');setTitle('');setNotes('');setFiveW({who:'',what:'',where_text:'',when_happened:'',why:''});setCategory('other');setAssignmentId('');setTranscript('');setAiSuggestion(null);setUpdateToReportId('');setUpdateToTitle('')}} style={{padding:'10px 20px',borderRadius:8,border:'none',background:BRAND.orange,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Record another</button>
 <a href="/feed" style={{padding:'10px 20px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#666',fontSize:13,fontWeight:500,textDecoration:'none',fontFamily:'inherit'}}>Go to feed</a>
 </div>
 </div>
