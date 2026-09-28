@@ -17,7 +17,6 @@ export async function POST(req: NextRequest) {
     if (!report_id && !title) return NextResponse.json({ error: 'report_id or title required' }, { status: 400 })
 
     // If report_id provided, fetch existing data
-    let transcript = ''
     let reportData: any = null
     if (report_id) {
       const { data } = await supabase
