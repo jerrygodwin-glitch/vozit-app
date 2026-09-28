@@ -37,6 +37,8 @@ const[category,setCategory]=useState('other')
 const[assignmentId,setAssignmentId]=useState('')
 const[activeAssignments,setActiveAssignments]=useState<any[]>([])
 const[gps,setGps]=useState<{lat:number;lng:number}|null>(null)
+const[altitude,setAltitude]=useState<number|null>(null)
+const[bearing,setBearing]=useState<number|null>(null)
 const[aiSuggestion,setAiSuggestion]=useState<AISuggestion|null>(null)
 const[analyzing,setAnalyzing]=useState(false)
 const[accepted,setAccepted]=useState<Record<string,boolean>>({who:false,what:false,where_text:false,when_happened:false,why:false})
@@ -59,8 +61,30 @@ useEffect(()=>{
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(p=>{
       setGps({lat:p.coords.latitude,lng:p.coords.longitude})
+      // GPS altitude is often less precise than lat/lng and isn't always
+      // reported at all — capture it when present, don't require it.
+      if(p.coords.altitude!=null)setAltitude(Math.round(p.coords.altitude))
     },()=>{},{enableHighAccuracy:true})
   }
+},[])
+
+// Compass bearing — iOS requires an explicit permission prompt (must be
+// triggered from a user gesture), Android generally doesn't. Best-effort:
+// if it's unavailable or denied, we just don't capture it.
+useEffect(()=>{
+  function onOrientation(e:any){
+    const heading=e.webkitCompassHeading??(e.alpha!=null?360-e.alpha:null)
+    if(heading!=null)setBearing(Math.round(heading))
+  }
+  const DOE:any=(window as any).DeviceOrientationEvent
+  if(DOE&&typeof DOE.requestPermission==='function'){
+    DOE.requestPermission().then((state:string)=>{
+      if(state==='granted')window.addEventListener('deviceorientation',onOrientation)
+    }).catch(()=>{})
+  }else if(DOE){
+    window.addEventListener('deviceorientation',onOrientation)
+  }
+  return()=>window.removeEventListener('deviceorientation',onOrientation)
 },[])
 
 // If we arrived via "Post an update" from an existing report, remember which one
@@ -166,6 +190,19 @@ async function submitReport(){
     const{data:{user}}=await sb.auth.getUser()
     if(!user){submittingRef.current=false;return}
 
+    // Hash the raw video bytes so the server can catch an exact re-upload of
+    // the same file (recycled footage passed off as a new event). This only
+    // catches byte-identical duplicates, not a re-encoded/trimmed copy —
+    // real perceptual/frame-fingerprint matching is a bigger future step.
+    let content_hash:string|undefined
+    if(videoBlob){
+      try{
+        const buf=await videoBlob.arrayBuffer()
+        const digest=await crypto.subtle.digest('SHA-256',buf)
+        content_hash=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('')
+      }catch{}
+    }
+
     // Upload the captured video to Mux before creating the report, so the
     // report can be linked to it from the moment it's created.
     let mux_upload_id:string|undefined
@@ -185,6 +222,8 @@ async function submitReport(){
         category,
         assignment_id:assignmentId||undefined,
         location_lat:gps?.lat,location_lng:gps?.lng,
+        bearing_degrees:bearing??undefined,altitude_meters:altitude??undefined,
+        content_hash,
         ai_enhanced:!!aiSuggestion,
         ai_tags:aiSuggestion?.tags||[],
         update_to_report_id:updateToReportId||undefined,

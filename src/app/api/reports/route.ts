@@ -7,6 +7,7 @@ import { checkAndPromoteTier } from '@/lib/revenue'
 import { rateLimit, RATE_LIMITS, sanitizeInput } from '@/lib/security'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
 import { captureError } from '@/lib/monitoring'
+import { lookupWeather } from '@/lib/weather'
 
 export async function GET(req: NextRequest) {
   try {
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category, assignment_id } = body
+    const { title, who, what, where_text, when_happened, why, location_name, location_lat, location_lng, mux_upload_id, content_hash, update_to_report_id, category, assignment_id, bearing_degrees, altitude_meters } = body
 
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
@@ -162,6 +163,9 @@ export async function POST(req: NextRequest) {
       status = 'flagged'
     }
 
+    // Best-effort weather lookup — never blocks publishing if it's slow or fails
+    const weatherData = (location_lat && location_lng) ? await lookupWeather(location_lat, location_lng) : null
+
     // Insert report
     const { data: report, error } = await supabase.from('reports').insert({
       user_id: user.id,
@@ -176,6 +180,9 @@ export async function POST(req: NextRequest) {
       location_lng: location_lng || null,
       category: categoryClean,
       assignment_id: assignmentIdClean,
+      bearing_degrees: bearing_degrees ?? null,
+      altitude_meters: altitude_meters ?? null,
+      weather_data: weatherData,
       mux_upload_id: mux_upload_id || null,
       content_hash: content_hash || null,
       series_id: seriesId,
