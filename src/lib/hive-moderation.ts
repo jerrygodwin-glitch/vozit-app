@@ -23,6 +23,12 @@ export interface ModerationResult {
   scanId: string
   scannedAt: string
   processingMs: number
+  // Show a localized crisis-resource panel to viewers — independent of
+  // autoAction, since this can be true even when the content just publishes.
+  showCrisisResources: boolean
+  // True when auto_remove was triggered by a NO_STRIKE_CATEGORIES match —
+  // tells the caller to skip applyStrike() for this removal.
+  noStrikeRemoval: boolean
 }
 
 export interface ModerationFlag {
@@ -42,6 +48,12 @@ const THRESHOLDS = {
     minor: 0.70,           // Lower threshold for child safety
     minor_suggestive: 0.60, // Very low — err on side of caution
     ai_generated: 0.85,    // High-confidence AI-generated/deepfake — VozIt only accepts real recorded footage
+    // High-confidence self-harm depiction only — see NO_STRIKE_CATEGORIES
+    // below. Moderate-confidence hits (someone discussing their own
+    // experience, news coverage) are handled separately, via
+    // SELF_HARM_PANEL_THRESHOLD, and are meant to publish normally with a
+    // crisis-resource panel rather than being removed at all.
+    self_harm: 0.85,
   },
   // Flag for human review
   flag_review: {
@@ -61,7 +73,6 @@ const THRESHOLDS = {
     hate_symbol: 0.70,
     hate_speech: 0.65,
     drugs: 0.75,
-    self_harm: 0.60,
     misleading: 0.70,
     ai_generated: 0.50,    // Lower-confidence AI-generated signal — don't auto-remove, but a human should look
     ai_generated_audio: 0.50, // Possible voice clone / synthetic narration
@@ -69,8 +80,21 @@ const THRESHOLDS = {
   },
 }
 
+// Below this, self-harm content still publishes normally, but the viewer
+// sees a crisis-resource panel (localized to them, see crisis-resources.ts)
+// — a much lower bar than any removal threshold, since showing a helpful
+// resource on a false positive costs nothing, unlike a false-positive
+// removal or strike would.
+const SELF_HARM_PANEL_THRESHOLD = 0.40
+
 // Auto-ban categories (immediate permanent ban)
 const AUTO_BAN_CATEGORIES: ModerationCategory[] = ['minor_suggestive']
+
+// A high-confidence hit here still removes the content, but never applies
+// the account strike applyStrike() would otherwise add — the uploader may
+// be the person actually at risk, and a strike is the wrong response to
+// that, unlike for fabrication/exploitation categories.
+const NO_STRIKE_CATEGORIES: ModerationCategory[] = ['self_harm']
 
 // Never auto-remove these regardless of confidence — a human always looks
 // first. All three show up routinely in legitimate frontline combat and
@@ -477,6 +501,14 @@ export async function moderateContent(params: {
     return order.indexOf(f.severity) > order.indexOf(max) ? f.severity : max
   }, 'safe')
 
+  const showCrisisResources = allFlags.some(
+    f => f.category === 'self_harm' && f.confidence >= SELF_HARM_PANEL_THRESHOLD
+  )
+  const noStrikeRemoval = autoAction === 'auto_remove' && allFlags.some(
+    f => NO_STRIKE_CATEGORIES.includes(f.category)
+      && f.confidence >= (THRESHOLDS.auto_remove[f.category as keyof typeof THRESHOLDS.auto_remove] ?? Infinity)
+  )
+
   return {
     passed: autoAction === 'publish',
     severity: highestSeverity,
@@ -485,6 +517,8 @@ export async function moderateContent(params: {
     scanId: `HIVE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     scannedAt: new Date().toISOString(),
     processingMs: Date.now() - startTime,
+    showCrisisResources,
+    noStrikeRemoval,
   }
 }
 

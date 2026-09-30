@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { createServerClient } from '@/lib/supabase-server'
 import { ReportDetailClient } from './ReportDetailClient'
+import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 
 interface Props { params: { id: string } }
@@ -89,5 +90,9 @@ export default async function ReportDetailPage({ params }: Props) {
     seriesReports = data ?? []
   }
 
-  return <ReportDetailClient report={report} seriesReports={seriesReports} />
+  // Vercel's own edge geolocation header — who's watching, not where the
+  // event happened, since that's who a crisis-resource panel can help.
+  const viewerCountry = headers().get('x-vercel-ip-country')
+
+  return <ReportDetailClient report={report} seriesReports={seriesReports} viewerCountry={viewerCountry} />
 }

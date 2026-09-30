@@ -192,6 +192,7 @@ export async function POST(req: NextRequest) {
       series_id: seriesId,
       series_part: seriesPart,
       status,
+      show_crisis_resources: textModeration.showCrisisResources,
       upvotes: 0,
       downvotes: 0,
       credibility_pct: 80,
@@ -223,7 +224,9 @@ export async function POST(req: NextRequest) {
     // newsworthy content like violence/weapons/gore can never reach this
     // branch, see NEWSWORTHY_CATEGORIES in hive-moderation.ts) applies the
     // same strike escalation a human moderator's 'remove' action would.
-    if (textModeration.autoAction === 'auto_remove') {
+    // Skipped for self-harm removals (noStrikeRemoval) — the uploader may
+    // be the person at risk, and a strike is the wrong response to that.
+    if (textModeration.autoAction === 'auto_remove' && !textModeration.noStrikeRemoval) {
       await applyStrike(createAdminClient(), {
         userId: user.id,
         reportId: report.id,

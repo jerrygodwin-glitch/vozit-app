@@ -86,6 +86,7 @@ CREATE TABLE public.reports (
   weather_data      JSONB,
   transcript        TEXT,
   flag_count        INT NOT NULL DEFAULT 0,
+  show_crisis_resources BOOLEAN NOT NULL DEFAULT false,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

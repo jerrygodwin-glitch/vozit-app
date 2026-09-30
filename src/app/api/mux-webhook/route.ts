@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       // Find the report linked to this Mux upload
       const { data: report } = await supabase
         .from('reports')
-        .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
+        .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, show_crisis_resources, user:users(country)')
         .eq('mux_asset_id', assetId)
         .single()
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         if (uploadId) {
           const { data: r2 } = await supabase
             .from('reports')
-            .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, user:users(country)')
+            .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, show_crisis_resources, user:users(country)')
             .eq('mux_upload_id', uploadId)
             .single()
           if (!r2) return NextResponse.json({ ok: true })
@@ -168,12 +168,16 @@ export async function POST(req: NextRequest) {
         case 'auto_remove':
           videoStatus = 'removed'
           // Fabrication/exploitation categories only — never fires for
-          // violence/weapons/gore, see NEWSWORTHY_CATEGORIES.
-          await applyStrike(createAdminClient(), {
-            userId: report.user_id,
-            reportId: report.id,
-            reason: `Auto-removed: ${modResult.flags.map(f => f.category).join(', ')}`,
-          })
+          // violence/weapons/gore, see NEWSWORTHY_CATEGORIES. Also skipped
+          // for self-harm removals (noStrikeRemoval) — the uploader may be
+          // the person at risk, and a strike is the wrong response to that.
+          if (!modResult.noStrikeRemoval) {
+            await applyStrike(createAdminClient(), {
+              userId: report.user_id,
+              reportId: report.id,
+              reason: `Auto-removed: ${modResult.flags.map(f => f.category).join(', ')}`,
+            })
+          }
           break
         case 'flag_review':
           videoStatus = 'flagged'
@@ -243,6 +247,10 @@ export async function POST(req: NextRequest) {
         status: reportStatus,
         geo_risk: geoRisk.riskLevel,
         moderation_flags: modResult.flags.map(f => f.category),
+        // OR, not overwrite — the text-moderation pass at creation time may
+        // already have set this true, and a clean video scan shouldn't turn
+        // it back off.
+        show_crisis_resources: report.show_crisis_resources || modResult.showCrisisResources,
       }).eq('id', report!.id)
 
       return NextResponse.json({
