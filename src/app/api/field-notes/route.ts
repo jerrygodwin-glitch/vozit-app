@@ -9,9 +9,9 @@ const MIN_ACCOUNT_AGE_DAYS = 7
 // picked 48h as the midpoint) — concentrates engagement while a story is
 // actually breaking, rather than trickling in on old content indefinitely.
 // Separate videos/follow-ups are never time-limited — only this text note.
-const FACT_CHECK_WINDOW_HOURS = 48
+const FIELD_NOTE_WINDOW_HOURS = 48
 
-// GET /api/fact-checks?report_id=X — every note on a report, split into
+// GET /api/field-notes?report_id=X — every note on a report, split into
 // visible (sorted by helpfulness) and hidden (enough ratings, mostly
 // "not helpful") — the community's own filter, not a moderator's.
 export async function GET(req: NextRequest) {
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: notes } = await supabase
-    .from('fact_checks')
+    .from('field_notes')
     .select('*, user:users(id, username, display_name, tier)')
     .eq('report_id', reportId)
     .order('created_at', { ascending: false })
@@ -30,11 +30,11 @@ export async function GET(req: NextRequest) {
   let myRatings: Record<string, boolean> = {}
   if (user && notes?.length) {
     const { data: ratings } = await supabase
-      .from('fact_check_ratings')
-      .select('fact_check_id, helpful')
+      .from('field_note_ratings')
+      .select('field_note_id, helpful')
       .eq('user_id', user.id)
-      .in('fact_check_id', notes.map(n => n.id))
-    myRatings = Object.fromEntries((ratings || []).map(r => [r.fact_check_id, r.helpful]))
+      .in('field_note_id', notes.map(n => n.id))
+    myRatings = Object.fromEntries((ratings || []).map(r => [r.field_note_id, r.helpful]))
   }
 
   const withScore = (notes || []).map(n => ({
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ visible, hidden, hiddenCount: hidden.length })
 }
 
-// POST /api/fact-checks — add a fact-check note. Structured (category +
+// POST /api/field-notes — add a field note. Structured (category +
 // substantiation), never an open box — the category picker comes first,
 // so there's nowhere for a one-word reaction to go.
 export async function POST(req: NextRequest) {
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (!report_id) return NextResponse.json({ error: 'report_id required' }, { status: 400 })
   if (!CATEGORIES.includes(category)) return NextResponse.json({ error: `category must be one of: ${CATEGORIES.join(', ')}` }, { status: 400 })
   if (!content || content.trim().length < MIN_LENGTH) {
-    return NextResponse.json({ error: `Please write at least ${MIN_LENGTH} characters explaining your fact-check.` }, { status: 400 })
+    return NextResponse.json({ error: `Please write at least ${MIN_LENGTH} characters explaining your field note.` }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -77,24 +77,24 @@ export async function POST(req: NextRequest) {
   const { data: report } = await admin.from('reports').select('created_at').eq('id', report_id).single()
   if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
   const hoursSincePublish = (Date.now() - new Date(report.created_at).getTime()) / (1000 * 60 * 60)
-  if (hoursSincePublish > FACT_CHECK_WINDOW_HOURS) {
+  if (hoursSincePublish > FIELD_NOTE_WINDOW_HOURS) {
     return NextResponse.json({
-      error: `Fact-checks close ${FACT_CHECK_WINDOW_HOURS} hours after publishing, to keep focus on breaking developments. You can still post a follow-up video or update instead.`,
+      error: `Field notes close ${FIELD_NOTE_WINDOW_HOURS} hours after publishing, to keep focus on breaking developments. You can still post a follow-up video or update instead.`,
     }, { status: 403 })
   }
 
   // Account tenure gate — same trust principle as vote-weighting: a
-  // day-old account's fact-check is worth less scrutiny-wise than an
+  // day-old account's field note is worth less scrutiny-wise than an
   // established reporter's.
   const { data: profile } = await admin.from('users').select('created_at').eq('id', user.id).single()
   const accountAgeDays = profile ? (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24) : 0
   if (accountAgeDays < MIN_ACCOUNT_AGE_DAYS) {
     return NextResponse.json({
-      error: `Fact-checks require an account at least ${MIN_ACCOUNT_AGE_DAYS} days old — yours is ${Math.floor(accountAgeDays)} day(s) old. This helps keep fact-checks credible.`,
+      error: `Field notes require an account at least ${MIN_ACCOUNT_AGE_DAYS} days old — yours is ${Math.floor(accountAgeDays)} day(s) old. This helps keep field notes credible.`,
     }, { status: 403 })
   }
 
-  const { data: note, error } = await admin.from('fact_checks').insert({
+  const { data: note, error } = await admin.from('field_notes').insert({
     report_id, user_id: user.id, category, content: content.trim(),
   }).select('*, user:users(id, username, display_name, tier)').single()
 

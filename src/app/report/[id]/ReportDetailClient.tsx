@@ -86,50 +86,50 @@ async function flag(reason:string){
   }catch(e:any){setFlagMsg(e.message)}
 }
 
-// Fact-check notes — structured (category + substantiation), never an
+// Field notes — structured (category + substantiation), never an
 // open box, and filtered by community rating rather than a moderator.
-const FC_CATEGORIES=[
+const FN_CATEGORIES=[
   {v:'confirms_location',l:'I can confirm this location'},
   {v:'contradicts',l:'I have information that contradicts this'},
   {v:'nearby_witness',l:"I was nearby — here's what I saw"},
   {v:'additional_context',l:'Additional context'},
 ]
-const[factChecks,setFactChecks]=useState<{visible:any[],hidden:any[],hiddenCount:number}>({visible:[],hidden:[],hiddenCount:0})
-const[showAddFactCheck,setShowAddFactCheck]=useState(false)
+const[fieldNotes,setFieldNotes]=useState<{visible:any[],hidden:any[],hiddenCount:number}>({visible:[],hidden:[],hiddenCount:0})
+const[showAddFieldNote,setShowAddFieldNote]=useState(false)
 const[showHiddenNotes,setShowHiddenNotes]=useState(false)
-const[fcCategory,setFcCategory]=useState('')
-const[fcContent,setFcContent]=useState('')
-const[fcSubmitting,setFcSubmitting]=useState(false)
-const[fcError,setFcError]=useState('')
+const[fnCategory,setFnCategory]=useState('')
+const[fnContent,setFnContent]=useState('')
+const[fnSubmitting,setFnSubmitting]=useState(false)
+const[fnError,setFnError]=useState('')
 
-async function loadFactChecks(){
-  try{const res=await fetch(`/api/fact-checks?report_id=${r.id}`);const d=await res.json();setFactChecks({visible:d.visible||[],hidden:d.hidden||[],hiddenCount:d.hiddenCount||0})}catch{}
+async function loadFieldNotes(){
+  try{const res=await fetch(`/api/field-notes?report_id=${r.id}`);const d=await res.json();setFieldNotes({visible:d.visible||[],hidden:d.hidden||[],hiddenCount:d.hiddenCount||0})}catch{}
 }
-useEffect(()=>{loadFactChecks()},[r.id])
+useEffect(()=>{loadFieldNotes()},[r.id])
 
 const accountAgeDays=user?.created_at?(Date.now()-new Date(user.created_at).getTime())/86400000:0
-const FACT_CHECK_WINDOW_HOURS=48
+const FIELD_NOTE_WINDOW_HOURS=48
 const hoursSincePublish=(Date.now()-new Date(r.created_at).getTime())/3600000
-const factCheckWindowOpen=hoursSincePublish<=FACT_CHECK_WINDOW_HOURS
-const factCheckEligible=accountAgeDays>=7&&factCheckWindowOpen
+const fieldNoteWindowOpen=hoursSincePublish<=FIELD_NOTE_WINDOW_HOURS
+const fieldNoteEligible=accountAgeDays>=7&&fieldNoteWindowOpen
 
-async function submitFactCheck(){
-  if(!fcCategory||fcContent.trim().length<30)return
-  setFcSubmitting(true);setFcError('')
+async function submitFieldNote(){
+  if(!fnCategory||fnContent.trim().length<30)return
+  setFnSubmitting(true);setFnError('')
   try{
-    const res=await fetch('/api/fact-checks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,category:fcCategory,content:fcContent.trim()})})
+    const res=await fetch('/api/field-notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,category:fnCategory,content:fnContent.trim()})})
     const d=await res.json()
-    if(!res.ok){setFcError(d.error||'Could not post this fact-check');return}
-    setFcCategory('');setFcContent('');setShowAddFactCheck(false)
-    await loadFactChecks()
-  }catch(e:any){setFcError(e.message)}
-  setFcSubmitting(false)
+    if(!res.ok){setFnError(d.error||'Could not post this field note');return}
+    setFnCategory('');setFnContent('');setShowAddFieldNote(false)
+    await loadFieldNotes()
+  }catch(e:any){setFnError(e.message)}
+  setFnSubmitting(false)
 }
 
-async function rateFactCheck(id:string,helpful:boolean){
+async function rateFieldNote(id:string,helpful:boolean){
   try{
-    await fetch('/api/fact-checks/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fact_check_id:id,helpful})})
-    await loadFactChecks()
+    await fetch('/api/field-notes/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({field_note_id:id,helpful})})
+    await loadFieldNotes()
   }catch{}
 }
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
@@ -211,66 +211,66 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 )}
 </div>
 
-{/* Fact-check notes — available on every report, not just flagged ones.
+{/* Field notes — available on every report, not just flagged ones.
     Sorted by community helpfulness rating, not chronologically. */}
 <div style={{borderTop:'1px solid #f0f0f0',paddingTop:16}}>
 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
 <div>
-<div style={{fontSize:13,fontWeight:700,color:'#1a1a1a'}}>Fact Checks {factChecks.visible.length>0&&`(${factChecks.visible.length})`}</div>
-<div style={{fontSize:10,color:'#999',marginTop:2}}>{factCheckWindowOpen?`Open for ${Math.max(0,Math.ceil(FACT_CHECK_WINDOW_HOURS-hoursSincePublish))} more hour${Math.ceil(FACT_CHECK_WINDOW_HOURS-hoursSincePublish)===1?'':'s'}`:'Window closed — follow-ups can still be posted as a new report'}</div>
+<div style={{fontSize:13,fontWeight:700,color:'#1a1a1a'}}>Field Notes {fieldNotes.visible.length>0&&`(${fieldNotes.visible.length})`}</div>
+<div style={{fontSize:10,color:'#999',marginTop:2}}>{fieldNoteWindowOpen?`Open for ${Math.max(0,Math.ceil(FIELD_NOTE_WINDOW_HOURS-hoursSincePublish))} more hour${Math.ceil(FIELD_NOTE_WINDOW_HOURS-hoursSincePublish)===1?'':'s'}`:'Window closed — follow-ups can still be posted as a new report'}</div>
 </div>
-{user&&!showAddFactCheck&&<button onClick={()=>setShowAddFactCheck(true)} style={{fontSize:11,fontWeight:600,color:'#0a8fe8',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>+ Add a fact check</button>}
+{user&&!showAddFieldNote&&<button onClick={()=>setShowAddFieldNote(true)} style={{fontSize:11,fontWeight:600,color:'#0a8fe8',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>+ Add a field note</button>}
 </div>
 
-{showAddFactCheck&&(
+{showAddFieldNote&&(
 <div style={{border:'1px solid #eee',borderRadius:10,padding:12,marginBottom:12,background:'#fafafa'}}>
-{!factCheckEligible?(
+{!fieldNoteEligible?(
 <div style={{fontSize:12,color:'#92400E',background:'#FEF3E6',border:'1px solid #FED7AA',borderRadius:8,padding:10}}>
-{!factCheckWindowOpen
-  ?`Fact-checks closed ${FACT_CHECK_WINDOW_HOURS} hours after this report published, to keep focus on breaking developments. You can still post a follow-up video or update instead.`
-  :`Fact-checks require an account at least 7 days old (yours is ${Math.max(0,Math.floor(accountAgeDays))} day${Math.floor(accountAgeDays)===1?'':'s'} old) — this helps keep fact-checks credible.`}
-<div><button onClick={()=>setShowAddFactCheck(false)} style={{marginTop:8,fontSize:11,color:'#92400E',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Close</button></div>
+{!fieldNoteWindowOpen
+  ?`Field notes closed ${FIELD_NOTE_WINDOW_HOURS} hours after this report published, to keep focus on breaking developments. You can still post a follow-up video or update instead.`
+  :`Field notes require an account at least 7 days old (yours is ${Math.max(0,Math.floor(accountAgeDays))} day${Math.floor(accountAgeDays)===1?'':'s'} old) — this helps keep field notes credible.`}
+<div><button onClick={()=>setShowAddFieldNote(false)} style={{marginTop:8,fontSize:11,color:'#92400E',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Close</button></div>
 </div>
 ):(<>
-<div style={{fontSize:12,fontWeight:600,color:'#1a1a1a',marginBottom:8}}>What kind of fact-check is this?</div>
-{FC_CATEGORIES.map(c=>(
-<button key={c.v} onClick={()=>setFcCategory(c.v)} style={{display:'block',width:'100%',textAlign:'left',padding:'8px 10px',borderRadius:8,border:fcCategory===c.v?'2px solid #0a8fe8':'1px solid #eee',background:fcCategory===c.v?'#EFF6FF':'#fff',color:'#333',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginBottom:6}}>{c.l}</button>
+<div style={{fontSize:12,fontWeight:600,color:'#1a1a1a',marginBottom:8}}>What kind of field note is this?</div>
+{FN_CATEGORIES.map(c=>(
+<button key={c.v} onClick={()=>setFnCategory(c.v)} style={{display:'block',width:'100%',textAlign:'left',padding:'8px 10px',borderRadius:8,border:fnCategory===c.v?'2px solid #0a8fe8':'1px solid #eee',background:fnCategory===c.v?'#EFF6FF':'#fff',color:'#333',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginBottom:6}}>{c.l}</button>
 ))}
-{fcCategory&&<>
-<textarea value={fcContent} onChange={e=>setFcContent(e.target.value)} placeholder="Explain what you know — be specific." rows={3} style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid #ddd',fontSize:12,fontFamily:'inherit',resize:'vertical',marginTop:4}}/>
-<div style={{fontSize:10,color:fcContent.trim().length>=30?'#22C55E':'#999',marginTop:4,marginBottom:8}}>{fcContent.trim().length}/30 characters minimum</div>
-{fcError&&<div style={{fontSize:11,color:'#DC2626',marginBottom:8}}>{fcError}</div>}
+{fnCategory&&<>
+<textarea value={fnContent} onChange={e=>setFnContent(e.target.value)} placeholder="Explain what you know — be specific." rows={3} style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid #ddd',fontSize:12,fontFamily:'inherit',resize:'vertical',marginTop:4}}/>
+<div style={{fontSize:10,color:fnContent.trim().length>=30?'#22C55E':'#999',marginTop:4,marginBottom:8}}>{fnContent.trim().length}/30 characters minimum</div>
+{fnError&&<div style={{fontSize:11,color:'#DC2626',marginBottom:8}}>{fnError}</div>}
 <div style={{display:'flex',gap:8}}>
-<button onClick={submitFactCheck} disabled={fcSubmitting||fcContent.trim().length<30} style={{flex:1,padding:8,borderRadius:8,border:'none',background:'#0a8fe8',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:(fcSubmitting||fcContent.trim().length<30)?0.5:1}}>{fcSubmitting?'Posting...':'Post fact-check'}</button>
-<button onClick={()=>{setShowAddFactCheck(false);setFcCategory('');setFcContent('');setFcError('')}} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #ddd',background:'#fff',color:'#666',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+<button onClick={submitFieldNote} disabled={fnSubmitting||fnContent.trim().length<30} style={{flex:1,padding:8,borderRadius:8,border:'none',background:'#0a8fe8',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:(fnSubmitting||fnContent.trim().length<30)?0.5:1}}>{fnSubmitting?'Posting...':'Post field note'}</button>
+<button onClick={()=>{setShowAddFieldNote(false);setFnCategory('');setFnContent('');setFnError('')}} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #ddd',background:'#fff',color:'#666',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
 </div>
 </>}
 </>)}
 </div>
 )}
 
-{factChecks.visible.length===0&&!showAddFactCheck&&<div style={{fontSize:12,color:'#999',textAlign:'center',padding:'12px 0'}}>No fact-checks yet.</div>}
+{fieldNotes.visible.length===0&&!showAddFieldNote&&<div style={{fontSize:12,color:'#999',textAlign:'center',padding:'12px 0'}}>No field notes yet.</div>}
 
-{factChecks.visible.map(n=>(
+{fieldNotes.visible.map(n=>(
 <div key={n.id} style={{border:'1px solid #eee',borderRadius:10,padding:12,marginBottom:8}}>
 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
-<span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:'#EFF6FF',color:'#0a8fe8'}}>{FC_CATEGORIES.find(c=>c.v===n.category)?.l||n.category}</span>
+<span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:'#EFF6FF',color:'#0a8fe8'}}>{FN_CATEGORIES.find(c=>c.v===n.category)?.l||n.category}</span>
 </div>
 <div style={{fontSize:13,color:'#333',lineHeight:1.5,marginBottom:8}}>{n.content}</div>
 <div style={{display:'flex',alignItems:'center',gap:8}}>
 <span style={{fontSize:11,color:'#888',flex:1}}>@{n.user?.username||'reporter'}</span>
-<button onClick={()=>rateFactCheck(n.id,true)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #eee',background:n.my_rating===true?'#ECFDF5':'#fff',color:n.my_rating===true?'#085041':'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>👍 Helpful {n.helpful_count>0&&`(${n.helpful_count})`}</button>
-<button onClick={()=>rateFactCheck(n.id,false)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #eee',background:n.my_rating===false?'#FEF2F2':'#fff',color:n.my_rating===false?'#DC2626':'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>👎 Not helpful {n.not_helpful_count>0&&`(${n.not_helpful_count})`}</button>
+<button onClick={()=>rateFieldNote(n.id,true)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #eee',background:n.my_rating===true?'#ECFDF5':'#fff',color:n.my_rating===true?'#085041':'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>👍 Helpful {n.helpful_count>0&&`(${n.helpful_count})`}</button>
+<button onClick={()=>rateFieldNote(n.id,false)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #eee',background:n.my_rating===false?'#FEF2F2':'#fff',color:n.my_rating===false?'#DC2626':'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>👎 Not helpful {n.not_helpful_count>0&&`(${n.not_helpful_count})`}</button>
 </div>
 </div>
 ))}
 
-{factChecks.hiddenCount>0&&(
+{fieldNotes.hiddenCount>0&&(
 <div style={{marginTop:8}}>
-<button onClick={()=>setShowHiddenNotes(s=>!s)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>{showHiddenNotes?'Hide':'Show'} {factChecks.hiddenCount} note{factChecks.hiddenCount===1?'':'s'} hidden by community rating</button>
-{showHiddenNotes&&factChecks.hidden.map(n=>(
+<button onClick={()=>setShowHiddenNotes(s=>!s)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>{showHiddenNotes?'Hide':'Show'} {fieldNotes.hiddenCount} note{fieldNotes.hiddenCount===1?'':'s'} hidden by community rating</button>
+{showHiddenNotes&&fieldNotes.hidden.map(n=>(
 <div key={n.id} style={{border:'1px solid #eee',borderRadius:10,padding:12,marginTop:8,opacity:0.6}}>
-<div style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:'#F3F4F6',color:'#666',display:'inline-block',marginBottom:6}}>{FC_CATEGORIES.find(c=>c.v===n.category)?.l||n.category}</div>
+<div style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:'#F3F4F6',color:'#666',display:'inline-block',marginBottom:6}}>{FN_CATEGORIES.find(c=>c.v===n.category)?.l||n.category}</div>
 <div style={{fontSize:13,color:'#666',lineHeight:1.5,marginBottom:6}}>{n.content}</div>
 <div style={{fontSize:11,color:'#999'}}>@{n.user?.username||'reporter'} · 👍 {n.helpful_count} · 👎 {n.not_helpful_count}</div>
 </div>
