@@ -29,6 +29,9 @@ export interface ModerationResult {
   // True when auto_remove was triggered by a NO_STRIKE_CATEGORIES match —
   // tells the caller to skip applyStrike() for this removal.
   noStrikeRemoval: boolean
+  // Seconds into the video where gore was detected — the player blurs a
+  // window around each of these rather than holding/removing the report.
+  goreTimestamps: number[]
 }
 
 export interface ModerationFlag {
@@ -39,45 +42,38 @@ export interface ModerationFlag {
   description: string
 }
 
-// Thresholds for auto-actions
+// Thresholds for auto-actions. There is deliberately no standing "hold
+// pending human review" tier any more — VozIt is a one-person operation
+// and an unreviewed queue either becomes a silent bottleneck on exactly
+// the time-sensitive content (breaking conflict/crisis footage) the
+// platform exists to carry, or never gets cleared at all. Every category
+// below is confidently-bad-so-remove, or not-confident-so-publish — with
+// publish backstopped by community flags, votes, and Field Notes rather
+// than a person's judgment call before anyone ever sees it.
 const THRESHOLDS = {
-  // Auto-remove (no human review needed)
+  // Auto-remove (no human review — confident enough to act alone)
   auto_remove: {
     sexual: 0.90,
     nudity: 0.92,
-    minor: 0.70,           // Lower threshold for child safety
-    minor_suggestive: 0.60, // Very low — err on side of caution
-    ai_generated: 0.85,    // High-confidence AI-generated/deepfake — VozIt only accepts real recorded footage
+    minor: 0.70,             // Lower threshold for child safety
+    minor_suggestive: 0.60,  // Very low — err on side of caution
+    ai_generated: 0.85,      // High-confidence deepfake — VozIt only accepts real recorded footage
+    ai_generated_audio: 0.85, // High-confidence synthetic/cloned voice narration
+    hate_symbol: 0.85,
+    hate_speech: 0.85,
+    drugs: 0.85,
     // High-confidence self-harm depiction only — see NO_STRIKE_CATEGORIES
-    // below. Moderate-confidence hits (someone discussing their own
-    // experience, news coverage) are handled separately, via
-    // SELF_HARM_PANEL_THRESHOLD, and are meant to publish normally with a
-    // crisis-resource panel rather than being removed at all.
+    // below. Below this, self-harm content still publishes normally, just
+    // with a crisis-resource panel (SELF_HARM_PANEL_THRESHOLD) rather than
+    // being removed.
     self_harm: 0.85,
   },
-  // Flag for human review
-  flag_review: {
-    sexual: 0.60,
-    nudity: 0.65,
-    suggestive: 0.75,
-    violence: 0.70,        // Violence MAY be newsworthy
-    weapons: 0.80,
-    // Gore lives here, not in auto_remove — VozIt's own content mix includes
-    // real frontline combat and protest footage (Ukraine-style: explosions,
-    // weapons fire, injury) that can be graphic without being exploitative.
-    // Auto-deleting on a "gore" match would silence exactly the reporting
-    // the platform exists to carry, and cost it future licensing value — a
-    // human call is worth the day's delay a fabricated upload isn't owed.
-    gore: 0.90,
-    minor: 0.40,           // Very sensitive — flag at low confidence
-    hate_symbol: 0.70,
-    hate_speech: 0.65,
-    drugs: 0.75,
-    misleading: 0.70,
-    ai_generated: 0.50,    // Lower-confidence AI-generated signal — don't auto-remove, but a human should look
-    ai_generated_audio: 0.50, // Possible voice clone / synthetic narration
-    metadata_mismatch: 0.50,  // GPS/timestamp inconsistency — see checkMetadataConsistency()
-  },
+  // Below auto_remove confidence, everything just publishes. Categories
+  // that never appear here at all (violence, weapons, gore, suggestive,
+  // misleading, metadata_mismatch) always publish regardless of Hive's
+  // confidence — see NEWSWORTHY_CATEGORIES for why violence/weapons/gore
+  // specifically are excluded even from this table.
+  flag_review: {},
 }
 
 // Below this, self-harm content still publishes normally, but the viewer
@@ -508,6 +504,11 @@ export async function moderateContent(params: {
     f => NO_STRIKE_CATEGORIES.includes(f.category)
       && f.confidence >= (THRESHOLDS.auto_remove[f.category as keyof typeof THRESHOLDS.auto_remove] ?? Infinity)
   )
+  // Gore never removes (NEWSWORTHY_CATEGORIES) — every detection just marks
+  // a timestamp for the player to blur instead.
+  const goreTimestamps = allFlags
+    .filter(f => f.category === 'gore' && typeof f.timestamp === 'number')
+    .map(f => f.timestamp as number)
 
   return {
     passed: autoAction === 'publish',
@@ -519,6 +520,7 @@ export async function moderateContent(params: {
     processingMs: Date.now() - startTime,
     showCrisisResources,
     noStrikeRemoval,
+    goreTimestamps,
   }
 }
 

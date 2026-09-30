@@ -65,6 +65,15 @@ function onAdEnded(){
   playerRef.current?.play?.()
 }
 const floatPos=FLOAT_POSITIONS[Math.floor(currentTime/4)%FLOAT_POSITIONS.length]
+
+// Gore never holds or removes the report (NEWSWORTHY_CATEGORIES in
+// hive-moderation.ts) — instead the player blurs a short window around
+// each flagged second, reusing the timeupdate-driven currentTime above.
+// Combat/protest footage publishes and plays completely normally outside
+// these windows.
+const[goreRevealed,setGoreRevealed]=useState(false)
+const goreWindows=(r.gore_timestamps||[]).map((ts:number)=>[ts-1,ts+2])
+const inGoreWindow=goreWindows.some(([s,e]:number[])=>currentTime>=s&&currentTime<=e)
 const isOwner=user?.id===r.user_id
 const otherParts=(seriesReports||[]).filter(sr=>sr.id!==r.id)
 async function vote(d:'up'|'down'){if(voted===d)return;setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}));fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})}).catch(()=>{})}
@@ -75,16 +84,26 @@ useEffect(()=>{
   fetch(`/api/reports/corroboration?report_id=${r.id}`).then(res=>res.json()).then(d=>setCorroboration({count:d.count||0,corroborating:d.corroborating||[]})).catch(()=>{})
 },[r.id])
 
-// Community "flag as fake/misleading" — separate from up/downvotes
+// Community "flag as fake/misleading/explicit/hateful" — separate from
+// up/downvotes. Flags never hold or remove a report themselves; they're a
+// visible "buyer beware" signal (loadFlagCounts below), backstopping
+// whatever Hive wasn't confident enough to act on alone.
+const FLAG_REASON_LABELS:Record<string,string>={fake_or_ai_generated:'fake or AI-generated',recycled_footage:'recycled footage',wrong_location_or_time:'the wrong location or time',explicit_content:'explicit',hateful_content:'hateful',other:'a problem'}
 const[showFlagMenu,setShowFlagMenu]=useState(false)
 const[flagged,setFlagged]=useState(false)
 const[flagMsg,setFlagMsg]=useState('')
+const[flagCounts,setFlagCounts]=useState<{reason:string,count:number}[]>([])
+function loadFlagCounts(){
+  fetch(`/api/reports/flag?report_id=${r.id}`).then(res=>res.json()).then(d=>setFlagCounts(d.counts||[])).catch(()=>{})
+}
+useEffect(()=>{loadFlagCounts()},[r.id])
 async function flag(reason:string){
   try{
     const res=await fetch('/api/reports/flag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,reason})})
     const d=await res.json()
     if(!res.ok){setFlagMsg(d.error||'Could not flag this report');return}
-    setFlagged(true);setShowFlagMenu(false);setFlagMsg('Thanks — this has been sent for review.')
+    setFlagged(true);setShowFlagMenu(false);setFlagMsg('Thanks — this helps other viewers.')
+    loadFlagCounts()
   }catch(e:any){setFlagMsg(e.message)}
 }
 
@@ -143,6 +162,17 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
   {adState==='playing'&&adUrl&&<div style={{position:'absolute',inset:0,background:'#000',display:'flex',flexDirection:'column'}}>
     <video ref={adVideoRef} src={adUrl} autoPlay playsInline onEnded={onAdEnded} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
     <span style={{position:'absolute',top:8,right:10,fontSize:10,color:'rgba(255,255,255,0.6)',background:'rgba(0,0,0,0.4)',padding:'2px 8px',borderRadius:4}}>Ad</span>
+  </div>}
+
+  {/* Graphic content (gore) — blurred at playback only, never removed or
+      held. The underlying video is untouched (playback keeps running
+      behind the blur), so a tap-to-reveal doesn't need to seek or reload
+      anything — just lifts this overlay for the rest of the viewing. */}
+  {inGoreWindow&&!goreRevealed&&<div onClick={()=>setGoreRevealed(true)} style={{position:'absolute',inset:0,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+    <div style={{textAlign:'center',padding:'10px 18px',borderRadius:8,background:'rgba(0,0,0,0.5)'}}>
+      <div style={{fontSize:13,fontWeight:700,color:'#fff'}}>⚠ Graphic content</div>
+      <div style={{fontSize:11,color:'rgba(255,255,255,0.8)',marginTop:2}}>Tap to view</div>
+    </div>
   </div>}
 
   {/* Layer 1 — persistent bottom bar */}
@@ -210,15 +240,18 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 <div style={{marginBottom:20}}>
 {flagged||flagMsg?<div style={{fontSize:12,color:'#666',textAlign:'center'}}>{flagMsg}</div>:showFlagMenu?(
 <div style={{border:'1px solid #eee',borderRadius:10,padding:12}}>
-<div style={{fontSize:12,fontWeight:600,color:'#1a1a1a',marginBottom:8}}>Why does this look fake or misleading?</div>
-{[{v:'fake_or_ai_generated',l:'Looks AI-generated / deepfake'},{v:'recycled_footage',l:'Old footage passed off as new'},{v:'wrong_location_or_time',l:'Wrong location or time'},{v:'other',l:'Other'}].map(o=>(
+<div style={{fontSize:12,fontWeight:600,color:'#1a1a1a',marginBottom:8}}>What's the concern?</div>
+{[{v:'fake_or_ai_generated',l:'Looks AI-generated / deepfake'},{v:'recycled_footage',l:'Old footage passed off as new'},{v:'wrong_location_or_time',l:'Wrong location or time'},{v:'explicit_content',l:'Explicit or inappropriate content'},{v:'hateful_content',l:'Hateful or discriminatory content'},{v:'other',l:'Other'}].map(o=>(
 <button key={o.v} onClick={()=>flag(o.v)} style={{display:'block',width:'100%',textAlign:'left',padding:'8px 10px',borderRadius:8,border:'1px solid #eee',background:'#fff',color:'#333',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginBottom:6}}>{o.l}</button>
 ))}
 <button onClick={()=>setShowFlagMenu(false)} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
 </div>
 ):(
-<button onClick={()=>setShowFlagMenu(true)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>🚩 Flag as fake or misleading</button>
+<button onClick={()=>setShowFlagMenu(true)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>🚩 Flag this report</button>
 )}
+{flagCounts.length>0&&<div style={{fontSize:11,color:'#999',textAlign:'center',marginTop:8}}>
+{flagCounts.map((f,i)=>(<span key={f.reason}>{i>0&&' · '}{f.count} flagged this as {FLAG_REASON_LABELS[f.reason]||f.reason}</span>))}
+</div>}
 </div>
 
 {/* Field notes — available on every report, not just flagged ones.

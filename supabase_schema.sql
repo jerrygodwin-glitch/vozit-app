@@ -87,6 +87,7 @@ CREATE TABLE public.reports (
   transcript        TEXT,
   flag_count        INT NOT NULL DEFAULT 0,
   show_crisis_resources BOOLEAN NOT NULL DEFAULT false,
+  gore_timestamps   NUMERIC[] DEFAULT '{}',
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -267,6 +268,20 @@ CREATE TABLE public.payout_records (
   stripe_transfer_id  TEXT,
   clears_at           TIMESTAMPTZ NOT NULL,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- REPORT FLAGS (community "buyer beware" signal — never holds or removes
+-- a report by itself; counts only surface publicly once 5+ accumulate)
+-- ══════════════════════════════════════════════════════════════════════════
+CREATE TABLE public.report_flags (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id   UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  reason      TEXT NOT NULL CHECK (reason IN ('fake_or_ai_generated','recycled_footage','wrong_location_or_time','explicit_content','hateful_content','other')),
+  notes       TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (report_id, user_id)
 );
 
 -- ══════════════════════════════════════════════════════════════════════════

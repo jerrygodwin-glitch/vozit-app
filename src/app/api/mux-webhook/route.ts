@@ -251,6 +251,9 @@ export async function POST(req: NextRequest) {
         // already have set this true, and a clean video scan shouldn't turn
         // it back off.
         show_crisis_resources: report.show_crisis_resources || modResult.showCrisisResources,
+        // Gore never removes the report (NEWSWORTHY_CATEGORIES) — the
+        // player blurs these specific seconds instead.
+        gore_timestamps: modResult.goreTimestamps,
       }).eq('id', report!.id)
 
       return NextResponse.json({
