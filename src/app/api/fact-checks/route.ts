@@ -5,6 +5,11 @@ import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 const CATEGORIES = ['confirms_location', 'contradicts', 'nearby_witness', 'additional_context']
 const MIN_LENGTH = 30
 const MIN_ACCOUNT_AGE_DAYS = 7
+// Closes new submissions to the peak-attention window (24-72h target,
+// picked 48h as the midpoint) — concentrates engagement while a story is
+// actually breaking, rather than trickling in on old content indefinitely.
+// Separate videos/follow-ups are never time-limited — only this text note.
+const FACT_CHECK_WINDOW_HOURS = 48
 
 // GET /api/fact-checks?report_id=X — every note on a report, split into
 // visible (sorted by helpfulness) and hidden (enough ratings, mostly
@@ -66,6 +71,17 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // Peak-window gate — checked before the account-tenure gate since it's
+  // unconditional (applies to every account regardless of trust level).
+  const { data: report } = await admin.from('reports').select('created_at').eq('id', report_id).single()
+  if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+  const hoursSincePublish = (Date.now() - new Date(report.created_at).getTime()) / (1000 * 60 * 60)
+  if (hoursSincePublish > FACT_CHECK_WINDOW_HOURS) {
+    return NextResponse.json({
+      error: `Fact-checks close ${FACT_CHECK_WINDOW_HOURS} hours after publishing, to keep focus on breaking developments. You can still post a follow-up video or update instead.`,
+    }, { status: 403 })
+  }
 
   // Account tenure gate — same trust principle as vote-weighting: a
   // day-old account's fact-check is worth less scrutiny-wise than an

@@ -108,7 +108,10 @@ async function loadFactChecks(){
 useEffect(()=>{loadFactChecks()},[r.id])
 
 const accountAgeDays=user?.created_at?(Date.now()-new Date(user.created_at).getTime())/86400000:0
-const factCheckEligible=accountAgeDays>=7
+const FACT_CHECK_WINDOW_HOURS=48
+const hoursSincePublish=(Date.now()-new Date(r.created_at).getTime())/3600000
+const factCheckWindowOpen=hoursSincePublish<=FACT_CHECK_WINDOW_HOURS
+const factCheckEligible=accountAgeDays>=7&&factCheckWindowOpen
 
 async function submitFactCheck(){
   if(!fcCategory||fcContent.trim().length<30)return
@@ -212,7 +215,10 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
     Sorted by community helpfulness rating, not chronologically. */}
 <div style={{borderTop:'1px solid #f0f0f0',paddingTop:16}}>
 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+<div>
 <div style={{fontSize:13,fontWeight:700,color:'#1a1a1a'}}>Fact Checks {factChecks.visible.length>0&&`(${factChecks.visible.length})`}</div>
+<div style={{fontSize:10,color:'#999',marginTop:2}}>{factCheckWindowOpen?`Open for ${Math.max(0,Math.ceil(FACT_CHECK_WINDOW_HOURS-hoursSincePublish))} more hour${Math.ceil(FACT_CHECK_WINDOW_HOURS-hoursSincePublish)===1?'':'s'}`:'Window closed — follow-ups can still be posted as a new report'}</div>
+</div>
 {user&&!showAddFactCheck&&<button onClick={()=>setShowAddFactCheck(true)} style={{fontSize:11,fontWeight:600,color:'#0a8fe8',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>+ Add a fact check</button>}
 </div>
 
@@ -220,7 +226,9 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 <div style={{border:'1px solid #eee',borderRadius:10,padding:12,marginBottom:12,background:'#fafafa'}}>
 {!factCheckEligible?(
 <div style={{fontSize:12,color:'#92400E',background:'#FEF3E6',border:'1px solid #FED7AA',borderRadius:8,padding:10}}>
-Fact-checks require an account at least 7 days old (yours is {Math.max(0,Math.floor(accountAgeDays))} day{Math.floor(accountAgeDays)===1?'':'s'} old) — this helps keep fact-checks credible.
+{!factCheckWindowOpen
+  ?`Fact-checks closed ${FACT_CHECK_WINDOW_HOURS} hours after this report published, to keep focus on breaking developments. You can still post a follow-up video or update instead.`
+  :`Fact-checks require an account at least 7 days old (yours is ${Math.max(0,Math.floor(accountAgeDays))} day${Math.floor(accountAgeDays)===1?'':'s'} old) — this helps keep fact-checks credible.`}
 <div><button onClick={()=>setShowAddFactCheck(false)} style={{marginTop:8,fontSize:11,color:'#92400E',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Close</button></div>
 </div>
 ):(<>
