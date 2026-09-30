@@ -85,6 +85,50 @@ async function flag(reason:string){
     setFlagged(true);setShowFlagMenu(false);setFlagMsg('Thanks — this has been sent for review.')
   }catch(e:any){setFlagMsg(e.message)}
 }
+
+// Fact-check notes — structured (category + substantiation), never an
+// open box, and filtered by community rating rather than a moderator.
+const FC_CATEGORIES=[
+  {v:'confirms_location',l:'I can confirm this location'},
+  {v:'contradicts',l:'I have information that contradicts this'},
+  {v:'nearby_witness',l:"I was nearby — here's what I saw"},
+  {v:'additional_context',l:'Additional context'},
+]
+const[factChecks,setFactChecks]=useState<{visible:any[],hidden:any[],hiddenCount:number}>({visible:[],hidden:[],hiddenCount:0})
+const[showAddFactCheck,setShowAddFactCheck]=useState(false)
+const[showHiddenNotes,setShowHiddenNotes]=useState(false)
+const[fcCategory,setFcCategory]=useState('')
+const[fcContent,setFcContent]=useState('')
+const[fcSubmitting,setFcSubmitting]=useState(false)
+const[fcError,setFcError]=useState('')
+
+async function loadFactChecks(){
+  try{const res=await fetch(`/api/fact-checks?report_id=${r.id}`);const d=await res.json();setFactChecks({visible:d.visible||[],hidden:d.hidden||[],hiddenCount:d.hiddenCount||0})}catch{}
+}
+useEffect(()=>{loadFactChecks()},[r.id])
+
+const accountAgeDays=user?.created_at?(Date.now()-new Date(user.created_at).getTime())/86400000:0
+const factCheckEligible=accountAgeDays>=7
+
+async function submitFactCheck(){
+  if(!fcCategory||fcContent.trim().length<30)return
+  setFcSubmitting(true);setFcError('')
+  try{
+    const res=await fetch('/api/fact-checks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,category:fcCategory,content:fcContent.trim()})})
+    const d=await res.json()
+    if(!res.ok){setFcError(d.error||'Could not post this fact-check');return}
+    setFcCategory('');setFcContent('');setShowAddFactCheck(false)
+    await loadFactChecks()
+  }catch(e:any){setFcError(e.message)}
+  setFcSubmitting(false)
+}
+
+async function rateFactCheck(id:string,helpful:boolean){
+  try{
+    await fetch('/api/fact-checks/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fact_check_id:id,helpful})})
+    await loadFactChecks()
+  }catch{}
+}
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div style={{position:'relative',overflow:'hidden'}}>
   <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
@@ -163,4 +207,68 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 <button onClick={()=>setShowFlagMenu(true)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>🚩 Flag as fake or misleading</button>
 )}
 </div>
+
+{/* Fact-check notes — available on every report, not just flagged ones.
+    Sorted by community helpfulness rating, not chronologically. */}
+<div style={{borderTop:'1px solid #f0f0f0',paddingTop:16}}>
+<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+<div style={{fontSize:13,fontWeight:700,color:'#1a1a1a'}}>Fact Checks {factChecks.visible.length>0&&`(${factChecks.visible.length})`}</div>
+{user&&!showAddFactCheck&&<button onClick={()=>setShowAddFactCheck(true)} style={{fontSize:11,fontWeight:600,color:'#0a8fe8',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>+ Add a fact check</button>}
+</div>
+
+{showAddFactCheck&&(
+<div style={{border:'1px solid #eee',borderRadius:10,padding:12,marginBottom:12,background:'#fafafa'}}>
+{!factCheckEligible?(
+<div style={{fontSize:12,color:'#92400E',background:'#FEF3E6',border:'1px solid #FED7AA',borderRadius:8,padding:10}}>
+Fact-checks require an account at least 7 days old (yours is {Math.max(0,Math.floor(accountAgeDays))} day{Math.floor(accountAgeDays)===1?'':'s'} old) — this helps keep fact-checks credible.
+<div><button onClick={()=>setShowAddFactCheck(false)} style={{marginTop:8,fontSize:11,color:'#92400E',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Close</button></div>
+</div>
+):(<>
+<div style={{fontSize:12,fontWeight:600,color:'#1a1a1a',marginBottom:8}}>What kind of fact-check is this?</div>
+{FC_CATEGORIES.map(c=>(
+<button key={c.v} onClick={()=>setFcCategory(c.v)} style={{display:'block',width:'100%',textAlign:'left',padding:'8px 10px',borderRadius:8,border:fcCategory===c.v?'2px solid #0a8fe8':'1px solid #eee',background:fcCategory===c.v?'#EFF6FF':'#fff',color:'#333',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginBottom:6}}>{c.l}</button>
+))}
+{fcCategory&&<>
+<textarea value={fcContent} onChange={e=>setFcContent(e.target.value)} placeholder="Explain what you know — be specific." rows={3} style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid #ddd',fontSize:12,fontFamily:'inherit',resize:'vertical',marginTop:4}}/>
+<div style={{fontSize:10,color:fcContent.trim().length>=30?'#22C55E':'#999',marginTop:4,marginBottom:8}}>{fcContent.trim().length}/30 characters minimum</div>
+{fcError&&<div style={{fontSize:11,color:'#DC2626',marginBottom:8}}>{fcError}</div>}
+<div style={{display:'flex',gap:8}}>
+<button onClick={submitFactCheck} disabled={fcSubmitting||fcContent.trim().length<30} style={{flex:1,padding:8,borderRadius:8,border:'none',background:'#0a8fe8',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:(fcSubmitting||fcContent.trim().length<30)?0.5:1}}>{fcSubmitting?'Posting...':'Post fact-check'}</button>
+<button onClick={()=>{setShowAddFactCheck(false);setFcCategory('');setFcContent('');setFcError('')}} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #ddd',background:'#fff',color:'#666',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+</div>
+</>}
+</>)}
+</div>
+)}
+
+{factChecks.visible.length===0&&!showAddFactCheck&&<div style={{fontSize:12,color:'#999',textAlign:'center',padding:'12px 0'}}>No fact-checks yet.</div>}
+
+{factChecks.visible.map(n=>(
+<div key={n.id} style={{border:'1px solid #eee',borderRadius:10,padding:12,marginBottom:8}}>
+<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+<span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:'#EFF6FF',color:'#0a8fe8'}}>{FC_CATEGORIES.find(c=>c.v===n.category)?.l||n.category}</span>
+</div>
+<div style={{fontSize:13,color:'#333',lineHeight:1.5,marginBottom:8}}>{n.content}</div>
+<div style={{display:'flex',alignItems:'center',gap:8}}>
+<span style={{fontSize:11,color:'#888',flex:1}}>@{n.user?.username||'reporter'}</span>
+<button onClick={()=>rateFactCheck(n.id,true)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #eee',background:n.my_rating===true?'#ECFDF5':'#fff',color:n.my_rating===true?'#085041':'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>👍 Helpful {n.helpful_count>0&&`(${n.helpful_count})`}</button>
+<button onClick={()=>rateFactCheck(n.id,false)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #eee',background:n.my_rating===false?'#FEF2F2':'#fff',color:n.my_rating===false?'#DC2626':'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>👎 Not helpful {n.not_helpful_count>0&&`(${n.not_helpful_count})`}</button>
+</div>
+</div>
+))}
+
+{factChecks.hiddenCount>0&&(
+<div style={{marginTop:8}}>
+<button onClick={()=>setShowHiddenNotes(s=>!s)} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>{showHiddenNotes?'Hide':'Show'} {factChecks.hiddenCount} note{factChecks.hiddenCount===1?'':'s'} hidden by community rating</button>
+{showHiddenNotes&&factChecks.hidden.map(n=>(
+<div key={n.id} style={{border:'1px solid #eee',borderRadius:10,padding:12,marginTop:8,opacity:0.6}}>
+<div style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:'#F3F4F6',color:'#666',display:'inline-block',marginBottom:6}}>{FC_CATEGORIES.find(c=>c.v===n.category)?.l||n.category}</div>
+<div style={{fontSize:13,color:'#666',lineHeight:1.5,marginBottom:6}}>{n.content}</div>
+<div style={{fontSize:11,color:'#999'}}>@{n.user?.username||'reporter'} · 👍 {n.helpful_count} · 👎 {n.not_helpful_count}</div>
+</div>
+))}
+</div>
+)}
+</div>
+
 </div></div>)}

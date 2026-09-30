@@ -225,6 +225,29 @@ ALTER TABLE public.reports
   FOREIGN KEY (assignment_angle_id) REFERENCES public.assignment_angles(id);
 
 -- ══════════════════════════════════════════════════════════════════════════
+-- FACT-CHECK NOTES (community verification, always-on — not gated by flags)
+-- ══════════════════════════════════════════════════════════════════════════
+CREATE TABLE public.fact_checks (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id         UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
+  user_id           UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  category          TEXT NOT NULL CHECK (category IN ('confirms_location','contradicts','nearby_witness','additional_context')),
+  content           TEXT NOT NULL CHECK (char_length(content) >= 30),
+  helpful_count     INT NOT NULL DEFAULT 0,
+  not_helpful_count INT NOT NULL DEFAULT 0,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.fact_check_ratings (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  fact_check_id  UUID NOT NULL REFERENCES public.fact_checks(id) ON DELETE CASCADE,
+  user_id        UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  helpful        BOOLEAN NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (fact_check_id, user_id)
+);
+
+-- ══════════════════════════════════════════════════════════════════════════
 -- PAYOUT RECORDS
 -- ══════════════════════════════════════════════════════════════════════════
 CREATE TABLE public.payout_records (
