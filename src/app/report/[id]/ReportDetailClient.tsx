@@ -153,6 +153,16 @@ async function rateFieldNote(id:string,helpful:boolean){
     await loadFieldNotes()
   }catch{}
 }
+
+// Confirmed/contradicted badges — symmetric treatment on purpose (both
+// sides of a dispute get equal visibility, not just the negative one).
+// Recomputed live from the same visible notes already fetched above, so a
+// badge disappears on its own if the note it was based on later gets
+// buried by its own ratings — never a sticky, permanent mark on the report.
+const WELL_RATED_MIN_RATINGS=5,WELL_RATED_RATIO=0.6
+function isWellRated(n:any){return n.total_ratings>=WELL_RATED_MIN_RATINGS&&(n.helpful_count/n.total_ratings)>=WELL_RATED_RATIO}
+const confirmedBadge=fieldNotes.visible.some((n:any)=>n.category==='confirms_location'&&isWellRated(n))
+const contradictedBadge=fieldNotes.visible.some((n:any)=>n.category==='contradicts'&&isWellRated(n))
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div style={{position:'relative',overflow:'hidden'}}>
   <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
@@ -215,6 +225,18 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 {corroboration.count>0&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:16,background:'#ECFDF5',border:'1px solid #A7F3D0'}}>
 <div style={{fontSize:12,fontWeight:700,color:'#065F46',marginBottom:corroboration.count?4:0}}>✓ Corroborated by {corroboration.count} other report{corroboration.count===1?'':'s'}</div>
 <div style={{fontSize:11,color:'#065F46'}}>Independent reporters filed video near this same place and time.</div>
+</div>}
+
+{/* Confirmed/contradicted — both derived live from Field Notes ratings,
+    same threshold, same neutral tone. Can both show at once: that's the
+    honest "all-source" outcome when the community itself is split. */}
+{confirmedBadge&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:16,background:'#ECFDF5',border:'1px solid #A7F3D0'}}>
+<div style={{fontSize:12,fontWeight:700,color:'#065F46'}}>✓ Confirmed by community</div>
+<div style={{fontSize:11,color:'#065F46'}}>A well-rated Field Note confirms this location. See notes below.</div>
+</div>}
+{contradictedBadge&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:16,background:'#FEF3E6',border:'1px solid #FED7AA'}}>
+<div style={{fontSize:12,fontWeight:700,color:'#92400E'}}>⚠ Contradicted by community</div>
+<div style={{fontSize:11,color:'#92400E'}}>A well-rated Field Note disputes this report. See notes below.</div>
 </div>}
 
 {(otherParts.length>0||isOwner)&&<div style={{borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>
