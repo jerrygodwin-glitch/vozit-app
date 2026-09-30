@@ -30,6 +30,8 @@ CREATE TABLE public.users (
   revenue_opt_in    BOOLEAN NOT NULL DEFAULT false,
   is_suspended      BOOLEAN NOT NULL DEFAULT false,
   strike_count      INT NOT NULL DEFAULT 0,
+  is_banned         BOOLEAN NOT NULL DEFAULT false,
+  ban_reason        TEXT,
   role              TEXT CHECK (role IN ('reporter','moderator','admin')) DEFAULT 'reporter',
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -271,11 +273,11 @@ CREATE TABLE public.payout_records (
 -- ══════════════════════════════════════════════════════════════════════════
 CREATE TABLE public.moderation_log (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  moderator_id      UUID NOT NULL REFERENCES public.users(id),
+  moderator_id      UUID REFERENCES public.users(id), -- NULL = automated (Hive auto-strike), not a human
   report_id         UUID REFERENCES public.reports(id),
   target_user_id    UUID REFERENCES public.users(id),
   action            TEXT NOT NULL
-                      CHECK (action IN ('restore','remove','remove_warn','remove_ban','keep_flagged')),
+                      CHECK (action IN ('restore','remove','remove_warn','remove_ban','keep_flagged','auto_strike')),
   reason            TEXT,
   notes             TEXT,
   result            TEXT,

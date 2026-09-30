@@ -41,7 +41,6 @@ const THRESHOLDS = {
     nudity: 0.92,
     minor: 0.70,           // Lower threshold for child safety
     minor_suggestive: 0.60, // Very low — err on side of caution
-    gore: 0.90,
     ai_generated: 0.85,    // High-confidence AI-generated/deepfake — VozIt only accepts real recorded footage
   },
   // Flag for human review
@@ -51,6 +50,13 @@ const THRESHOLDS = {
     suggestive: 0.75,
     violence: 0.70,        // Violence MAY be newsworthy
     weapons: 0.80,
+    // Gore lives here, not in auto_remove — VozIt's own content mix includes
+    // real frontline combat and protest footage (Ukraine-style: explosions,
+    // weapons fire, injury) that can be graphic without being exploitative.
+    // Auto-deleting on a "gore" match would silence exactly the reporting
+    // the platform exists to carry, and cost it future licensing value — a
+    // human call is worth the day's delay a fabricated upload isn't owed.
+    gore: 0.90,
     minor: 0.40,           // Very sensitive — flag at low confidence
     hate_symbol: 0.70,
     hate_speech: 0.65,
@@ -66,8 +72,13 @@ const THRESHOLDS = {
 // Auto-ban categories (immediate permanent ban)
 const AUTO_BAN_CATEGORIES: ModerationCategory[] = ['minor_suggestive']
 
-// Newsworthy exception categories (violence/weapons may be legitimate reporting)
-const NEWSWORTHY_CATEGORIES: ModerationCategory[] = ['violence', 'weapons']
+// Never auto-remove these regardless of confidence — a human always looks
+// first. All three show up routinely in legitimate frontline combat and
+// protest footage (weapons fire, explosions, injury), which is exactly the
+// content VozIt exists to carry. Enforced directly in determineAction()
+// below, not just by omission from THRESHOLDS.auto_remove, so a future
+// edit to that table can't silently reintroduce auto-removal for these.
+const NEWSWORTHY_CATEGORIES: ModerationCategory[] = ['violence', 'weapons', 'gore']
 
 // Scan video via Hive Visual Moderation API
 export async function scanVideoFrames(videoUrl: string): Promise<ModerationFlag[]> {
@@ -393,6 +404,9 @@ function determineAction(flags: ModerationFlag[]): ModerationResult['autoAction'
     if (AUTO_BAN_CATEGORIES.includes(flag.category) && flag.confidence > 0.5) {
       return 'auto_ban'
     }
+    // Newsworthy categories never auto-remove, no matter how confident the
+    // scan is — falls through to the flag_review pass below instead.
+    if (NEWSWORTHY_CATEGORIES.includes(flag.category)) continue
     // Auto-remove: high-confidence explicit content
     const removeThreshold = THRESHOLDS.auto_remove[flag.category as keyof typeof THRESHOLDS.auto_remove]
     if (removeThreshold && flag.confidence >= removeThreshold) {

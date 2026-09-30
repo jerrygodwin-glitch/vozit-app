@@ -1,11 +1,12 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient, getAuthedUser } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient, getAuthedUser } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { calculateTrendingScore, updateTrendingScores } from '@/lib/trending'
 import { checkAndPromoteTier } from '@/lib/revenue'
 import { rateLimit, RATE_LIMITS, sanitizeInput } from '@/lib/security'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
+import { applyStrike } from '@/lib/strikes'
 import { captureError } from '@/lib/monitoring'
 import { lookupWeather } from '@/lib/weather'
 
@@ -216,6 +217,18 @@ export async function POST(req: NextRequest) {
         is_banned: true,
         ban_reason: `Auto-banned: ${textModeration.flags.map(f => f.category).join(', ')}`,
       }).eq('id', user.id)
+    }
+
+    // High-confidence auto-removal (fabrication/exploitation categories only —
+    // newsworthy content like violence/weapons/gore can never reach this
+    // branch, see NEWSWORTHY_CATEGORIES in hive-moderation.ts) applies the
+    // same strike escalation a human moderator's 'remove' action would.
+    if (textModeration.autoAction === 'auto_remove') {
+      await applyStrike(createAdminClient(), {
+        userId: user.id,
+        reportId: report.id,
+        reason: `Auto-removed: ${textModeration.flags.map(f => f.category).join(', ')}`,
+      })
     }
 
     // report_count is incremented automatically by the trg_increment_report_count

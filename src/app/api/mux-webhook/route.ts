@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
+import { applyStrike } from '@/lib/strikes'
 import { createCaptureManifest, addModerationAssertion, addPublishAssertion, signManifest, storeProvenance } from '@/lib/c2pa-provenance'
 import { generate5Ws, storeAnalysis } from '@/lib/ai-5w-analysis'
 import { assessGeoRisk } from '@/lib/security'
@@ -166,6 +167,13 @@ export async function POST(req: NextRequest) {
           break
         case 'auto_remove':
           videoStatus = 'removed'
+          // Fabrication/exploitation categories only — never fires for
+          // violence/weapons/gore, see NEWSWORTHY_CATEGORIES.
+          await applyStrike(createAdminClient(), {
+            userId: report.user_id,
+            reportId: report.id,
+            reason: `Auto-removed: ${modResult.flags.map(f => f.category).join(', ')}`,
+          })
           break
         case 'flag_review':
           videoStatus = 'flagged'
