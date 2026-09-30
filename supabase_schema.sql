@@ -102,10 +102,15 @@ CREATE INDEX idx_reports_category ON public.reports(category);
 -- VOTES
 -- ══════════════════════════════════════════════════════════════════════════
 CREATE TABLE public.votes (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id    UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  report_id  UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
-  value      SMALLINT NOT NULL CHECK (value IN (1, -1)),
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id            UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  report_id          UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
+  value              SMALLINT NOT NULL CHECK (value IN (1, -1)),
+  -- Tier weight × account-age ramp (src/app/api/votes/route.ts) — how much
+  -- this specific vote counts, not the raw up/down direction above.
+  weight             DECIMAL(3,1) DEFAULT 1.0,
+  device_fingerprint TEXT,
+  ip_address         TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, report_id)
 );

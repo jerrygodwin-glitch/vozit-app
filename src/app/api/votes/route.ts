@@ -13,6 +13,19 @@ const VOTE_WEIGHT: Record<string, number> = {
   platinum: 3,
 }
 
+// Account-age ramp — raises the cost of throwaway sockpuppet accounts
+// without silencing real new users: a vote still counts from day one, just
+// at a fraction of its eventual weight, reaching full weight once an
+// account is established. Composes with (multiplies) the tier weight
+// above, doesn't replace it.
+const MIN_AGE_WEIGHT = 0.25
+const AGE_RAMP_DAYS = 30
+function ageWeight(createdAt: string | null): number {
+  if (!createdAt) return MIN_AGE_WEIGHT
+  const days = (Date.now() - new Date(createdAt).getTime()) / 86400000
+  return MIN_AGE_WEIGHT + (1 - MIN_AGE_WEIGHT) * Math.min(Math.max(days, 0) / AGE_RAMP_DAYS, 1)
+}
+
 // Simple device fingerprint from headers
 function getFingerprint(req: NextRequest): string {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
@@ -75,10 +88,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid vote' }, { status: 400 })
     }
 
-    // Get voter's tier for vote weighting
-    const { data: voter } = await supabase.from('users').select('tier').eq('id', user.id).single()
+    // Get voter's tier + account age for vote weighting
+    const { data: voter } = await supabase.from('users').select('tier, created_at').eq('id', user.id).single()
     const tier = voter?.tier || 'starter'
-    const weight = VOTE_WEIGHT[tier] || 1
+    const weight = (VOTE_WEIGHT[tier] || 1) * ageWeight(voter?.created_at || null)
 
     // Sybil detection
     const fingerprint = getFingerprint(req)
