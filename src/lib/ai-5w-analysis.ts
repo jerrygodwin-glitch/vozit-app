@@ -53,6 +53,9 @@ export interface AnalysisResult {
   sources: Record<keyof FiveWs, string>     // Where each suggestion came from
   summary: string              // One-line summary for the feed
   tags: string[]               // Auto-generated topic tags
+  language: string             // ISO 639-1 code of the transcript/reporter input — the
+                                // suggestions above are written in this language, not
+                                // forced into English
 }
 
 // ── GET TRANSCRIPT FROM MUX ──────────────────────────────────
@@ -100,15 +103,22 @@ export async function getVideoTranscript(playbackId: string): Promise<string> {
 }
 
 // ── REVERSE GEOCODE GPS ──────────────────────────────────────
-export async function reverseGeocode(lat: number, lng: number): Promise<{
+// No accept-language forced to English anymore — omitting it entirely
+// returns the place name in ITS OWN local convention (e.g. a Ukrainian
+// village comes back named in Ukrainian), which is more accurate than
+// forcing English, and needs no knowledge of the reporter's own language
+// preference to get right. Pass lang explicitly only if a specific
+// language is actually wanted for some other reason.
+export async function reverseGeocode(lat: number, lng: number, lang?: string): Promise<{
   locationName: string
   city: string
   country: string
   countryCode: string
 }> {
   try {
+    const langParam = lang ? `&accept-language=${lang}` : ''
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json${langParam}`,
       { headers: { 'User-Agent': 'VozIt/1.0 (citizen-journalism)' } }
     )
     const data = await res.json()
@@ -172,10 +182,16 @@ export async function generate5Ws(input: AnalysisInput): Promise<AnalysisResult>
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: `You are an AI assistant for VozIt, a citizen journalism platform. 
+        system: `You are an AI assistant for VozIt, a citizen journalism platform.
 Analyze the provided context about a video report and generate the 5Ws (Who, What, Where, When, Why).
 Be factual and concise. Only state what the evidence supports — do not speculate or fabricate.
 If evidence is insufficient for a field, say so briefly rather than guessing.
+
+Detect the primary language of the reporter's own input (transcript, notes, or typed fields —
+whichever is present). Write who/what/where_text/why/summary IN THAT SAME LANGUAGE, not in
+English by default — a Ukrainian reporter's own words should come back in Ukrainian, a Spanish
+reporter's in Spanish. If no reporter-language signal exists at all (e.g. GPS/timestamp only),
+default to English.
 
 Respond ONLY with valid JSON in this exact format, no other text:
 {
@@ -186,7 +202,8 @@ Respond ONLY with valid JSON in this exact format, no other text:
   "why": "...",
   "summary": "One-line summary for social media feed",
   "tags": ["tag1", "tag2", "tag3"],
-  "confidence": {"who": 0.0-1.0, "what": 0.0-1.0, "where_text": 0.0-1.0, "when_happened": 0.0-1.0, "why": 0.0-1.0}
+  "confidence": {"who": 0.0-1.0, "what": 0.0-1.0, "where_text": 0.0-1.0, "when_happened": 0.0-1.0, "why": 0.0-1.0},
+  "language": "ISO 639-1 code of the language used above, e.g. en, uk, es"
 }`,
         messages: [{ role: 'user', content: `Analyze this citizen journalist report and generate the 5Ws:\n\n${contextParts}` }],
       }),
@@ -220,6 +237,7 @@ Respond ONLY with valid JSON in this exact format, no other text:
       },
       summary: parsed.summary || input.title,
       tags: parsed.tags || [],
+      language: parsed.language || 'en',
     }
   } catch {
     return buildFallback5Ws(input, location, transcript)
@@ -252,6 +270,9 @@ function buildFallback5Ws(input: AnalysisInput, location: string, transcript: st
     },
     summary: input.title,
     tags: [],
+    // No AI call in this path — nothing actually detected the language,
+    // so this is honestly just "unknown," not a real detection result.
+    language: 'en',
   }
 }
 
@@ -264,6 +285,7 @@ export async function storeAnalysis(supabase: any, reportId: string, result: Ana
     sources: result.sources,
     summary: result.summary,
     tags: result.tags,
+    language: result.language,
     created_at: new Date().toISOString(),
   })
 }

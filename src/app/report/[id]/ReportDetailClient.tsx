@@ -20,6 +20,31 @@ const FLOAT_POSITIONS=[
 
 export function ReportDetailClient({report:r,seriesReports,viewerCountry}:{report:any,seriesReports:any[],viewerCountry?:string|null}){const router=useRouter();const{user}=useAuth();const[voted,setVoted]=useState<'up'|'down'|null>(null);const[votes,setVotes]=useState({up:r.upvotes,down:r.downvotes});const t=TC[r.user?.tier||'starter']||TC.starter
 const crisisResource=r.show_crisis_resources?getCrisisResource(viewerCountry):null
+
+// On-demand translation — never touches the original fields, purely a
+// read-side view for a viewer who doesn't share the reporter's language.
+// Target language comes from the viewer's own browser, not the report's.
+const[translation,setTranslation]=useState<{title:string,who:string,what:string,where_text:string,why:string,transcript:string}|null>(null)
+const[showTranslation,setShowTranslation]=useState(false)
+const[translating,setTranslating]=useState(false)
+const[translateError,setTranslateError]=useState('')
+async function loadTranslation(){
+  if(translation){setShowTranslation(true);return}
+  setTranslating(true);setTranslateError('')
+  try{
+    const lang=(navigator.language||'en').split('-')[0]
+    const res=await fetch(`/api/reports/translate?report_id=${r.id}&lang=${lang}`)
+    const d=await res.json()
+    if(!res.ok){setTranslateError(d.error||'Translation unavailable right now');return}
+    setTranslation(d.translation);setShowTranslation(true)
+  }catch(e:any){setTranslateError(e.message)}
+  setTranslating(false)
+}
+const displayTitle=showTranslation&&translation?.title||r.title
+const displayWho=showTranslation?translation?.who||'':r.who
+const displayWhat=showTranslation?translation?.what||'':r.what
+const displayWhere=showTranslation?translation?.where_text||'':(r.where_text||r.location_name)
+const displayWhy=showTranslation?translation?.why||'':r.why
 const playerRef=useRef<any>(null)
 const adVideoRef=useRef<HTMLVideoElement>(null)
 const[currentTime,setCurrentTime]=useState(0)
@@ -210,7 +235,10 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
     @keyframes vzEndCardFade{from{opacity:0}to{opacity:1}}
   `}</style>
 </div>:<div style={{height:200,background:'#0a1e30',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'rgba(255,255,255,0.2)'}}>Video processing...</span></div>}
-<div style={{maxWidth:600,margin:'0 auto',padding:'14px 16px 60px'}}><h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',lineHeight:1.4,marginBottom:4}}>{r.title}</h1><div style={{fontSize:12,color:'#00AACC',fontWeight:500,marginBottom:12}}>{r.location_name} · {new Date(r.created_at).toLocaleDateString()}</div>
+<div style={{maxWidth:600,margin:'0 auto',padding:'14px 16px 60px'}}><h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',lineHeight:1.4,marginBottom:4}}>{displayTitle}</h1><div style={{fontSize:12,color:'#00AACC',fontWeight:500,marginBottom:12,display:'flex',alignItems:'center',gap:8}}><span>{r.location_name} · {new Date(r.created_at).toLocaleDateString()}</span>
+<button onClick={()=>showTranslation?setShowTranslation(false):loadTranslation()} disabled={translating} style={{fontSize:11,color:'#999',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textDecoration:'underline',padding:0}}>{translating?'Translating…':showTranslation?'Show original':'🌐 See translation'}</button>
+</div>
+{translateError&&<div style={{fontSize:11,color:'#DC2626',marginBottom:8}}>{translateError}</div>}
 
 {crisisResource&&<div style={{borderRadius:10,padding:'12px 14px',marginBottom:16,background:'#F5F0FF',border:'1px solid #D9C8FA'}}>
 <div style={{fontSize:12,fontWeight:700,color:'#4C1D95',marginBottom:4}}>If you or someone in this video needs support</div>
@@ -220,7 +248,12 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 </div>}
 
 {r.description&&<p style={{fontSize:14,color:'#333',lineHeight:1.6,marginBottom:16}}>{r.description}</p>}
-<div style={{background:'#fafafa',borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>{[{l:'WHO',v:r.who,c:'#B53D0F'},{l:'WHAT',v:r.what,c:'#1565C0'},{l:'WHERE',v:r.where_text||r.location_name,c:'#085041'},{l:'WHEN',v:r.when_happened?new Date(r.when_happened).toLocaleString():'',c:'#854F0B'},{l:'WHY',v:r.why,c:'#993556'}].map(w=>w.v?(<div key={w.l} style={{display:'flex',gap:10,marginBottom:8}}><span style={{fontSize:10,fontWeight:700,color:w.c,width:40,flexShrink:0}}>{w.l}</span><span style={{fontSize:13,color:'#333',lineHeight:1.4}}>{w.v}</span></div>):null)}</div>
+<div style={{background:'#fafafa',borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>{[{l:'WHO',v:displayWho,c:'#B53D0F'},{l:'WHAT',v:displayWhat,c:'#1565C0'},{l:'WHERE',v:displayWhere,c:'#085041'},{l:'WHEN',v:r.when_happened?new Date(r.when_happened).toLocaleString():'',c:'#854F0B'},{l:'WHY',v:displayWhy,c:'#993556'}].map(w=>w.v?(<div key={w.l} style={{display:'flex',gap:10,marginBottom:8}}><span style={{fontSize:10,fontWeight:700,color:w.c,width:40,flexShrink:0}}>{w.l}</span><span style={{fontSize:13,color:'#333',lineHeight:1.4}}>{w.v}</span></div>):null)}</div>
+
+{showTranslation&&translation?.transcript&&<div style={{borderRadius:10,padding:14,marginBottom:16,border:'1px solid #f0f0f0'}}>
+<div style={{fontSize:11,fontWeight:700,color:'#888',marginBottom:6,textTransform:'uppercase',letterSpacing:0.5}}>Translated transcript</div>
+<div style={{fontSize:13,color:'#333',lineHeight:1.6}}>{translation.transcript}</div>
+</div>}
 
 {corroboration.count>0&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:16,background:'#ECFDF5',border:'1px solid #A7F3D0'}}>
 <div style={{fontSize:12,fontWeight:700,color:'#065F46',marginBottom:corroboration.count?4:0}}>✓ Corroborated by {corroboration.count} other report{corroboration.count===1?'':'s'}</div>

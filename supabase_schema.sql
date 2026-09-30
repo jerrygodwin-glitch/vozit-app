@@ -290,6 +290,40 @@ CREATE TABLE public.report_flags (
 );
 
 -- ══════════════════════════════════════════════════════════════════════════
+-- AI 5W ANALYSIS (src/lib/ai-5w-analysis.ts)
+-- ══════════════════════════════════════════════════════════════════════════
+CREATE TABLE public.ai_analyses (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id    UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
+  suggested_5w JSONB NOT NULL,
+  confidence   JSONB NOT NULL,
+  sources      JSONB NOT NULL,
+  summary      TEXT,
+  tags         TEXT[] DEFAULT '{}',
+  -- Detected from the reporter's own transcript/notes — the suggestions
+  -- above are written in this language, not forced into English.
+  language     TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- REPORT TRANSLATIONS (shared, cached — one row per report + target language)
+-- ══════════════════════════════════════════════════════════════════════════
+CREATE TABLE public.report_translations (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id   UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
+  lang        TEXT NOT NULL,
+  title       TEXT,
+  who         TEXT,
+  what        TEXT,
+  where_text  TEXT,
+  why         TEXT,
+  transcript  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (report_id, lang)
+);
+
+-- ══════════════════════════════════════════════════════════════════════════
 -- MODERATION LOG
 -- ══════════════════════════════════════════════════════════════════════════
 CREATE TABLE public.moderation_log (
