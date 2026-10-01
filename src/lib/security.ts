@@ -74,6 +74,9 @@ export const RATE_LIMITS = {
   password_reset:{ max: 3,  window: 3600 },    // 3 reset emails per hour
   api_general:  { max: 300, window: 60 },
   licensing:    { max: 20,  window: 3600 },
+  // Each uncached hit is a real paid API call — cap it per requester,
+  // not just per report, so looping garbage lang codes can't run up costs.
+  translate:    { max: 20,  window: 3600 },
 }
 
 // ── 2. WEBHOOK SIGNATURE VERIFICATION ────────────────────────
