@@ -15,13 +15,6 @@ export async function POST(req: NextRequest) {
     // var — likely why this didn't actually fix anything last time).
     const origin = req.nextUrl?.origin || req.headers.get('origin') || undefined
     const { uploadId, uploadUrl } = await createMuxUpload(origin)
-    // Temporary — three attempts at the CORS-origin angle and a full
-    // client-library swap haven't changed the symptom at all, which rules
-    // out the client side entirely. Logging exactly what was actually sent
-    // to Mux so the next failure gives real data instead of another guess
-    // (a CORS-blocked request tells the browser nothing useful at all —
-    // this is the only vantage point left to inspect it from).
-    console.log('[upload-url] origin=%s uploadId=%s uploadUrl=%s', origin, uploadId, uploadUrl)
     return NextResponse.json({ uploadId, uploadUrl })
   } catch (e: any) {
     // This had no logging at all before — a real failure here (e.g. a

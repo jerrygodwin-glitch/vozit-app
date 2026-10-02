@@ -448,7 +448,15 @@ export function getSecurityHeaders(): Record<string, string> {
       "img-src 'self' data: https://image.mux.com https://*.supabase.co blob:",
       "media-src 'self' https://stream.mux.com blob:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mux.com https://api.thehive.ai https://challenges.cloudflare.com",
+      // *.mux.com, not just api.mux.com — direct video uploads go straight
+      // from the browser to a regional storage host (e.g.
+      // direct-uploads-oci-us-phoenix-1-vop1.mux.com), which varies and
+      // isn't documented as a fixed address. Only api.mux.com being
+      // allowed here is exactly what silently blocked every upload: the
+      // browser refused to even attempt the connection, before CORS or
+      // the network were ever involved, which is why it failed completely
+      // independent of connection type, upload library, or device settings.
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mux.com https://api.thehive.ai https://challenges.cloudflare.com",
       "frame-src 'self' https://challenges.cloudflare.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",

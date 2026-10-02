@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import{useState,useEffect,useRef}from'react'
+import*as UpChunk from'@mux/upchunk'
 import{createBrowserClient}from'@/lib/supabase'
 import{NavBar}from'@/components/ui/NavBar'
 import{CameraRecorder}from'@/components/camera/CameraRecorder'
@@ -12,27 +13,25 @@ type Step='record'|'voiceover'|'mode'|'quick'|'detailed'|'review'|'submitting'|'
 type FiveWs={who:string;what:string;where_text:string;when_happened:string;why:string}
 type AISuggestion={suggested:FiveWs;confidence:Record<string,number>;sources:Record<string,string>;summary:string;tags:string[]}
 
-// Plain single PUT, not chunked — temporarily reverted from UpChunk (Mux's
-// chunked/resumable client) after three straight attempts at a CORS-origin
-// fix for "server responded with 0" made no difference, failing 100% of the
-// time on both WiFi and cellular. That consistency, independent of
-// connection quality, pointed away from a flaky-network explanation and
-// toward something in UpChunk's own request handling — removing it entirely
-// isolates whether that was the actual cause, and this surfaces the real
-// HTTP status/response text on failure instead of UpChunk's opaque "0."
-// Loses automatic retry-of-a-failed-chunk on a dropped connection; worth
-// restoring once the underlying cause here is confirmed and fixed.
+// Restored UpChunk (Mux's own chunked/resumable client) — the plain-PUT
+// revert was a deliberate diagnostic step to rule UpChunk out as the cause
+// of "server responded with 0," which it conclusively did: the real cause
+// was the site's own Content-Security-Policy only allowing connections to
+// api.mux.com, not the regional direct-uploads-*.mux.com host the actual
+// video bytes go to (fixed in src/lib/security.ts) — a browser-level block
+// that happened before CORS or the network were ever involved, which is
+// why neither the upload library nor the connection type mattered at all.
+// On a dropped connection mid-upload, UpChunk retries just the failed
+// chunk instead of restarting the whole file from byte zero.
 function uploadWithProgress(url:string,blob:Blob,onProgress:(pct:number)=>void):Promise<void>{
   return new Promise((resolve,reject)=>{
-    const xhr=new XMLHttpRequest()
-    xhr.open('PUT',url,true)
-    xhr.upload.onprogress=(e)=>{if(e.lengthComputable)onProgress(Math.round((e.loaded/e.total)*100))}
-    xhr.onload=()=>{
-      if(xhr.status>=200&&xhr.status<300)resolve()
-      else reject(new Error(`Upload failed — server returned status ${xhr.status}${xhr.statusText?' ('+xhr.statusText+')':''}.${xhr.responseText?' '+xhr.responseText.slice(0,200):''}`))
-    }
-    xhr.onerror=()=>reject(new Error('Upload failed — the connection to the upload server was rejected (status 0). This usually means the upload link expired or was refused, not a dropped connection.'))
-    xhr.send(blob)
+    // UpChunk requires an actual File, not just a Blob — a live recording's
+    // MediaRecorder output is a plain Blob, which UpChunk rejects outright.
+    const file=blob instanceof File?blob:new File([blob],`recording.${(blob.type.split('/')[1]||'webm').split(';')[0]}`,{type:blob.type||'video/webm'})
+    const upload=UpChunk.createUpload({endpoint:url,file,chunkSize:5120})
+    upload.on('progress',(e:any)=>onProgress(Math.round(e.detail)))
+    upload.on('success',()=>resolve())
+    upload.on('error',(e:any)=>reject(new Error(e.detail?.message||'Upload failed. Check your connection and try again.')))
   })
 }
 
