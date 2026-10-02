@@ -43,21 +43,16 @@ const PLATFORMS = [
 export function ShareButton({ reportId, title, location, username, compact }: SP) {
   const [show, setShow] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [embedCopied, setEmbedCopied] = useState(false)
   const [linkCopiedFor, setLinkCopiedFor] = useState<string | null>(null)
   const [distributing, setDistributing] = useState(false)
   const [distributed, setDistributed] = useState<string[]>([])
   const menuRef = useRef<HTMLDivElement>(null)
 
   const url = typeof window !== 'undefined' ? window.location.origin + '/report/' + reportId : ''
-  // Points at the real embed player (src/app/embed/[id]) — VozIt-branded,
-  // tracks embed_views, has its own "Watch on VozIt" CTA. This used to
-  // build "${url}?embed=1", a URL nothing handles specially, so pasting it
-  // anywhere would've embedded the full report page (header, sidebar and
-  // all) squeezed into a 400x320 box instead of a real player.
-  const embedUrl = typeof window !== 'undefined' ? window.location.origin + '/embed/' + reportId : ''
   const text = `${title} — @${username} on VozIt`
-  const embedCode = `<iframe src="${embedUrl}" width="640" height="400" frameborder="0" allowfullscreen></iframe>`
+  // "Copy embed code" is removed from this menu for now — pending a
+  // decision on how it should relate to the real embed system on the
+  // Licensing page (/embed/[id]). Tracked on the open items list.
 
   // The dropdown had no way to dismiss it besides clicking the toggle
   // button again — Escape did nothing, and clicking anywhere else on the
@@ -162,12 +157,6 @@ export function ShareButton({ reportId, title, location, username, compact }: SP
               onClick={async () => { await navigator.clipboard.writeText(url); setCopied(true); track('copy'); setTimeout(() => setCopied(false), 2000) }}
               style={{ padding: '7px 8px', cursor: 'pointer', color: copied ? '#085041' : '#333', fontSize: 12, fontWeight: copied ? 600 : 400 }}
             >{copied ? '✓ Link copied!' : '🔗 Copy link'}</div>
-
-            {/* Copy embed code */}
-            <div
-              onClick={async () => { await navigator.clipboard.writeText(embedCode); setEmbedCopied(true); track('embed'); setTimeout(() => setEmbedCopied(false), 2000) }}
-              style={{ padding: '7px 8px', cursor: 'pointer', color: embedCopied ? '#085041' : '#333', fontSize: 12, fontWeight: embedCopied ? 600 : 400 }}
-            >{embedCopied ? '✓ Embed code copied!' : '</> Copy embed code'}</div>
           </div>
 
           {/* Cross-post CTA */}
