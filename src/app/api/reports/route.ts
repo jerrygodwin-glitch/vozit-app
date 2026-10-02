@@ -147,7 +147,14 @@ export async function POST(req: NextRequest) {
     const whatClean = what ? sanitizeInput(what, 2000) : null
     const whereTextClean = where_text ? sanitizeInput(where_text, 500) : null
     const whyClean = why ? sanitizeInput(why, 2000) : null
-    const locationNameClean = location_name ? sanitizeInput(location_name, 200) : null
+    // reports.location_name is NOT NULL, but the upload form never actually
+    // sends a separate location_name field at all — only where_text. Falling
+    // through to the best available alternative (the reporter's own "where"
+    // answer, then raw GPS coordinates, then a plain placeholder) instead of
+    // inserting null, which failed this exact constraint on every report.
+    const locationNameClean = location_name
+      ? sanitizeInput(location_name, 200)
+      : whereTextClean || (location_lat != null && location_lng != null ? `${location_lat}, ${location_lng}` : 'Unknown location')
 
     // Pre-publish text moderation — the video itself is scanned separately once
     // Mux finishes processing it (see /api/mux-webhook). This catches abusive
