@@ -1,7 +1,6 @@
 // @ts-nocheck
 'use client'
 import{useState,useEffect,useRef}from'react'
-import*as UpChunk from'@mux/upchunk'
 import{createBrowserClient}from'@/lib/supabase'
 import{NavBar}from'@/components/ui/NavBar'
 import{CameraRecorder}from'@/components/camera/CameraRecorder'
@@ -13,24 +12,27 @@ type Step='record'|'voiceover'|'mode'|'quick'|'detailed'|'review'|'submitting'|'
 type FiveWs={who:string;what:string;where_text:string;when_happened:string;why:string}
 type AISuggestion={suggested:FiveWs;confidence:Record<string,number>;sources:Record<string,string>;summary:string;tags:string[]}
 
-// Chunked, resumable upload (Mux's own recommended client for their direct-
-// upload URLs) instead of one giant PUT. On a dropped connection mid-upload,
-// UpChunk automatically retries the chunk that failed — the whole file
-// doesn't restart from byte zero. It won't survive fully closing the app
-// mid-upload (that would need a native background task), but it fixes the
-// much more common case: a spotty connection dropping and picking back up
-// while the reporter stays on the page.
+// Plain single PUT, not chunked — temporarily reverted from UpChunk (Mux's
+// chunked/resumable client) after three straight attempts at a CORS-origin
+// fix for "server responded with 0" made no difference, failing 100% of the
+// time on both WiFi and cellular. That consistency, independent of
+// connection quality, pointed away from a flaky-network explanation and
+// toward something in UpChunk's own request handling — removing it entirely
+// isolates whether that was the actual cause, and this surfaces the real
+// HTTP status/response text on failure instead of UpChunk's opaque "0."
+// Loses automatic retry-of-a-failed-chunk on a dropped connection; worth
+// restoring once the underlying cause here is confirmed and fixed.
 function uploadWithProgress(url:string,blob:Blob,onProgress:(pct:number)=>void):Promise<void>{
   return new Promise((resolve,reject)=>{
-    // UpChunk requires an actual File, not just a Blob — fine for the
-    // "upload a video" path (a real File from the picker), but a live
-    // recording's MediaRecorder output is a plain Blob, which UpChunk
-    // rejected outright with "file must be a File object." Wrap it.
-    const file=blob instanceof File?blob:new File([blob],`recording.${(blob.type.split('/')[1]||'webm').split(';')[0]}`,{type:blob.type||'video/webm'})
-    const upload=UpChunk.createUpload({endpoint:url,file,chunkSize:5120})
-    upload.on('progress',(e:any)=>onProgress(Math.round(e.detail)))
-    upload.on('success',()=>resolve())
-    upload.on('error',(e:any)=>reject(new Error(e.detail?.message||'Upload failed. Check your connection and try again.')))
+    const xhr=new XMLHttpRequest()
+    xhr.open('PUT',url,true)
+    xhr.upload.onprogress=(e)=>{if(e.lengthComputable)onProgress(Math.round((e.loaded/e.total)*100))}
+    xhr.onload=()=>{
+      if(xhr.status>=200&&xhr.status<300)resolve()
+      else reject(new Error(`Upload failed — server returned status ${xhr.status}${xhr.statusText?' ('+xhr.statusText+')':''}.${xhr.responseText?' '+xhr.responseText.slice(0,200):''}`))
+    }
+    xhr.onerror=()=>reject(new Error('Upload failed — the connection to the upload server was rejected (status 0). This usually means the upload link expired or was refused, not a dropped connection.'))
+    xhr.send(blob)
   })
 }
 
