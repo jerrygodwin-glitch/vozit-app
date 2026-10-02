@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient, createAdminClient } from '@/lib/supabase-server'
-import { cookies } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase-server'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
 import { applyStrike } from '@/lib/strikes'
 import { createCaptureManifest, addModerationAssertion, addPublishAssertion, signManifest, storeProvenance } from '@/lib/c2pa-provenance'
@@ -27,7 +26,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const supabase = createServerClient()
+    // Real root cause of videos stuck forever on "Video processing...":
+    // this is a server-to-server callback from Mux, never a logged-in
+    // user, so createServerClient() always ran as an unauthenticated
+    // client here — auth.uid() is null. The "Update own report" RLS
+    // policy (USING auth.uid() = user_id) silently matched zero rows on
+    // every write this handler made: no thrown error, just nothing saved
+    // (confirmed via direct DB check — mux_asset_id/playback_id stayed
+    // null even though the handler ran its full pipeline without error
+    // and Mux's own asset had already finished processing). Needs the
+    // service-role client to actually bypass RLS like every other piece
+    // of this file already assumed it did.
+    const supabase = createAdminClient()
 
     if (type === 'video.asset.ready') {
       const assetId = data.id
