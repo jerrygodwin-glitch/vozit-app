@@ -22,7 +22,12 @@ type AISuggestion={suggested:FiveWs;confidence:Record<string,number>;sources:Rec
 // while the reporter stays on the page.
 function uploadWithProgress(url:string,blob:Blob,onProgress:(pct:number)=>void):Promise<void>{
   return new Promise((resolve,reject)=>{
-    const upload=UpChunk.createUpload({endpoint:url,file:blob,chunkSize:5120})
+    // UpChunk requires an actual File, not just a Blob — fine for the
+    // "upload a video" path (a real File from the picker), but a live
+    // recording's MediaRecorder output is a plain Blob, which UpChunk
+    // rejected outright with "file must be a File object." Wrap it.
+    const file=blob instanceof File?blob:new File([blob],`recording.${(blob.type.split('/')[1]||'webm').split(';')[0]}`,{type:blob.type||'video/webm'})
+    const upload=UpChunk.createUpload({endpoint:url,file,chunkSize:5120})
     upload.on('progress',(e:any)=>onProgress(Math.round(e.detail)))
     upload.on('success',()=>resolve())
     upload.on('error',(e:any)=>reject(new Error(e.detail?.message||'Upload failed. Check your connection and try again.')))
