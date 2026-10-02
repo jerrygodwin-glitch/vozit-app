@@ -111,20 +111,29 @@ export default function Landing() {
             </div>
           </div>
 
-          {loaded && !reports.length && (
+          {loaded && !reports.length && groupBy === 'category' && (
             <div style={{ padding: '24px 12px', fontSize: 13, color: '#999', textAlign: 'center', background: '#fafafa', borderRadius: 8 }}>
               No reports yet — be the first to <a href="/upload" style={{ color: '#0a8fe8', fontWeight: 600 }}>report what you see</a>.
             </div>
           )}
           {groups.map(group => {
             const groupReports = reportsForGroup(group)
-            if (!groupReports.length) return null
+            // Category sections just hide when empty (categories aren't a
+            // fixed "coverage map" the way regions are) — but an empty
+            // region reads as VozIt having no presence there at all, so it
+            // gets a "Coming Soon" placeholder instead of disappearing.
+            if (!groupReports.length && groupBy !== 'location') return null
             return (
               <div key={group} style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px 0 14px', background: '#D63006', borderRadius: 6, height: 32, marginBottom: 8 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{group}</span>
                   <a href="/upload" className="btn btn-sm" style={{ background: '#fff', color: '#0a8fe8', border: 'none', fontSize: 10, fontWeight: 700 }}>Contribute</a>
                 </div>
+                {!groupReports.length && (
+                  <div style={{ padding: '20px 14px', fontSize: 13, color: '#aaa', textAlign: 'center', background: '#fafafa', borderRadius: '0 0 8px 8px', fontWeight: 600, letterSpacing: 0.3 }}>
+                    Coming Soon
+                  </div>
+                )}
                 {groupReports.map(r => {
                   const t = TC[r.user?.tier || 'starter'] || TC.starter
                   return (
