@@ -54,11 +54,15 @@ export default function Login() {
           <span style={{ fontSize: 11, color: '#999' }}>or</span>
           <div style={{ flex: 1, height: 1, background: '#eee' }} />
         </div>
-        <button onClick={() => oauth('google')} style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <img src="https://www.google.com/favicon.ico" alt="" style={{ width: 16, height: 16 }} /> Continue with Google
+        {/* Disabled, not wired to oauth() — Google/Facebook aren't enabled as
+            sign-in providers yet (needs developer app credentials set up on
+            each platform first). A clickable button that silently fails is
+            worse than an honest "coming soon." */}
+        <button disabled title="Coming soon" style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid #eee', background: '#f7f7f7', color: '#aaa', fontSize: 13, fontWeight: 600, cursor: 'not-allowed', fontFamily: 'inherit', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <img src="https://www.google.com/favicon.ico" alt="" style={{ width: 16, height: 16, opacity: 0.5 }} /> Continue with Google <span style={{ fontSize: 11 }}>(coming soon)</span>
         </button>
-        <button onClick={() => oauth('facebook')} style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <span style={{ color: '#1877F2', fontWeight: 800 }}>f</span> Continue with Facebook
+        <button disabled title="Coming soon" style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid #eee', background: '#f7f7f7', color: '#aaa', fontSize: 13, fontWeight: 600, cursor: 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ color: '#aaa', fontWeight: 800 }}>f</span> Continue with Facebook <span style={{ fontSize: 11 }}>(coming soon)</span>
         </button>
 
         <p style={{ textAlign: 'center', fontSize: 13, color: '#999', marginTop: 16 }}>

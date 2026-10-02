@@ -48,11 +48,25 @@ export async function POST(req: NextRequest) {
     if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
     if (authData.user) {
-      // Previously fire-and-forget (.then(() => {})), which swallowed
-      // errors — a failed profile insert (e.g. blocked by RLS) still
-      // returned {ok:true}, leaving an orphaned auth user with no usable
-      // profile and no indication anything went wrong.
-      const { error: profileError } = await supabase.from('users').insert({
+      // Email confirmation is required on this project, so signUp() does
+      // NOT return an active session — auth.uid() is null on `supabase`
+      // (the cookie-based client) until the user clicks the verification
+      // link. Inserting the profile on that client therefore hit RLS and
+      // failed on every single signup, not just the rare username-race
+      // case this was originally written for. Use the admin client here
+      // instead — every input reaching this point (email, password,
+      // username) was already validated above, and authData.user.id came
+      // straight from Supabase's own signUp() response, not from anything
+      // client-supplied, so there's nothing for a user to spoof.
+      let admin
+      try {
+        admin = createAdminClient()
+      } catch (e: any) {
+        captureError(e, { route: 'POST /api/auth/register (admin client init)', userId: authData.user.id })
+        return NextResponse.json({ error: 'Account setup failed. Please try again.' }, { status: 500 })
+      }
+
+      const { error: profileError } = await admin.from('users').insert({
         id: authData.user.id, email: emailClean, username: usernameCheck.cleaned,
         display_name: sanitizeInput(display_name || username, 50),
         tier: 'starter', report_count: 0, credibility_score: 0, total_earned: 0, is_admin: false, is_banned: false,
@@ -64,7 +78,6 @@ export async function POST(req: NextRequest) {
         // username at once) surfaces here as a 23505 violation. Clean up
         // the auth user we just created so this isn't left as a dead,
         // profile-less account blocking that email address forever.
-        const admin = createAdminClient()
         await admin.auth.admin.deleteUser(authData.user.id).catch(() => {})
         if (profileError.code === '23505') {
           return NextResponse.json({ error: 'That username was just taken. Please choose another.' }, { status: 409 })
@@ -74,6 +87,13 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, message: 'Account created. Check your email to verify.', requiresVerification: true })
-  } catch (e: any) { captureError(e, { route: 'POST /api/auth/register' }); return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) {
+    // Never echo e.message to the client — it's an internal error string
+    // (this is exactly how "supabaseKey is required" leaked straight to
+    // the signup form instead of a usable message), captured for us, not
+    // meant for an end user to read.
+    captureError(e, { route: 'POST /api/auth/register' })
+    return NextResponse.json({ error: 'Account setup failed. Please try again.' }, { status: 500 })
+  }
 }
 export const dynamic = 'force-dynamic'
