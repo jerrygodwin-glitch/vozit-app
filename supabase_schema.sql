@@ -54,7 +54,7 @@ CREATE TABLE public.reports (
   location_lng      NUMERIC(10,6),
   mux_upload_id     TEXT,
   mux_asset_id      TEXT,
-  mux_playback_id   TEXT,
+  playback_id       TEXT,
   duration_seconds  NUMERIC(5,1),
   thumbnail_url     TEXT,
   series_id         UUID,
