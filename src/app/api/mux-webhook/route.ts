@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         : null
 
       // Find the report linked to this Mux upload
-      const { data: report } = await supabase
+      let { data: report } = await supabase
         .from('reports')
         .select('id, user_id, title, who, what, why, status, location_name, location_lat, location_lng, content_hash, created_at, show_crisis_resources, user:users(country)')
         .eq('mux_asset_id', assetId)
@@ -54,7 +54,11 @@ export async function POST(req: NextRequest) {
             .eq('mux_upload_id', uploadId)
             .single()
           if (!r2) return NextResponse.json({ ok: true })
-          Object.assign(report || {}, r2)
+          // report was declared const before — Object.assign(report || {}, r2)
+          // silently discarded its result instead of actually updating
+          // report, leaving it null and crashing a few lines down on
+          // report.id. report needs to actually become r2 here.
+          report = r2
         } else {
           return NextResponse.json({ ok: true })
         }
