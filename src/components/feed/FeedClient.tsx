@@ -4,6 +4,19 @@ import{useState}from'react'
 import Link from'next/link'
 const TC:Record<string,{c:string,bg:string,l:string}>={starter:{c:'#22C55E',bg:'#ECFDF5',l:'Starter'},silver:{c:'#94A3B8',bg:'#F0F4F8',l:'Silver'},gold:{c:'#EAB308',bg:'#FFF8E6',l:'Gold'},platinum:{c:'#8B5CF6',bg:'#F5F0FF',l:'Platinum'}}
 const REGIONS=['America','Europe','Middle East','Asia','Africa']
+// Matching only the literal region name missed almost everything, since
+// location text is normally "City, State, Country" (e.g. "Rockville,
+// Maryland, United States"), which never spells out the continent itself.
+// Not an exhaustive country list — covers the common/major ones per
+// region, same "good enough default, not exhaustive" bar as other
+// location-based lists this session (e.g. the crisis-resource countries).
+const REGION_KEYWORDS:Record<string,string[]>={
+  America:['america','united states','usa','u.s.','canada','mexico','brazil','argentina','colombia','chile','peru','venezuela','ecuador','cuba','jamaica'],
+  Europe:['europe','ukraine','russia','germany','france','united kingdom','uk','italy','spain','poland','portugal','netherlands','belgium','sweden','norway','greece','romania'],
+  'Middle East':['middle east','israel','palestine','iran','iraq','syria','saudi arabia','yemen','lebanon','jordan','turkey','qatar','kuwait','uae','united arab emirates'],
+  Asia:['asia','china','japan','india','korea','vietnam','philippines','indonesia','pakistan','afghanistan','thailand','malaysia','bangladesh'],
+  Africa:['africa','nigeria','egypt','kenya','south africa','ethiopia','sudan','congo','somalia','ghana','morocco','uganda'],
+}
 export function FeedClient({reports:initialReports,pageSize=30}:{reports:any[],pageSize?:number}){
   const[reports,setReports]=useState(initialReports)
   const[loading,setLoading]=useState(false)
@@ -25,10 +38,9 @@ export function FeedClient({reports:initialReports,pageSize=30}:{reports:any[],p
     setLoading(false)
   }
 
-  // Location text rarely spells out the continent name literally (e.g. "Kharkiv,
-  // Ukraine" won't match "Europe"), so anything that doesn't match a region falls
-  // into a catch-all instead of silently disappearing from the feed.
-  const grouped=REGIONS.reduce((acc,r)=>{acc[r]=reports.filter(rp=>(rp.location_name||'').toLowerCase().includes(r.toLowerCase()));return acc},{} as Record<string,any[]>)
+  // Anything that still doesn't match any keyword falls into a catch-all
+  // instead of silently disappearing from the feed.
+  const grouped=REGIONS.reduce((acc,r)=>{const name=(l:string)=>(l||'').toLowerCase();acc[r]=reports.filter(rp=>REGION_KEYWORDS[r].some(k=>name(rp.location_name).includes(k)));return acc},{} as Record<string,any[]>)
   const matchedIds=new Set(Object.values(grouped).flat().map((r:any)=>r.id))
   const other=reports.filter(r=>!matchedIds.has(r.id))
   const sections=other.length?[...REGIONS,'Other']:REGIONS

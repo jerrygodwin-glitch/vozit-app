@@ -401,6 +401,23 @@ if(step==='quick')return(<div style={{minHeight:'100vh',background:'#fff'}}>
 <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder="Anything else you want to add — context, what you saw, who was there..." style={{width:'100%',padding:'12px 14px',borderRadius:10,border:'1px solid #ddd',fontSize:13,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
 </div>
 
+{/* Previously only in detailed mode — a Quick-mode submission always
+    fell through to the 'other' default with no way to change it, since
+    this picker was the only thing that ever set the category. */}
+<div style={{marginBottom:14}}>
+<label style={{fontSize:12,fontWeight:600,color:'#1a1a1a',display:'block',marginBottom:4}}>Category</label>
+<select value={category} onChange={e=>setCategory(e.target.value)} style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #ddd',fontSize:13,outline:'none',fontFamily:'inherit',background:'#fff'}}>
+<option value="justice">Justice</option>
+<option value="politics">Politics</option>
+<option value="economy">Economy</option>
+<option value="environment">Environment</option>
+<option value="crisis">Conflict/Crisis</option>
+<option value="entertainment">Entertainment</option>
+<option value="sports">Sports</option>
+<option value="other">Other</option>
+</select>
+</div>
+
 {gps&&<div style={{padding:10,borderRadius:8,background:'#ECFDF5',border:'1px solid #d0f0e0',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
 <span>📍</span><span style={{fontSize:12,color:'#065F46'}}>GPS location captured automatically</span>
 </div>}
