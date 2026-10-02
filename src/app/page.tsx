@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { LOGO } from '@/lib/ui'
 
 const G = 'https://www.google.com/s2/favicons?domain=DOMAIN&sz=128'
@@ -13,22 +13,50 @@ const TABS = [
   { l: 'Licensing', h: '/licensing' },
   { l: 'About', h: '#about' },
 ]
-const REPORTS = [
-  { id: '1', t: 'Shelling hits residential area in Saltivka', loc: 'Kharkiv, Ukraine', u: 'olena_k', tier: 'platinum', up: 847, cred: 98, dur: 67, time: '2h ago', region: 'Europe', category: 'Conflict/Crisis' },
-  { id: '2', t: 'Protesters block main highway', loc: 'Caracas, Venezuela', u: 'maria_vzla', tier: 'gold', up: 412, cred: 93, dur: 45, time: '4h ago', region: 'Americas', category: 'Politics' },
-  { id: '3', t: 'Flash flooding destroys bridge', loc: 'Bihar, India', u: 'ravi_reports', tier: 'silver', up: 234, cred: 89, dur: 52, time: '6h ago', region: 'Asia', category: 'Environment' },
-  { id: '6', t: 'Aid convoy blocked at border crossing', loc: 'Rafah, Gaza', u: 'ahmad_gz', tier: 'gold', up: 1203, cred: 96, dur: 88, time: '1h ago', region: 'Middle East', category: 'Conflict/Crisis' },
-  { id: '4', t: 'Police teargas at student march', loc: 'Nairobi, Kenya', u: 'chidi_nbo', tier: 'starter', up: 156, cred: 85, dur: 38, time: '8h ago', region: 'Africa', category: 'Justice' },
-  { id: '5', t: 'Wildfire approaches residential zone', loc: 'Valparaiso, Chile', u: 'pablo_cl', tier: 'silver', up: 198, cred: 91, dur: 72, time: '12h ago', region: 'Americas', category: 'Environment' },
-]
 const TC: any = { starter: { c: '#22C55E', l: 'Starter' }, silver: { c: '#64748B', l: 'Silver' }, gold: { c: '#CA8A04', l: 'Gold' }, platinum: { c: '#7C3AED', l: 'Platinum' } }
 const REGIONS = ['Americas', 'Europe', 'Middle East', 'Africa', 'Asia']
+// Same keyword-matching approach as FeedClient — location text is normally
+// "City, State, Country", which never spells out the continent itself.
+const REGION_KEYWORDS: Record<string, string[]> = {
+  Americas: ['america', 'united states', 'usa', 'u.s.', 'canada', 'mexico', 'brazil', 'argentina', 'colombia', 'chile', 'peru', 'venezuela', 'ecuador', 'cuba', 'jamaica'],
+  Europe: ['europe', 'ukraine', 'russia', 'germany', 'france', 'united kingdom', 'uk', 'italy', 'spain', 'poland', 'portugal', 'netherlands', 'belgium', 'sweden', 'norway', 'greece', 'romania'],
+  'Middle East': ['middle east', 'israel', 'palestine', 'iran', 'iraq', 'syria', 'saudi arabia', 'yemen', 'lebanon', 'jordan', 'turkey', 'qatar', 'kuwait', 'uae', 'united arab emirates'],
+  Asia: ['asia', 'china', 'japan', 'india', 'korea', 'vietnam', 'philippines', 'indonesia', 'pakistan', 'afghanistan', 'thailand', 'malaysia', 'bangladesh'],
+  Africa: ['africa', 'nigeria', 'egypt', 'kenya', 'south africa', 'ethiopia', 'sudan', 'congo', 'somalia', 'ghana', 'morocco', 'uganda'],
+}
 const CATEGORIES = ['Justice', 'Politics', 'Economy', 'Environment', 'Conflict/Crisis', 'Entertainment', 'Sports']
+// Reports store category as the lowercase code chosen on upload (see
+// CATEGORIES in /api/reports) — map each code to its display label here.
+const CATEGORY_LABELS: Record<string, string> = { justice: 'Justice', politics: 'Politics', economy: 'Economy', environment: 'Environment', crisis: 'Conflict/Crisis', entertainment: 'Entertainment', sports: 'Sports', other: 'Other' }
+
+function timeAgo(iso: string) {
+  if (!iso) return ''
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 export default function Landing() {
   const [groupBy, setGroupBy] = useState<'location' | 'category'>('location')
+  const [reports, setReports] = useState<any[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/reports?limit=50&sort=recent')
+      .then(res => res.json())
+      .then(data => setReports(data.reports || []))
+      .catch(() => {})
+      .finally(() => setLoaded(true))
+  }, [])
+
   const groups = groupBy === 'location' ? REGIONS : CATEGORIES
-  const groupKey = groupBy === 'location' ? 'region' : 'category'
+  const matchName = (l: string) => (l || '').toLowerCase()
+  const reportsForGroup = (group: string) => groupBy === 'location'
+    ? reports.filter(r => REGION_KEYWORDS[group]?.some(k => matchName(r.location_name).includes(k)))
+    : reports.filter(r => CATEGORY_LABELS[r.category] === group)
   return (
     <div style={{ minHeight: '100vh', background: '#fff' }}>
       {/* TOP BAR */}
@@ -83,8 +111,13 @@ export default function Landing() {
             </div>
           </div>
 
+          {loaded && !reports.length && (
+            <div style={{ padding: '24px 12px', fontSize: 13, color: '#999', textAlign: 'center', background: '#fafafa', borderRadius: 8 }}>
+              No reports yet — be the first to <a href="/upload" style={{ color: '#0a8fe8', fontWeight: 600 }}>report what you see</a>.
+            </div>
+          )}
           {groups.map(group => {
-            const groupReports = REPORTS.filter(r => (r as any)[groupKey] === group)
+            const groupReports = reportsForGroup(group)
             if (!groupReports.length) return null
             return (
               <div key={group} style={{ marginBottom: 20 }}>
@@ -93,26 +126,27 @@ export default function Landing() {
                   <a href="/upload" className="btn btn-sm" style={{ background: '#fff', color: '#0a8fe8', border: 'none', fontSize: 10, fontWeight: 700 }}>Contribute</a>
                 </div>
                 {groupReports.map(r => {
-                  const t = TC[r.tier]
+                  const t = TC[r.user?.tier || 'starter'] || TC.starter
                   return (
-                    <div key={r.id} style={{ display: 'flex', borderBottom: '1px solid #f0f0f0', marginBottom: 4 }}>
-                      <div style={{ width: 140, minHeight: 90, background: 'linear-gradient(135deg,#1a2a3a,#2a3a4a)', position: 'relative', flexShrink: 0, borderRadius: '8px 0 0 8px' }}>
+                    <a key={r.id} href={'/report/' + r.id} style={{ display: 'flex', borderBottom: '1px solid #f0f0f0', marginBottom: 4, textDecoration: 'none', color: 'inherit' }}>
+                      <div style={{ width: 140, minHeight: 90, background: 'linear-gradient(135deg,#1a2a3a,#2a3a4a)', position: 'relative', flexShrink: 0, borderRadius: '8px 0 0 8px', overflow: 'hidden' }}>
+                        {r.thumbnail_url && <img src={r.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 36, height: 36, borderRadius: 18, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <div style={{ width: 0, height: 0, borderLeft: '12px solid #fff', borderTop: '7px solid transparent', borderBottom: '7px solid transparent', marginLeft: 2 }} />
                         </div>
-                        <span style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 10, color: 'rgba(255,255,255,0.8)', background: 'rgba(0,0,0,0.5)', padding: '1px 5px', borderRadius: 3 }}>0:{r.dur}</span>
+                        <span style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 10, color: 'rgba(255,255,255,0.8)', background: 'rgba(0,0,0,0.5)', padding: '1px 5px', borderRadius: 3 }}>0:{String(r.duration_seconds || 0).padStart(2, '0')}</span>
                       </div>
                       <div style={{ flex: 1, padding: '8px 12px' }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{r.t}</div>
-                        <div style={{ fontSize: 12, color: '#0a8fe8', marginTop: 4 }}>{r.loc} · {r.time}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{r.title}</div>
+                        <div style={{ fontSize: 12, color: '#0a8fe8', marginTop: 4 }}>{r.location_name} · {timeAgo(r.created_at)}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
-                          <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 600 }}>▲ {r.up}</span>
-                          <span style={{ fontSize: 12, color: '#666' }}>{r.cred}% credibility</span>
+                          <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 600 }}>▲ {r.upvotes || 0}</span>
+                          <span style={{ fontSize: 12, color: '#666' }}>{r.credibility_pct}% credibility</span>
                           <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: t.c + '15', color: t.c, fontWeight: 600, marginLeft: 'auto' }}>★ {t.l}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#666', marginTop: 3 }}>by <span style={{ fontWeight: 600 }}>@{r.u}</span></div>
+                        <div style={{ fontSize: 12, color: '#666', marginTop: 3 }}>by <span style={{ fontWeight: 600 }}>@{r.user?.username}</span></div>
                       </div>
-                    </div>
+                    </a>
                   )
                 })}
               </div>
