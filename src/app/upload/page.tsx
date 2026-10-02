@@ -189,6 +189,12 @@ async function requestAIAnalysis(){
         title, notes,
         ...fiveW,
         gps, captured_at:new Date().toISOString(),
+        // The server has no idea what timezone the reporter is actually
+        // in — without this, "when did this happen" context built
+        // server-side silently used the server's own clock (effectively
+        // UTC on Vercel) while looking like a normal local time, which is
+        // exactly what showed up as a timestamp hours off for the reporter.
+        timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
         transcript:transcriptText,
       }),
     })

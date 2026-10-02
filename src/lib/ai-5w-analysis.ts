@@ -36,6 +36,12 @@ export interface AnalysisInput {
   playbackId?: string
   duration?: number
   capturedAt: string          // ISO timestamp from device
+  // IANA zone (e.g. "America/New_York") from the reporter's own device —
+  // this runs server-side, which has no idea what timezone the reporter
+  // is actually in. Without this, formatting capturedAt for the prompt
+  // used the server's own clock (effectively UTC on Vercel) while looking
+  // exactly like an ordinary local time, with nothing to say otherwise.
+  timezone?: string
 
   // GPS from device
   gps?: { lat: number; lng: number; alt?: number }
@@ -159,7 +165,15 @@ export async function generate5Ws(input: AnalysisInput): Promise<AnalysisResult>
     input.reporterWhy ? `Reporter said WHY: "${input.reporterWhy}"` : '',
     location ? `GPS reverse-geocoded to: ${location}` : '',
     input.gps ? `GPS coordinates: ${input.gps.lat}, ${input.gps.lng}` : '',
-    `Video recorded at: ${new Date(input.capturedAt).toLocaleString()}`,
+    // Without a known timezone, toLocaleString() here would render using
+    // the SERVER's clock (effectively UTC on Vercel) while looking exactly
+    // like an ordinary local time — this is what put reporters' timestamps
+    // hours off. With input.timezone (from the reporter's own device), this
+    // renders their actual local time, explicit zone abbreviation included,
+    // so it's unambiguous either way.
+    input.timezone
+      ? `Video recorded at: ${new Date(input.capturedAt).toLocaleString('en-US', { timeZone: input.timezone, timeZoneName: 'short' })} (reporter's local time)`
+      : `Video recorded at: ${input.capturedAt} (UTC)`,
     input.duration ? `Video duration: ${input.duration} seconds` : '',
     transcript ? `Audio transcript from video: "${transcript.slice(0, 2000)}"` : '',
     input.visualContext ? `Visual analysis: "${input.visualContext}"` : '',
@@ -251,7 +265,13 @@ function buildFallback5Ws(input: AnalysisInput, location: string, transcript: st
       who: input.reporterWho || '',
       what: input.reporterWhat || input.title,
       where_text: input.reporterWhere || location || '',
-      when_happened: input.reporterWhen || new Date(input.capturedAt).toLocaleString(),
+      // Same timezone fix as the main prompt builder above — without
+      // input.timezone this would render in the SERVER's local time while
+      // looking exactly like the reporter's own, which is what produced a
+      // "when" timestamp hours off from reality.
+      when_happened: input.reporterWhen || (input.timezone
+        ? new Date(input.capturedAt).toLocaleString('en-US', { timeZone: input.timezone, timeZoneName: 'short' })
+        : input.capturedAt),
       why: input.reporterWhy || '',
     },
     confidence: {
