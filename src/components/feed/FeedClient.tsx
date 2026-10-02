@@ -37,7 +37,7 @@ export function FeedClient({reports:initialReports,pageSize=30}:{reports:any[],p
     {sections.map(region=>{const items=allGrouped[region]||[];return(<div key={region}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 8px 0 12px',margin:'6px 10px 4px',background:'#FE3D07',borderRadius:6,height:30}}>
         <span style={{fontSize:14,fontWeight:700,color:'#fff'}}>{region}</span>
-        <button style={{backgroundColor:'#fff',color:'#0a8fe8',border:'none',padding:'3px 12px',borderRadius:4,fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',lineHeight:'1.5',boxShadow:'0 1px 2px rgba(0,0,0,0.1)'}}>Contribute</button>
+        <Link href="/upload" style={{backgroundColor:'#fff',color:'#0a8fe8',border:'none',padding:'3px 12px',borderRadius:4,fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',lineHeight:'1.5',boxShadow:'0 1px 2px rgba(0,0,0,0.1)',textDecoration:'none',display:'inline-block'}}>Contribute</Link>
       </div>
       {items.length?items.map(r=>{const t=TC[r.user?.tier||'starter']||TC.starter;return(
         <Link key={r.id} href={'/report/'+r.id} style={{display:'flex',borderBottom:'1px solid #f0f0f0',textDecoration:'none'}}>
