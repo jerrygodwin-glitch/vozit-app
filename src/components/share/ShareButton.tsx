@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface SP { reportId: string; title: string; location: string; username: string; compact?: boolean }
 
@@ -47,10 +47,26 @@ export function ShareButton({ reportId, title, location, username, compact }: SP
   const [linkCopiedFor, setLinkCopiedFor] = useState<string | null>(null)
   const [distributing, setDistributing] = useState(false)
   const [distributed, setDistributed] = useState<string[]>([])
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const url = typeof window !== 'undefined' ? window.location.origin + '/report/' + reportId : ''
   const text = `${title} — @${username} on VozIt`
   const embedCode = `<iframe src="${url}?embed=1" width="400" height="320" frameborder="0" allowfullscreen></iframe>`
+
+  // The dropdown had no way to dismiss it besides clicking the toggle
+  // button again — Escape did nothing, and clicking anywhere else on the
+  // page left it open too.
+  useEffect(() => {
+    if (!show) return
+    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') setShow(false) }
+    function onClickOutside(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShow(false) }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mousedown', onClickOutside)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mousedown', onClickOutside)
+    }
+  }, [show])
 
   function track(platform: string) {
     fetch('/api/share', {
@@ -96,7 +112,7 @@ export function ShareButton({ reportId, title, location, username, compact }: SP
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={menuRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setShow(!show)}
         style={{ background: show ? '#FE3D07' : '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', color: show ? '#fff' : '#333', fontSize: 13, fontWeight: 500, fontFamily: 'inherit' }}
