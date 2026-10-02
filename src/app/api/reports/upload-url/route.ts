@@ -8,7 +8,11 @@ export async function POST(req: NextRequest) {
   const { user } = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    const { uploadId, uploadUrl } = await createMuxUpload()
+    // The real origin this request actually came from — always matches
+    // wherever the browser is about to upload from, so it can't drift out
+    // of sync with the live domain the way a separately-set env var can.
+    const origin = req.headers.get('origin') || undefined
+    const { uploadId, uploadUrl } = await createMuxUpload(origin)
     return NextResponse.json({ uploadId, uploadUrl })
   } catch (e: any) {
     // This had no logging at all before — a real failure here (e.g. a

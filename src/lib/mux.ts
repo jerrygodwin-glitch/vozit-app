@@ -16,14 +16,21 @@ function getMux() {
   return muxClient
 }
 
-export async function createMuxUpload(): Promise<{ uploadId: string; uploadUrl: string }> {
+// corsOrigin should be the actual incoming request's own Origin header,
+// not a separately-configured env var — Mux only accepts an upload from
+// whatever single origin it was told to expect, and a hardcoded/stale
+// value (e.g. an old preview URL, or one that just doesn't exactly match
+// the live domain) silently breaks every upload with no readable error,
+// just a CORS rejection the browser reports as "server responded with 0."
+// Deriving it from the request itself removes that whole class of bug.
+export async function createMuxUpload(corsOrigin?: string): Promise<{ uploadId: string; uploadUrl: string }> {
   const mux = getMux()
   const upload = await mux.video.uploads.create({
     new_asset_settings: {
       playback_policy: ['public'],
       encoding_tier: 'baseline',
     },
-    cors_origin: process.env.NEXT_PUBLIC_APP_URL || '*',
+    cors_origin: corsOrigin || process.env.NEXT_PUBLIC_APP_URL || '*',
   })
   return { uploadId: upload.id, uploadUrl: upload.url }
 }
