@@ -8,10 +8,12 @@ export async function POST(req: NextRequest) {
   const { user } = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    // The real origin this request actually came from — always matches
-    // wherever the browser is about to upload from, so it can't drift out
-    // of sync with the live domain the way a separately-set env var can.
-    const origin = req.headers.get('origin') || undefined
+    // req.nextUrl.origin first — it's derived from the request's own
+    // destination URL, which is always present, unlike the Origin header
+    // (some browsers, Safari included, omit it on same-origin requests,
+    // which would have silently fallen through to a possibly-stale env
+    // var — likely why this didn't actually fix anything last time).
+    const origin = req.nextUrl?.origin || req.headers.get('origin') || undefined
     const { uploadId, uploadUrl } = await createMuxUpload(origin)
     return NextResponse.json({ uploadId, uploadUrl })
   } catch (e: any) {
