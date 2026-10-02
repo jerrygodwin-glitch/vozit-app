@@ -142,11 +142,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // who/what/where_text/why are all NOT NULL on reports, same as
+    // location_name was — '' (not null) when the reporter hasn't filled
+    // them in yet (e.g. mid Quick-mode flow, before AI suggestions land),
+    // since the display already treats an empty string as "nothing to
+    // show" and renders correctly either way.
     const titleClean = sanitizeInput(title, 200)
-    const whoClean = who ? sanitizeInput(who, 2000) : null
-    const whatClean = what ? sanitizeInput(what, 2000) : null
-    const whereTextClean = where_text ? sanitizeInput(where_text, 500) : null
-    const whyClean = why ? sanitizeInput(why, 2000) : null
+    const whoClean = who ? sanitizeInput(who, 2000) : ''
+    const whatClean = what ? sanitizeInput(what, 2000) : ''
+    const whereTextClean = where_text ? sanitizeInput(where_text, 500) : ''
+    const whyClean = why ? sanitizeInput(why, 2000) : ''
     // reports.location_name is NOT NULL, but the upload form never actually
     // sends a separate location_name field at all — only where_text. Falling
     // through to the best available alternative (the reporter's own "where"
@@ -181,7 +186,9 @@ export async function POST(req: NextRequest) {
       who: whoClean,
       what: whatClean,
       where_text: whereTextClean,
-      when_happened: when_happened || null,
+      // Also NOT NULL — falls back to the submission time itself rather
+      // than null when the reporter hasn't specified a when_happened value.
+      when_happened: when_happened || new Date().toISOString(),
       why: whyClean,
       location_name: locationNameClean,
       location_lat: location_lat || null,
