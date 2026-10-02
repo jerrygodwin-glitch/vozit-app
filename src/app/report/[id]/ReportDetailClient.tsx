@@ -101,7 +101,29 @@ const goreWindows=(r.gore_timestamps||[]).map((ts:number)=>[ts-1,ts+2])
 const inGoreWindow=goreWindows.some(([s,e]:number[])=>currentTime>=s&&currentTime<=e)
 const isOwner=user?.id===r.user_id
 const otherParts=(seriesReports||[]).filter(sr=>sr.id!==r.id)
-async function vote(d:'up'|'down'){if(voted===d)return;setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}));fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})}).catch(()=>{})}
+const[voteMsg,setVoteMsg]=useState('')
+// Previously fired-and-forgot the fetch — any failure (not logged in,
+// session cookie rejected, network drop) left the optimistic +1 showing
+// on screen with nothing actually saved server-side, and no indication
+// anything was wrong. Now checks the response and rolls the UI back +
+// explains why on failure.
+async function vote(d:'up'|'down'){
+  if(voted===d)return
+  const prevVoted=voted,prevVotes=votes
+  setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}))
+  try{
+    const res=await fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})})
+    if(!res.ok){
+      setVoted(prevVoted);setVotes(prevVotes)
+      setVoteMsg(res.status===401?'Sign in to vote.':'Could not record your vote — please try again.')
+      setTimeout(()=>setVoteMsg(''),4000)
+    }
+  }catch{
+    setVoted(prevVoted);setVotes(prevVotes)
+    setVoteMsg('Could not record your vote — check your connection and try again.')
+    setTimeout(()=>setVoteMsg(''),4000)
+  }
+}
 
 // Multi-reporter corroboration — independent reports near the same place/time
 const[corroboration,setCorroboration]=useState<{count:number,corroborating:any[]}>({count:0,corroborating:[]})
@@ -290,6 +312,7 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
 <button onClick={()=>vote('up')} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #eee',cursor:'pointer',fontSize:13,fontWeight:600,background:voted==='up'?'#ECFDF5':'#fff',color:voted==='up'?'#085041':'#333',fontFamily:'inherit'}}>{'\u25b2'} {votes.up}</button>
 <button onClick={()=>vote('down')} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #eee',cursor:'pointer',fontSize:13,fontWeight:600,background:voted==='down'?'#FEF2F2':'#fff',color:voted==='down'?'#DC2626':'#333',fontFamily:'inherit'}}>{'\u25bc'} {votes.down}</button>
 </div>
+{voteMsg&&<div style={{fontSize:12,color:'#DC2626',textAlign:'center',marginTop:-8,marginBottom:10}}>{voteMsg}{voteMsg==='Sign in to vote.'&&<> <a href="/auth/login" style={{color:'#0a8fe8',fontWeight:600}}>Sign in</a></>}</div>}
 <div style={{marginBottom:14}}><ShareButton reportId={r.id} title={r.title} location={r.location_name} username={r.user?.username}/></div>
 
 <div style={{marginBottom:20}}>
