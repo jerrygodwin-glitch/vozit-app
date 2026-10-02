@@ -50,8 +50,14 @@ export function ShareButton({ reportId, title, location, username, compact }: SP
   const menuRef = useRef<HTMLDivElement>(null)
 
   const url = typeof window !== 'undefined' ? window.location.origin + '/report/' + reportId : ''
+  // Points at the real embed player (src/app/embed/[id]) — VozIt-branded,
+  // tracks embed_views, has its own "Watch on VozIt" CTA. This used to
+  // build "${url}?embed=1", a URL nothing handles specially, so pasting it
+  // anywhere would've embedded the full report page (header, sidebar and
+  // all) squeezed into a 400x320 box instead of a real player.
+  const embedUrl = typeof window !== 'undefined' ? window.location.origin + '/embed/' + reportId : ''
   const text = `${title} — @${username} on VozIt`
-  const embedCode = `<iframe src="${url}?embed=1" width="400" height="320" frameborder="0" allowfullscreen></iframe>`
+  const embedCode = `<iframe src="${embedUrl}" width="640" height="400" frameborder="0" allowfullscreen></iframe>`
 
   // The dropdown had no way to dismiss it besides clicking the toggle
   // button again — Escape did nothing, and clicking anywhere else on the
