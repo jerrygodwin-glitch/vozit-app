@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthedUser } from '@/lib/supabase-server'
-import { cookies } from 'next/headers'
+import { getAuthedUser, createAdminClient } from '@/lib/supabase-server'
 import { rateLimit, RATE_LIMITS } from '@/lib/security'
 import { captureError } from '@/lib/monitoring'
 
@@ -75,8 +74,18 @@ async function detectSybil(supabase: any, reportId: string, fingerprint: string,
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, supabase } = await getAuthedUser(req)
+    const { user } = await getAuthedUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Voting on anyone else's report needs to write to that report's row
+    // (and, for sybil checks, read other voters' rows) — things a
+    // session-scoped client can never do under the "Update own report" /
+    // "Own votes" RLS policies (both keyed to auth.uid(), not the voter).
+    // Those writes were silently matching zero rows: no error, nothing
+    // saved, which is why the count never moved except when voting on
+    // your own report. identity still comes from the real signed-in user
+    // above; this is only for the actual reads/writes.
+    const supabase = createAdminClient()
 
     const limit = await rateLimit(`vote:${user.id}`, RATE_LIMITS.vote.max, RATE_LIMITS.vote.window, supabase)
     if (!limit.allowed) {
