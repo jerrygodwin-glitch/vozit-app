@@ -232,7 +232,10 @@ async function submitReport(){
     if(videoBlob){
       const upRes=await fetch('/api/reports/upload-url',{method:'POST'})
       const upData=await upRes.json()
-      if(!upData.uploadUrl)throw new Error('Could not start the video upload. Please try again.')
+      // Surface the real server-side reason (e.g. "Mux credentials not
+      // configured") instead of a generic message that hides it — this is
+      // exactly what masked the actual cause the first time this broke.
+      if(!upData.uploadUrl)throw new Error(upData.error||'Could not start the video upload. Please try again.')
       await uploadWithProgress(upData.uploadUrl,videoBlob,setUploadProgress)
       mux_upload_id=upData.uploadId
     }

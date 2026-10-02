@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedUser } from '@/lib/supabase-server'
 import { createMuxUpload } from '@/lib/mux'
+import { captureError } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   const { user } = await getAuthedUser(req)
@@ -9,7 +10,13 @@ export async function POST(req: NextRequest) {
   try {
     const { uploadId, uploadUrl } = await createMuxUpload()
     return NextResponse.json({ uploadId, uploadUrl })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) {
+    // This had no logging at all before — a real failure here (e.g. a
+    // missing Mux credential) left no trace anywhere except a generic
+    // message on the upload screen, with nothing to actually diagnose it.
+    captureError(e, { route: 'POST /api/reports/upload-url', userId: user.id })
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
 
 export const dynamic = 'force-dynamic'
