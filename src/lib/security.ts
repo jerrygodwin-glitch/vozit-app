@@ -446,7 +446,15 @@ export function getSecurityHeaders(): Record<string, string> {
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https://image.mux.com https://*.supabase.co blob:",
-      "media-src 'self' https://stream.mux.com blob:",
+      // https://stream.mux.com alone only covers the master playlist request
+      // itself — the actual video/audio renditions it points to are served
+      // from a separate regional CDN host (e.g.
+      // manifest-oci-us-phoenix-1-vop1.edgemv.mux.com), which this didn't
+      // cover. The browser silently blocked those, the player fell back to
+      // trying to parse the raw manifest directly, and playback failed with
+      // "DEMUXER_ERROR_COULD_NOT_PARSE" — same family of bug as the
+      // connect-src gap that broke uploads earlier.
+      "media-src 'self' https://stream.mux.com https://*.mux.com blob:",
       "font-src 'self' https://fonts.gstatic.com",
       // *.mux.com, not just api.mux.com — direct video uploads go straight
       // from the browser to a regional storage host (e.g.
