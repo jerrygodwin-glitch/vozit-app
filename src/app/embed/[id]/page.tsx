@@ -56,6 +56,18 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
           .embed { width: 100%; height: 100vh; display: flex; flex-direction: column; }
           .video-wrap { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
           .video-wrap video { width: 100%; height: 100%; object-fit: contain; }
+          /* Native fullscreen only expands the <video> element itself,
+             leaving the watermark div (a sibling, not a child of it)
+             behind — an unattributed, unbranded copy the instant someone
+             taps it. Hiding the browser's own fullscreen control (WebKit/
+             Chromium only — the two engines that matter here, since iOS
+             requires WebKit for every browser) and driving fullscreen
+             ourselves via a CSS-simulated expand keeps the watermark
+             inside the same box that gets enlarged. */
+          video::-webkit-media-controls-fullscreen-button { display: none !important; }
+          .video-wrap.vz-fs { position: fixed; inset: 0; z-index: 9999; }
+          .expand-btn { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 6px; background: rgba(0,0,0,0.5); border: none; cursor: pointer; z-index: 6; display: flex; align-items: center; justify-content: center; }
+          .expand-btn svg { width: 15px; height: 15px; }
           .poster { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; cursor: pointer; }
           .play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 64px; height: 64px; border-radius: 32px; background: rgba(254,61,7,0.9); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2; }
           .play-btn::after { content: ''; width: 0; height: 0; border-left: 22px solid #fff; border-top: 14px solid transparent; border-bottom: 14px solid transparent; margin-left: 4px; }
@@ -92,6 +104,12 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
             <div className="watermark">
               <span>VozIt! · @{(report.user as any)?.username} · <em>I was there...</em></span>
             </div>
+            <button className="expand-btn" id="expandBtn" aria-label="Expand">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            </button>
           </div>
           <div className="bar">
             <a href={appUrl} target="_blank" rel="noopener">
@@ -126,6 +144,9 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
             var v = document.getElementById('player');
             var p = document.getElementById('poster');
             if (v) { v.style.display = 'block'; v.play(); this.style.display = 'none'; if(p) p.style.display = 'none'; }
+          };
+          document.getElementById('expandBtn').onclick = function() {
+            document.querySelector('.video-wrap').classList.toggle('vz-fs');
           };
         `}} />
       </body>
