@@ -147,14 +147,24 @@ export async function POST(req: NextRequest) {
       .select('value, weight')
       .eq('report_id', report_id)
 
-    const upvotes = (votes || []).filter(v => v.value === 1).reduce((sum, v) => sum + (v.weight || 1), 0)
-    const downvotes = (votes || []).filter(v => v.value === -1).reduce((sum, v) => sum + (v.weight || 1), 0)
+    const upvoters = (votes || []).filter(v => v.value === 1)
+    const downvoters = (votes || []).filter(v => v.value === -1)
+    const upvotes = upvoters.reduce((sum, v) => sum + (v.weight || 1), 0)
+    const downvotes = downvoters.reduce((sum, v) => sum + (v.weight || 1), 0)
     const total = upvotes + downvotes
+    // Credibility and trending stay on the true weighted math (the whole
+    // point of weighting is to resist sockpuppets) — only the public-
+    // facing counter gets floored. A brand-new account's vote can weigh
+    // so little it rounds to 0, which reads as "my vote didn't count" to
+    // a real person even though it saved correctly; floor it to 1 for
+    // display whenever at least one real vote exists in that direction.
+    const displayUpvotes = upvoters.length > 0 ? Math.max(1, Math.round(upvotes)) : 0
+    const displayDownvotes = downvoters.length > 0 ? Math.max(1, Math.round(downvotes)) : 0
     const credibility = total > 0 ? Math.round((upvotes / total) * 100) : 80
 
     await supabase.from('reports').update({
-      upvotes: Math.round(upvotes),
-      downvotes: Math.round(downvotes),
+      upvotes: displayUpvotes,
+      downvotes: displayDownvotes,
       credibility_pct: credibility,
     }).eq('id', report_id)
 
@@ -171,7 +181,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, upvotes: Math.round(upvotes), downvotes: Math.round(downvotes), credibility })
+    return NextResponse.json({ ok: true, upvotes: displayUpvotes, downvotes: displayDownvotes, credibility })
   } catch (e: any) {
     captureError(e, { route: 'POST /api/votes' })
     return NextResponse.json({ error: e.message }, { status: 500 })
