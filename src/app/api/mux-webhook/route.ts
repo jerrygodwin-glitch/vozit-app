@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createAdminClient } from '@/lib/supabase-server'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
 import { applyStrike } from '@/lib/strikes'
@@ -222,8 +223,17 @@ export async function POST(req: NextRequest) {
       // started, so every post to VozIt's own YouTube/TikTok/IG/FB/X went
       // out with the raw, unbranded master and zero visible credit.
       if (reportStatus === 'published' && playbackId) {
-        // Non-blocking: process watermark in background
-        processVideoWatermark({
+        // Non-blocking, but NOT fire-and-forget — on Vercel, a serverless
+        // function's execution can be frozen the instant the response
+        // below is sent, so a bare un-awaited .then() here had no
+        // guarantee of ever finishing (this job alone can take up to
+        // ~280s, run by processVideoWatermark). waitUntil tells Vercel's
+        // runtime to keep this invocation alive until the promise
+        // settles, without delaying the response back to Mux. This is
+        // the real reason watermark_applied/watermarked_url never got
+        // set even once the worker and its secrets were configured and
+        // working correctly.
+        waitUntil(processVideoWatermark({
           playbackId,
           reportId: report.id,
           username: (report.user as any)?.username || 'reporter',
@@ -231,29 +241,28 @@ export async function POST(req: NextRequest) {
           duration: Math.round(duration),
         }).then(result => {
           if (result.success) {
-            supabase.from('reports').update({
+            return supabase.from('reports').update({
               watermarked_url: result.watermarkedUrl,
               watermark_applied: true,
-            }).eq('id', report!.id)
+            }).eq('id', report!.id).then(() => result)
           }
-
+          return result
+        }).then(result => {
           // Distribute to VozIt's own channels either way — with the
           // branded copy if watermarking succeeded, falling back to the
           // raw master (still better than never posting) if it failed.
-          autoDistributeToVozItChannels({
+          return autoDistributeToVozItChannels({
             reportId: report.id,
             title: report.title,
             description: report.what || report.title,
             playbackId,
-            watermarkedUrl: result.success ? result.watermarkedUrl : undefined,
+            watermarkedUrl: result?.success ? result.watermarkedUrl : undefined,
             locationName: report.location_name,
             location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined,
             reporterUsername: (report.user as any)?.username || 'reporter',
             reporterTier: (report.user as any)?.tier || 'starter',
-          }).then(dist => {
-            logVozItDistribution(supabase, report.id, dist.results)
-          })
-        }) // Non-blocking
+          }).then(dist => logVozItDistribution(supabase, report.id, dist.results))
+        }))
       }
 
       // 7. Update report with final status + risk level
@@ -287,3 +296,8 @@ export async function POST(req: NextRequest) {
 }
 
 export const dynamic = 'force-dynamic'
+// The watermark worker call this route kicks off (via waitUntil, above)
+// can take up to ~280s. Vercel's Hobby plan caps serverless functions at
+// 60s regardless of this setting — watermarking needs at least a Pro
+// plan to actually get the full runway it asks for.
+export const maxDuration = 300
