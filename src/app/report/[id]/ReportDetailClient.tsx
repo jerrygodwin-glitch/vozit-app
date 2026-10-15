@@ -212,14 +212,26 @@ const confirmedBadge=fieldNotes.visible.some((n:any)=>n.category==='confirms_loc
 const contradictedBadge=fieldNotes.visible.some((n:any)=>n.category==='contradicts'&&isWellRated(n))
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div id={`vz-player-${r.id}`} style={{position:'relative',overflow:'hidden'}}>
-  {/* fullscreenElement tells Mux Player to fullscreen THIS wrapper div
-      instead of just its own internal video element. Without it, the
+  {/* Once the watermark worker has burned the username/VozIt branding
+      into the actual video pixels, play THAT file instead of the raw
+      Mux stream. A DOM overlay (Layers 1-3 below) can always be lost —
+      fullscreenElement handles most browsers, but iOS's native video
+      fullscreen is a hard OS-level wall no webpage can draw over. A
+      baked-in watermark survives every viewing mode unconditionally:
+      fullscreen on any device, casting, screen recording, downloading.
+      Falls back to the live Mux stream while watermarking is still
+      processing (non-blocking, shouldn't delay anyone watching) or if
+      the worker isn't configured at all. */}
+  {r.watermark_applied&&r.watermarked_url?
+    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" poster={r.thumbnail_url||undefined} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
+  :
+  /* fullscreenElement tells Mux Player to fullscreen THIS wrapper div
+      instead of just its own internal video element — otherwise the
       native fullscreen/expand button only takes the player itself
-      fullscreen — the watermark overlays below (Layers 1-3) are siblings
-      positioned over the player, not inside it, so they'd vanish the
-      instant someone expanded, cast, or screen-recorded in fullscreen,
-      leaving a clean unattributed copy. */}
-  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} fullscreenElement={`vz-player-${r.id}`} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
+      fullscreen and the overlay layers below get left behind. Mitigates
+      the gap on everything except iOS native fullscreen, until the
+      watermarked file above takes over. */
+  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} fullscreenElement={`vz-player-${r.id}`} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>}
 
   {/* Mid-roll ad break — pauses the report at ~45s, plays a short ad,
       then resumes. Non-skippable by design at this length. */}

@@ -14,7 +14,7 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
   // Fetch report
   const { data: report } = await supabase
     .from('reports')
-    .select('id, title, playback_id, thumbnail_url, location_name, created_at, duration, user:users(username, display_name, tier)')
+    .select('id, title, playback_id, thumbnail_url, location_name, created_at, duration, watermarked_url, watermark_applied, user:users(username, display_name, tier)')
     .eq('id', params.id)
     .eq('status', 'published')
     .single()
@@ -41,9 +41,17 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app'
   const reportUrl = `${appUrl}/report/${report.id}`
-  const videoUrl = report.playback_id
+  // External embeds are exactly where a baked-in watermark matters most —
+  // prefer the burned-in copy once it exists; the CSS watermark div below
+  // is still kept as a fallback while it's processing, or if the worker
+  // isn't configured.
+  const hasWatermarkedFile = report.watermark_applied && report.watermarked_url
+  const videoUrl = hasWatermarkedFile
+    ? report.watermarked_url
+    : report.playback_id
     ? `https://stream.mux.com/${report.playback_id}.m3u8`
     : null
+  const videoMimeType = hasWatermarkedFile ? 'video/mp4' : 'application/x-mpegURL'
 
   return (
     <html>
@@ -97,7 +105,7 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
                 poster={report.thumbnail_url || undefined}
                 style={{ display: 'none' }}
               >
-                <source src={videoUrl} type="application/x-mpegURL" />
+                <source src={videoUrl} type={videoMimeType} />
               </video>
             )}
             <button className="play-btn" id="playBtn" />
