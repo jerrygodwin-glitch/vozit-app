@@ -50,6 +50,13 @@ const adVideoRef=useRef<HTMLVideoElement>(null)
 const[currentTime,setCurrentTime]=useState(0)
 const[duration,setDuration]=useState(0)
 const[showEndCard,setShowEndCard]=useState(false)
+// Most VozIt footage is shot holding the phone upright (portrait), but
+// the player box was hardcoded to a 16:9 landscape shape — Mux Player
+// doesn't auto-size itself to the real video's dimensions, it needs to
+// be told. Reading the actual dimensions once metadata loads and
+// sizing the box to match avoids pillarboxing a portrait video down to
+// a thin strip inside a wide, mostly-black landscape frame.
+const[videoAspect,setVideoAspect]=useState('16/9')
 
 // Mid-roll ad break at ~45s — client-side insertion (not full server-side
 // ad insertion), since VozIt's video runs on Mux, not an AWS-based stack.
@@ -68,6 +75,7 @@ useEffect(()=>{
     setCurrentTime(ct)
     if(dur)setDuration(dur)
     setShowEndCard(dur>0&&ct>=dur-1.5)
+    if(el.videoWidth&&el.videoHeight)setVideoAspect(`${el.videoWidth}/${el.videoHeight}`)
     if(adState==='idle'&&adUrl&&dur>50&&ct>=45){
       setAdState('playing')
       el.pause()
@@ -223,7 +231,7 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
       processing (non-blocking, shouldn't delay anyone watching) or if
       the worker isn't configured at all. */}
   {r.watermark_applied&&r.watermarked_url?
-    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" poster={r.thumbnail_url||undefined} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>
+    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" poster={r.thumbnail_url||undefined} style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>
   :
   /* fullscreenElement tells Mux Player to fullscreen THIS wrapper div
       instead of just its own internal video element — otherwise the
@@ -231,7 +239,7 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
       fullscreen and the overlay layers below get left behind. Mitigates
       the gap on everything except iOS native fullscreen, until the
       watermarked file above takes over. */
-  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} fullscreenElement={`vz-player-${r.id}`} style={{width:'100%',aspectRatio:'16/9',background:'#0a1e30'}}/>}
+  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} fullscreenElement={`vz-player-${r.id}`} style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>}
 
   {/* Mid-roll ad break — pauses the report at ~45s, plays a short ad,
       then resumes. Non-skippable by design at this length. */}
