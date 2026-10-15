@@ -217,59 +217,13 @@ export async function POST(req: NextRequest) {
 
 
 
-      // ═══ THREE-LAYER WATERMARK PROCESSING, THEN AUTO-DISTRIBUTE ═══
-      // Auto-distribution now waits for the real watermarked copy instead
-      // of firing immediately — it previously ran before watermarking even
-      // started, so every post to VozIt's own YouTube/TikTok/IG/FB/X went
-      // out with the raw, unbranded master and zero visible credit.
-      if (reportStatus === 'published' && playbackId) {
-        // Non-blocking, but NOT fire-and-forget — on Vercel, a serverless
-        // function's execution can be frozen the instant the response
-        // below is sent, so a bare un-awaited .then() here had no
-        // guarantee of ever finishing (this job alone can take up to
-        // ~280s, run by processVideoWatermark). waitUntil tells Vercel's
-        // runtime to keep this invocation alive until the promise
-        // settles, without delaying the response back to Mux. This is
-        // the real reason watermark_applied/watermarked_url never got
-        // set even once the worker and its secrets were configured and
-        // working correctly.
-        waitUntil(processVideoWatermark({
-          playbackId,
-          reportId: report.id,
-          username: (report.user as any)?.username || 'reporter',
-          tier: ((report.user as any)?.tier || 'starter') as any,
-          duration: Math.round(duration),
-        }).then(result => {
-          if (result.success) {
-            return supabase.from('reports').update({
-              watermarked_url: result.watermarkedUrl,
-              watermark_applied: true,
-            }).eq('id', report!.id).then(() => result)
-          }
-          // processVideoWatermark() catches its own errors and returns
-          // {success:false} instead of throwing, so without this, a
-          // worker rejection (e.g. a mismatched WATERMARK_WORKER_SECRET
-          // between here and the worker) left literally no trace
-          // anywhere — not the DB, not Sentry, nothing to diagnose from.
-          captureMessage('Watermarking failed', { reportId: report.id, error: result.error })
-          return result
-        }).then(result => {
-          // Distribute to VozIt's own channels either way — with the
-          // branded copy if watermarking succeeded, falling back to the
-          // raw master (still better than never posting) if it failed.
-          return autoDistributeToVozItChannels({
-            reportId: report.id,
-            title: report.title,
-            description: report.what || report.title,
-            playbackId,
-            watermarkedUrl: result?.success ? result.watermarkedUrl : undefined,
-            locationName: report.location_name,
-            location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined,
-            reporterUsername: (report.user as any)?.username || 'reporter',
-            reporterTier: (report.user as any)?.tier || 'starter',
-          }).then(dist => logVozItDistribution(supabase, report.id, dist.results))
-        }).catch(e => captureError(e, { route: 'POST /api/mux-webhook', step: 'watermark/distribute background job', reportId: report.id })))
-      }
+      // Watermarking + auto-distribute moved to the video.asset.static_
+      // rendition.ready handler below — it needs the plain MP4 file Mux
+      // generates from static_renditions, which is a separate, slower
+      // process than the streaming (HLS) rendition this event is about.
+      // Firing it here 404'd every time: confirmed via the worker's own
+      // logs that the file genuinely didn't exist yet at this point,
+      // then existed minutes later once that rendition actually finished.
 
       // 7. Update report with final status + risk level
       await supabase.from('reports').update({
@@ -292,6 +246,67 @@ export async function POST(req: NextRequest) {
         geoRisk: geoRisk.riskLevel,
         provenance: manifest.manifestId,
       })
+    }
+
+    // ═══ THREE-LAYER WATERMARK PROCESSING, THEN AUTO-DISTRIBUTE ═══
+    // Fires separately from video.asset.ready, once Mux confirms the
+    // plain downloadable MP4 (requested via static_renditions, see
+    // src/lib/mux.ts) is actually ready — that file takes longer to
+    // generate than the streaming rendition, and the watermark worker
+    // needs to download it to run FFmpeg on.
+    if (type === 'video.asset.static_rendition.ready') {
+      const assetId = data?.id || body.object?.id
+      if (!assetId) return NextResponse.json({ ok: true })
+
+      const { data: report } = await supabase
+        .from('reports')
+        .select('id, user_id, title, what, status, location_name, location_lat, location_lng, playback_id, duration_seconds, user:users(username, tier)')
+        .eq('mux_asset_id', assetId)
+        .single()
+
+      if (!report || report.status !== 'published' || !report.playback_id) {
+        return NextResponse.json({ ok: true })
+      }
+
+      // Non-blocking, but NOT fire-and-forget — see the note on maxDuration
+      // below for why waitUntil matters here (a bare un-awaited .then()
+      // has no guarantee of surviving past this function's response).
+      waitUntil(processVideoWatermark({
+        playbackId: report.playback_id,
+        reportId: report.id,
+        username: (report.user as any)?.username || 'reporter',
+        tier: ((report.user as any)?.tier || 'starter') as any,
+        duration: report.duration_seconds || 90,
+      }).then(result => {
+        if (result.success) {
+          return supabase.from('reports').update({
+            watermarked_url: result.watermarkedUrl,
+            watermark_applied: true,
+          }).eq('id', report.id).then(() => result)
+        }
+        // processVideoWatermark() catches its own errors and returns
+        // {success:false} instead of throwing, so without this, a worker
+        // rejection left literally no trace anywhere to diagnose from.
+        captureMessage('Watermarking failed', { reportId: report.id, error: result.error })
+        return result
+      }).then(result => {
+        // Distribute to VozIt's own channels either way — with the
+        // branded copy if watermarking succeeded, falling back to the
+        // raw master (still better than never posting) if it failed.
+        return autoDistributeToVozItChannels({
+          reportId: report.id,
+          title: report.title,
+          description: report.what || report.title,
+          playbackId: report.playback_id,
+          watermarkedUrl: result?.success ? result.watermarkedUrl : undefined,
+          locationName: report.location_name,
+          location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined,
+          reporterUsername: (report.user as any)?.username || 'reporter',
+          reporterTier: (report.user as any)?.tier || 'starter',
+        }).then(dist => logVozItDistribution(supabase, report.id, dist.results))
+      }).catch(e => captureError(e, { route: 'POST /api/mux-webhook', step: 'watermark/distribute background job', reportId: report.id })))
+
+      return NextResponse.json({ ok: true })
     }
 
     return NextResponse.json({ ok: true })
