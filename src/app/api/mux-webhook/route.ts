@@ -246,6 +246,12 @@ export async function POST(req: NextRequest) {
               watermark_applied: true,
             }).eq('id', report!.id).then(() => result)
           }
+          // processVideoWatermark() catches its own errors and returns
+          // {success:false} instead of throwing, so without this, a
+          // worker rejection (e.g. a mismatched WATERMARK_WORKER_SECRET
+          // between here and the worker) left literally no trace
+          // anywhere — not the DB, not Sentry, nothing to diagnose from.
+          captureMessage('Watermarking failed', { reportId: report.id, error: result.error })
           return result
         }).then(result => {
           // Distribute to VozIt's own channels either way — with the
@@ -262,7 +268,7 @@ export async function POST(req: NextRequest) {
             reporterUsername: (report.user as any)?.username || 'reporter',
             reporterTier: (report.user as any)?.tier || 'starter',
           }).then(dist => logVozItDistribution(supabase, report.id, dist.results))
-        }))
+        }).catch(e => captureError(e, { route: 'POST /api/mux-webhook', step: 'watermark/distribute background job', reportId: report.id })))
       }
 
       // 7. Update report with final status + risk level

@@ -40,10 +40,17 @@ const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
 app.get('/health', (req, res) => res.json({ ok: true }))
 
 app.post('/process', async (req, res) => {
+  // This route previously had no logging at all except on a thrown error
+  // partway through FFmpeg/upload — an auth rejection or a missing-config
+  // response left zero trace anywhere, making "nothing happened" and
+  // "ran and failed silently" indistinguishable from the outside.
+  console.log('[watermark-worker] /process request received', { reportId: req.body?.reportId, hasSecret: !!req.headers['x-worker-secret'] })
   if (!WORKER_SECRET || req.headers['x-worker-secret'] !== WORKER_SECRET) {
+    console.error('[watermark-worker] rejected: secret mismatch or WORKER_SECRET unset', { hasWorkerSecret: !!WORKER_SECRET, hasHeaderSecret: !!req.headers['x-worker-secret'] })
     return res.status(401).json({ error: 'Unauthorized' })
   }
   if (!supabase) {
+    console.error('[watermark-worker] rejected: missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY')
     return res.status(500).json({ error: 'Worker missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY' })
   }
 
@@ -163,6 +170,7 @@ app.post('/process', async (req, res) => {
 
     const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath)
 
+    console.log('[watermark-worker] processing succeeded', reportId, pub.publicUrl)
     res.json({ success: true, watermarkedUrl: pub.publicUrl })
   } catch (e) {
     console.error('[watermark-worker] processing failed', reportId, e)
