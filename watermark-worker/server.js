@@ -74,7 +74,11 @@ app.post('/process', async (req, res) => {
     await fs.mkdir(workDir, { recursive: true })
 
     // 1. Download the source rendition from Mux
-    const sourceUrl = `https://stream.mux.com/${playbackId}/high.mp4`
+    // static_renditions with resolution:'highest' (set at upload time, see
+    // src/lib/mux.ts) names its file "highest.mp4" — the older
+    // mp4_support:'standard' shortcut would have produced "high.mp4"
+    // instead, which is deprecated and rejected on this account's plan.
+    const sourceUrl = `https://stream.mux.com/${playbackId}/highest.mp4`
     const videoRes = await fetch(sourceUrl)
     if (!videoRes.ok) throw new Error(`Could not fetch source video from Mux (${videoRes.status})`)
     await fs.writeFile(inputPath, Buffer.from(await videoRes.arrayBuffer()))

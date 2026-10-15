@@ -29,13 +29,16 @@ export async function createMuxUpload(corsOrigin?: string): Promise<{ uploadId: 
     new_asset_settings: {
       playback_policy: ['public'],
       encoding_tier: 'baseline',
-      // The watermark worker downloads this (stream.mux.com/{id}/high.mp4)
-      // to run FFmpeg on — Mux only generates a streaming (HLS) rendition
-      // by default, not a plain downloadable MP4, so every watermark job
-      // was 404ing on the very first step. This is the real root cause,
-      // confirmed via the worker's own logs once it actually started
-      // logging its failures.
-      mp4_support: 'standard',
+      // The watermark worker downloads a plain MP4 rendition to run FFmpeg
+      // on — Mux only generates a streaming (HLS) rendition by default,
+      // so every watermark job was 404ing on the very first step. The
+      // older mp4_support:'standard' shortcut (which would've produced
+      // stream.mux.com/{id}/high.mp4) is deprecated and actively rejected
+      // on this account's plan ("not allowed on basic assets") — Mux's
+      // current replacement is static_renditions, which instead produces
+      // stream.mux.com/{id}/highest.mp4 (see matching URL in
+      // watermark-worker/server.js).
+      static_renditions: [{ resolution: 'highest' }],
     },
     cors_origin: corsOrigin || process.env.NEXT_PUBLIC_APP_URL || '*',
   })
