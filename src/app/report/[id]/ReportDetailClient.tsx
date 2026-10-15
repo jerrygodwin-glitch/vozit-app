@@ -121,10 +121,19 @@ async function vote(d:'up'|'down'){
   setVoted(d);setVotes(v=>({up:v.up+(d==='up'?1:0),down:v.down+(d==='down'?1:0)}))
   try{
     const res=await fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report_id:r.id,value:d==='up'?1:-1})})
+    const data=await res.json().catch(()=>null)
     if(!res.ok){
       setVoted(prevVoted);setVotes(prevVotes)
       setVoteMsg(res.status===401?'Sign in to vote.':'Could not record your vote — please try again.')
       setTimeout(()=>setVoteMsg(''),4000)
+    }else if(typeof data?.upvotes==='number'){
+      // The naive +1 above assumes every vote counts equally, but votes
+      // are weighted by tier + account age (sockpuppet protection) — a
+      // brand-new account's vote can be weighted so low it rounds down
+      // to 0 server-side. Replacing the guess with the real computed
+      // count here avoids the display silently "reverting" on the next
+      // page load, which looked exactly like the vote hadn't saved.
+      setVotes({up:data.upvotes,down:data.downvotes})
     }
   }catch{
     setVoted(prevVoted);setVotes(prevVotes)
