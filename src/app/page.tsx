@@ -18,7 +18,7 @@ const REGIONS = ['Americas', 'Europe', 'Middle East', 'Africa', 'Asia']
 // Same keyword-matching approach as FeedClient — location text is normally
 // "City, State, Country", which never spells out the continent itself.
 const REGION_KEYWORDS: Record<string, string[]> = {
-  Americas: ['america', 'united states', 'usa', 'u.s.', 'canada', 'mexico', 'brazil', 'argentina', 'colombia', 'chile', 'peru', 'venezuela', 'ecuador', 'cuba', 'jamaica'],
+  Americas: ['america', 'united states', 'usa', 'u.s.', 'canada', 'mexico', 'brazil', 'argentina', 'colombia', 'chile', 'peru', 'venezuela', 'ecuador', 'cuba', 'jamaica', 'guatemala', 'belize', 'el salvador', 'honduras', 'nicaragua', 'costa rica', 'panama', 'haiti', 'dominican republic', 'puerto rico', 'bahamas', 'trinidad', 'barbados', 'saint lucia', 'grenada', 'antigua', 'dominica', 'bolivia', 'paraguay', 'uruguay', 'guyana', 'suriname'],
   Europe: ['europe', 'ukraine', 'russia', 'germany', 'france', 'united kingdom', 'uk', 'italy', 'spain', 'poland', 'portugal', 'netherlands', 'belgium', 'sweden', 'norway', 'greece', 'romania'],
   'Middle East': ['middle east', 'israel', 'palestine', 'iran', 'iraq', 'syria', 'saudi arabia', 'yemen', 'lebanon', 'jordan', 'turkey', 'qatar', 'kuwait', 'uae', 'united arab emirates'],
   Asia: ['asia', 'china', 'japan', 'india', 'korea', 'vietnam', 'philippines', 'indonesia', 'pakistan', 'afghanistan', 'thailand', 'malaysia', 'bangladesh'],

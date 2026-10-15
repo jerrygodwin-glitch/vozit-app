@@ -11,7 +11,7 @@ const REGIONS=['America','Europe','Middle East','Asia','Africa']
 // region, same "good enough default, not exhaustive" bar as other
 // location-based lists this session (e.g. the crisis-resource countries).
 const REGION_KEYWORDS:Record<string,string[]>={
-  America:['america','united states','usa','u.s.','canada','mexico','brazil','argentina','colombia','chile','peru','venezuela','ecuador','cuba','jamaica'],
+  America:['america','united states','usa','u.s.','canada','mexico','brazil','argentina','colombia','chile','peru','venezuela','ecuador','cuba','jamaica','guatemala','belize','el salvador','honduras','nicaragua','costa rica','panama','haiti','dominican republic','puerto rico','bahamas','trinidad','barbados','saint lucia','grenada','antigua','dominica','bolivia','paraguay','uruguay','guyana','suriname'],
   Europe:['europe','ukraine','russia','germany','france','united kingdom','uk','italy','spain','poland','portugal','netherlands','belgium','sweden','norway','greece','romania'],
   'Middle East':['middle east','israel','palestine','iran','iraq','syria','saudi arabia','yemen','lebanon','jordan','turkey','qatar','kuwait','uae','united arab emirates'],
   Asia:['asia','china','japan','india','korea','vietnam','philippines','indonesia','pakistan','afghanistan','thailand','malaysia','bangladesh'],
