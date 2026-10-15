@@ -227,7 +227,7 @@ const WELL_RATED_MIN_RATINGS=5,WELL_RATED_RATIO=0.6
 function isWellRated(n:any){return n.total_ratings>=WELL_RATED_MIN_RATINGS&&(n.helpful_count/n.total_ratings)>=WELL_RATED_RATIO}
 const confirmedBadge=fieldNotes.visible.some((n:any)=>n.category==='confirms_location'&&isWellRated(n))
 const contradictedBadge=fieldNotes.visible.some((n:any)=>n.category==='contradicts'&&isWellRated(n))
-return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#fff',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#fff',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
+return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#0a3ff1',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#0a3ff1',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div id={`vz-player-${r.id}`} style={{position:'relative',overflow:'hidden'}}>
   {/* Once the watermark worker has burned the username/VozIt branding
       into the actual video pixels, play THAT file instead of the raw
