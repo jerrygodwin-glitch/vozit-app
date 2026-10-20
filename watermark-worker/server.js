@@ -55,8 +55,6 @@ app.post('/process', async (req, res) => {
   }
 
   const { reportId, playbackId, username, tier, duration } = req.body || {}
-  const width = Number(req.body?.width) || 1920
-  const height = Number(req.body?.height) || 1080
   const videoDuration = Number(duration) || 90
 
   if (!reportId || !playbackId) {
@@ -82,6 +80,22 @@ app.post('/process', async (req, res) => {
     const videoRes = await fetch(sourceUrl)
     if (!videoRes.ok) throw new Error(`Could not fetch source video from Mux (${videoRes.status})`)
     await fs.writeFile(inputPath, Buffer.from(await videoRes.arrayBuffer()))
+
+    // Measure the real video dimensions instead of trusting a caller-
+    // supplied (or defaulted) width/height. The caller was defaulting to
+    // 1920x1080 whenever it didn't pass dimensions at all — for a portrait
+    // phone video (actually 1080x1920) that fed exactly backwards numbers
+    // into the bar-height/font-size math below, which produced a
+    // malformed FFmpeg filter expression and crashed every single job for
+    // vertical video, the most common shape this app actually receives.
+    const { stdout: probeOut } = await execFileAsync('ffprobe', [
+      '-v', 'error', '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height',
+      '-of', 'json', inputPath,
+    ])
+    const probed = JSON.parse(probeOut)?.streams?.[0] || {}
+    const width = Number(probed.width) || 1920
+    const height = Number(probed.height) || 1080
 
     // Strip anything that could break out of an FFmpeg drawtext filter
     // string (colons, quotes, commas, backslashes all have special meaning
