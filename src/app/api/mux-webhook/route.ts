@@ -13,13 +13,22 @@ import { captureError, captureMessage } from '@/lib/monitoring'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    // Signature verification needs the EXACT bytes Mux signed — reading
+    // the raw text first, then parsing it, instead of req.json() followed
+    // by JSON.stringify(parsed) to reconstruct a "raw" body. The
+    // reconstructed version isn't guaranteed byte-identical to what Mux
+    // actually sent (key order, number formatting, spacing can all
+    // differ on round-trip), so verification could silently fail for any
+    // payload complex enough to diverge — exactly the kind of thing a
+    // deeply-nested event like static_rendition.ready (files array,
+    // mixed string/number fields) is more likely to hit than a simple one.
+    const rawBody = await req.text()
+    const body = JSON.parse(rawBody)
     const { type, data } = body
 
     // Verify Mux webhook signature
     if (process.env.MUX_WEBHOOK_SECRET) {
       const { verifyMuxSignature } = await import('@/lib/security')
-      const rawBody = JSON.stringify(body)
       const sig = req.headers.get('mux-signature')
       if (!(await verifyMuxSignature(rawBody, sig, process.env.MUX_WEBHOOK_SECRET))) {
         captureMessage('Mux webhook signature verification failed', { type })
