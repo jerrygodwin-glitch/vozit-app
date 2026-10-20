@@ -40,6 +40,12 @@ export async function POST(req: NextRequest) {
     // of this file already assumed it did.
     const supabase = createAdminClient()
 
+    // Temporary visibility while chasing why static_rendition.ready
+    // never seems to arrive — no Vercel log access from this session,
+    // so this is the only way to see what Mux is actually sending
+    // without needing Jerry to dig through Mux's own dashboard each time.
+    captureMessage('Mux webhook event received', { type, objectId: body.object?.id, dataId: data?.id, dataAssetId: data?.asset_id })
+
     if (type === 'video.asset.ready') {
       const assetId = data.id
       const playbackId = data.playback_ids?.[0]?.id
@@ -255,8 +261,11 @@ export async function POST(req: NextRequest) {
     // generate than the streaming rendition, and the watermark worker
     // needs to download it to run FFmpeg on.
     if (type === 'video.asset.static_rendition.ready') {
-      const assetId = data?.id || body.object?.id
-      if (!assetId) return NextResponse.json({ ok: true })
+      const assetId = data?.asset_id || data?.id || body.object?.id
+      if (!assetId) {
+        captureMessage('static_rendition.ready had no extractable asset id', { body })
+        return NextResponse.json({ ok: true })
+      }
 
       const { data: report } = await supabase
         .from('reports')
@@ -264,7 +273,11 @@ export async function POST(req: NextRequest) {
         .eq('mux_asset_id', assetId)
         .single()
 
-      if (!report || report.status !== 'published' || !report.playback_id) {
+      if (!report) {
+        captureMessage('static_rendition.ready: no report matched this asset id', { assetId })
+        return NextResponse.json({ ok: true })
+      }
+      if (report.status !== 'published' || !report.playback_id) {
         return NextResponse.json({ ok: true })
       }
 
