@@ -220,10 +220,20 @@ app.post('/process', async (req, res) => {
     ], { timeout: 60_000, maxBuffer: 1024 * 1024 * 20 })
 
     // 4. Concatenate main + end card
+    // Confirmed via a direct byte-level check of an uploaded file (ftyp
+    // immediately followed by mdat, no moov in the first 64KB — "Jerry
+    // reported "disabled and cannot be played back""): -movflags
+    // +faststart on the two inputs above doesn't carry through the
+    // concat step. -c copy re-muxes into a brand-new container, and
+    // FFmpeg's MP4 muxer defaults to writing moov (the index every
+    // player needs before it can start playback) at the END of the file
+    // unless this output is ALSO told to use +faststart — so despite
+    // both inputs being correctly fast-started, the final concatenated
+    // file that actually gets uploaded wasn't.
     await fs.writeFile(concatListPath, `file '${preConcatPath}'\nfile '${endCardPath}'\n`)
     await execFileAsync('ffmpeg', [
       '-y', '-f', 'concat', '-safe', '0', '-i', concatListPath,
-      '-c', 'copy',
+      '-c', 'copy', '-movflags', '+faststart',
       outputPath,
     ], { timeout: 60_000 })
 
