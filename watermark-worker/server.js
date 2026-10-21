@@ -129,7 +129,13 @@ app.post('/process', async (req, res) => {
       `drawbox=x=0:y=ih-${barHeight}:w=iw:h=${barHeight}:color=black@0.55:t=fill`,
       `drawtext=text='VozIt!':fontsize=${fontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:` +
         `x=14:y=ih-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
-      `drawtext=text='\\· @${safeUsername} \\· I was there...':fontsize=${fontSize - 1}:fontcolor=white@0.82:` +
+      // No backslash before the middle dot — only :, ' and \ itself are
+      // actual FFmpeg drawtext escape characters. A backslash in front of
+      // any other character (like the \· this line used to have) isn't a
+      // real escape sequence and corrupted this filter's own argument
+      // parsing, which is exactly why only this one drawtext call ever
+      // failed — the em-dash two lines up was never escaped this way.
+      `drawtext=text='· @${safeUsername} · I was there...':fontsize=${fontSize - 1}:fontcolor=white@0.82:` +
         `fontfile=${FONT_REGULAR}:x=14+tw+10:y=ih-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
       `drawtext=text='${tierLabel}':fontsize=${fontSize - 3}:fontcolor=white@0.9:fontfile=${FONT_BOLD}:` +
         `x=iw-tw-14:y=ih-${barHeight}+${Math.round(barHeight / 2 - (fontSize - 3) / 2)}`,
