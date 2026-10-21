@@ -139,10 +139,18 @@ app.post('/process', async (req, res) => {
       { x: 'w*0.40', y: 'h*0.12' }, { x: 'w*0.30', y: 'h*0.38' },
       { x: 'w-text_w-w*0.22', y: 'h*0.18' },
     ]
+    // Drift interval widened from 4s to 8s: every drawtext filter in this
+    // chain gets evaluated on every single frame regardless of whether its
+    // enable=between(...) window is active, so halving the stamp count
+    // (≈23 → ≈12 for a 90s clip) meaningfully cuts per-frame cost. This
+    // was a real, measured contributor to encodes running slow enough to
+    // get killed by the caller's timeout — still drifts often enough for
+    // the original anti-scrape intent.
+    const STAMP_INTERVAL = 8
     const stampFilters = []
-    for (let t = 0; t < videoDuration; t += 4) {
-      const pos = positions[Math.floor(t / 4) % positions.length]
-      const tEnd = Math.min(t + 4, videoDuration)
+    for (let t = 0; t < videoDuration; t += STAMP_INTERVAL) {
+      const pos = positions[Math.floor(t / STAMP_INTERVAL) % positions.length]
+      const tEnd = Math.min(t + STAMP_INTERVAL, videoDuration)
       stampFilters.push(
         `drawtext=text='VozIt! — I was there...':fontsize=${fontSize}:fontcolor=white@0.50:` +
         `fontfile=${FONT_REGULAR}:x=${pos.x}:y=${pos.y}:enable='between(t\\,${t}\\,${tEnd})'`
@@ -166,10 +174,17 @@ app.post('/process', async (req, res) => {
       ...stampFilters,
     ].join(',')
 
+    // 'veryfast' instead of 'fast' — this is the full-length pass (the
+    // end-card pass below stays on 'fast', it's only 1.5s either way and
+    // isn't a real contributor to total time). A faster preset trades a
+    // bit of compression efficiency for real wall-clock time, which is
+    // what actually matters here: an encode that finishes reliably
+    // inside the caller's timeout beats a marginally smaller file that
+    // sometimes gets killed mid-job.
     await execFileAsync('ffmpeg', [
       '-y', '-i', inputPath,
       '-vf', mainFilter,
-      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
       '-movflags', '+faststart',
       preConcatPath,
