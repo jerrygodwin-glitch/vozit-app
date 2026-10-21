@@ -118,14 +118,26 @@ app.post('/process', async (req, res) => {
 
     // 2. Bottom bar (Layer 1) + drifting stamp (Layer 2), applied to the
     // main video as one filter chain.
+    //
+    // ROOT CAUSE of every "Undefined constant or missing '('" crash this
+    // feature ever hit, confirmed by direct, isolated testing on the live
+    // machine via `fly ssh console` (not guesswork): the drawtext filter's
+    // own frame-size variables are w/h (also main_w/main_h) — iw/ih are a
+    // *different* filter's variables (drawbox, scale, crop...) and are
+    // simply undefined inside drawtext. Every x/y expression below that
+    // used iw/ih failed the instant it was evaluated, regardless of how
+    // simple or complex the surrounding arithmetic was — confirmed
+    // multi-operator chains (including chained subtraction) parse fine
+    // once the variable name itself is correct. drawbox two lines down
+    // correctly keeps iw/ih — that filter actually defines them.
     const barHeight = Math.max(36, Math.round(height * 0.05))
     const fontSize = Math.max(14, Math.round(height * 0.02))
 
     const positions = [
-      { x: 'iw*0.08', y: 'ih*0.15' }, { x: 'iw-text_w-iw*0.10', y: 'ih*0.22' },
-      { x: 'iw*0.15', y: 'ih*0.40' }, { x: 'iw-text_w-iw*0.06', y: 'ih*0.45' },
-      { x: 'iw*0.40', y: 'ih*0.12' }, { x: 'iw*0.30', y: 'ih*0.38' },
-      { x: 'iw-text_w-iw*0.22', y: 'ih*0.18' },
+      { x: 'w*0.08', y: 'h*0.15' }, { x: 'w-text_w-w*0.10', y: 'h*0.22' },
+      { x: 'w*0.15', y: 'h*0.40' }, { x: 'w-text_w-w*0.06', y: 'h*0.45' },
+      { x: 'w*0.40', y: 'h*0.12' }, { x: 'w*0.30', y: 'h*0.38' },
+      { x: 'w-text_w-w*0.22', y: 'h*0.18' },
     ]
     const stampFilters = []
     for (let t = 0; t < videoDuration; t += 4) {
@@ -138,19 +150,19 @@ app.post('/process', async (req, res) => {
     }
 
     const mainFilter = [
+      // drawbox correctly keeps iw/ih — that's the filter that actually
+      // defines them.
       `drawbox=x=0:y=ih-${barHeight}:w=iw:h=${barHeight}:color=black@0.55:t=fill`,
       `drawtext=text='VozIt!':fontsize=${fontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:` +
-        `x=14:y=ih-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
+        `x=14:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
       // No backslash before the middle dot — only :, ' and \ itself are
       // actual FFmpeg drawtext escape characters. A backslash in front of
       // any other character (like the \· this line used to have) isn't a
-      // real escape sequence and corrupted this filter's own argument
-      // parsing, which is exactly why only this one drawtext call ever
-      // failed — the em-dash two lines up was never escaped this way.
+      // real escape sequence.
       `drawtext=text='· @${safeUsername} · I was there...':fontsize=${fontSize - 1}:fontcolor=white@0.82:` +
-        `fontfile=${FONT_REGULAR}:x=14+tw+10:y=ih-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
+        `fontfile=${FONT_REGULAR}:x=14+tw+10:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
       `drawtext=text='${tierLabel}':fontsize=${fontSize - 3}:fontcolor=white@0.9:fontfile=${FONT_BOLD}:` +
-        `x=iw-tw-14:y=ih-${barHeight}+${Math.round(barHeight / 2 - (fontSize - 3) / 2)}`,
+        `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - (fontSize - 3) / 2)}`,
       ...stampFilters,
     ].join(',')
 
