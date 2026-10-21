@@ -181,9 +181,20 @@ app.post('/process', async (req, res) => {
     // what actually matters here: an encode that finishes reliably
     // inside the caller's timeout beats a marginally smaller file that
     // sometimes gets killed mid-job.
+    // Phone recordings are commonly variable-frame-rate — ffprobe on a
+    // finished file showed its actual duration as ~117s against a ~92s
+    // source+end-card total, and the encode logs were quietly climbing a
+    // "dup=" (duplicate frame) counter the whole time. Without an
+    // explicit output rate, FFmpeg has to guess how to lay VFR input
+    // onto the fixed timeline the text-overlay filters need (their
+    // between(t,...) windows depend on a clean, predictable t), and
+    // guessed wrong — stretching the timeline and inserting duplicate
+    // frames to compensate. -r 30 -vsync cfr forces a constant, known
+    // frame rate instead of leaving that to chance.
     await execFileAsync('ffmpeg', [
       '-y', '-i', inputPath,
       '-vf', mainFilter,
+      '-r', '30', '-vsync', 'cfr',
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
       '-movflags', '+faststart',
