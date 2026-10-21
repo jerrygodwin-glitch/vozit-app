@@ -61,6 +61,18 @@ app.post('/process', async (req, res) => {
     return res.status(400).json({ error: 'reportId and playbackId required' })
   }
 
+  // Fail fast, before spending a minute on FFmpeg, if the one remaining
+  // untested link in this chain — the storage bucket the finished file
+  // gets uploaded to — doesn't actually exist. Every prior failure
+  // happened upstream of this step, so it's never actually been
+  // exercised; this turns a silent/late storage error into an
+  // immediate, clearly-labeled one.
+  const { error: bucketError } = await supabase.storage.from(STORAGE_BUCKET).list('', { limit: 1 })
+  if (bucketError) {
+    console.error('[watermark-worker] storage bucket check failed', { bucket: STORAGE_BUCKET, error: bucketError.message })
+    return res.status(500).json({ success: false, error: `Storage bucket "${STORAGE_BUCKET}" is missing or inaccessible: ${bucketError.message}` })
+  }
+
   const workDir = path.join(os.tmpdir(), `vz_${reportId}_${Date.now()}`)
   const inputPath = path.join(workDir, 'input.mp4')
   const preConcatPath = path.join(workDir, 'pre_concat.mp4')
