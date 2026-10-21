@@ -188,7 +188,12 @@ app.post('/process', async (req, res) => {
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
       '-movflags', '+faststart',
       preConcatPath,
-    ], { timeout: 240_000, maxBuffer: 1024 * 1024 * 20 })
+      // Raised from 240s — the worker now stays running continuously
+      // (fly.toml min_machines_running=1) instead of being at risk of
+      // getting stopped mid-job, so there's no longer a reason to cut
+      // this off tightly. This is just a safety ceiling against a
+      // genuinely hung process, not a budget to encode within.
+    ], { timeout: 600_000, maxBuffer: 1024 * 1024 * 20 })
 
     // 3. End card (Layer 3) — 1.5s orange bumper with the real logo,
     // rendered with a matching silent audio track so the concat step
@@ -222,8 +227,7 @@ app.post('/process', async (req, res) => {
       outputPath,
     ], { timeout: 60_000 })
 
-    // 5. Upload to Supabase Storage (public bucket) and hand back the URL
-    // — the caller (mux-webhook.ts) is what actually updates the report row.
+    // 5. Upload to Supabase Storage (public bucket) and hand back the URL.
     const fileBuffer = await fs.readFile(outputPath)
     const storagePath = `watermarked/${reportId}.mp4`
     const { error: uploadError } = await supabase.storage
@@ -232,6 +236,23 @@ app.post('/process', async (req, res) => {
     if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
 
     const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath)
+
+    // 6. Write the result straight to the report row ourselves, instead of
+    // relying solely on the caller (mux-webhook.ts) to do it after getting
+    // our HTTP response back. A full job here can take minutes — if the
+    // caller's own connection/timeout gives up before we're done (which
+    // kept happening in testing), the old design meant a successful
+    // upload could still never make it into the database: nothing else
+    // was going to write it. This makes the result durable the moment
+    // it's ready, regardless of whether anyone's still listening for the
+    // HTTP response. Still returns the same response below too, so the
+    // caller gets an immediate update on the fast path when it's around
+    // to receive it.
+    const { error: dbError } = await supabase.from('reports').update({
+      watermarked_url: pub.publicUrl,
+      watermark_applied: true,
+    }).eq('id', reportId)
+    if (dbError) console.error('[watermark-worker] uploaded file but failed to update report row', reportId, dbError)
 
     console.log('[watermark-worker] processing succeeded', reportId, pub.publicUrl)
     res.json({ success: true, watermarkedUrl: pub.publicUrl })
