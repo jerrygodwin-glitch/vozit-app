@@ -15,5 +15,12 @@ primary_region = 'iad'
   min_machines_running = 0
 
 [[vm]]
-  size = 'shared-cpu-1x'
-  memory = '1gb'
+  # Confirmed by direct testing: shared-cpu-1x genuinely isn't enough —
+  # FFmpeg was correctly encoding (no filter errors) but dropped from
+  # 24fps to under 3fps as it went, on a 1080x1920 video with ~23
+  # overlapping drawtext filters active in one pass, and got killed by
+  # the processing timeout well before finishing a 90s clip. Scale-to-
+  # zero (min_machines_running = 0, above) means this only costs more
+  # while an actual job is running, not while idle.
+  size = 'shared-cpu-4x'
+  memory = '2gb'
