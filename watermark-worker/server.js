@@ -88,8 +88,24 @@ app.post('/process', async (req, res) => {
     // src/lib/mux.ts) names its file "highest.mp4" — the older
     // mp4_support:'standard' shortcut would have produced "high.mp4"
     // instead, which is deprecated and rejected on this account's plan.
+    // Every FFmpeg step below has an explicit timeout; this fetch never
+    // did. Confirmed by direct testing: a /process request can log
+    // "received" and then produce zero further trace — no success, no
+    // error — for 7+ minutes straight, consistent with a stalled network
+    // read here hanging the whole job forever with nothing to show for
+    // it. AbortController gives this the same kind of ceiling the rest
+    // of the pipeline already has.
     const sourceUrl = `https://stream.mux.com/${playbackId}/highest.mp4`
-    const videoRes = await fetch(sourceUrl)
+    const downloadController = new AbortController()
+    const downloadTimeout = setTimeout(() => downloadController.abort(), 120_000)
+    let videoRes
+    try {
+      videoRes = await fetch(sourceUrl, { signal: downloadController.signal })
+    } catch (e) {
+      throw new Error(`Fetching source video from Mux timed out or failed: ${e.message}`)
+    } finally {
+      clearTimeout(downloadTimeout)
+    }
     if (!videoRes.ok) throw new Error(`Could not fetch source video from Mux (${videoRes.status})`)
     await fs.writeFile(inputPath, Buffer.from(await videoRes.arrayBuffer()))
 
@@ -191,11 +207,25 @@ app.post('/process', async (req, res) => {
     // guessed wrong — stretching the timeline and inserting duplicate
     // frames to compensate. -r 30 -vsync cfr forces a constant, known
     // frame rate instead of leaving that to chance.
+    // -level 4.2: without an explicit level, libx264 auto-picks the
+    // lowest one that technically fits the output — for a 1080x1920 @
+    // 30fps portrait video (the common case here), that lands on level
+    // 4.0, which caps out at 245,760 macroblocks/sec. This video needs
+    // 244,800 — 99.6% of that ceiling. Lenient software decoders
+    // (ffprobe, this worker's own verification checks) don't enforce the
+    // cap and play it back fine; strict ones, which real phone and
+    // browser decoders generally are, are within spec to reject a stream
+    // sitting right on its level's edge outright. That's consistent with
+    // every symptom seen so far: passes every structural/decode check
+    // this worker can run, still won't play on an actual device. Level
+    // 4.2 raises the ceiling to 522,240 — real headroom instead of a
+    // knife's edge — and is still supported by effectively every phone
+    // and browser in use.
     await execFileAsync('ffmpeg', [
       '-y', '-i', inputPath,
       '-vf', mainFilter,
       '-r', '30', '-vsync', 'cfr',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-level', '4.2',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
       '-movflags', '+faststart',
       preConcatPath,
@@ -224,33 +254,53 @@ app.post('/process', async (req, res) => {
       `[t1]drawtext=text='vozit.app':fontsize=${Math.round(fontSizeEnd * 0.6)}:fontcolor=white@0.4:fontfile=${FONT_REGULAR}:` +
         `x=(w-text_w)/2:y=(h/2)+${Math.round(logoSize / 2)}+${Math.round(fontSizeEnd * 1.8)}[vout]`,
       '-map', '[vout]', '-map', '1:a',
-      '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-level', '4.2',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
       '-shortest', '-t', '1.5',
       endCardPath,
     ], { timeout: 60_000, maxBuffer: 1024 * 1024 * 20 })
 
     // 4. Concatenate main + end card
-    // Confirmed via a direct byte-level check of an uploaded file (ftyp
-    // immediately followed by mdat, no moov in the first 64KB — "Jerry
-    // reported "disabled and cannot be played back""): -movflags
-    // +faststart on the two inputs above doesn't carry through the
-    // concat step. -c copy re-muxes into a brand-new container, and
-    // FFmpeg's MP4 muxer defaults to writing moov (the index every
-    // player needs before it can start playback) at the END of the file
-    // unless this output is ALSO told to use +faststart — so despite
-    // both inputs being correctly fast-started, the final concatenated
-    // file that actually gets uploaded wasn't.
+    // Previously used "-c copy" here (a pure stream splice, no decoding).
+    // NOTE: an earlier version of this comment blamed that on an invalid
+    // "reserved" color_transfer tag found on the spliced output — that
+    // turned out to be a red herring; the same tag is present on the raw
+    // Mux source and on freshly re-encoded output alike, so it's just an
+    // iPhone metadata quirk ffprobe doesn't have a name for, not a sign
+    // of damage. The real, confirmed-separate issue (see -level 4.2
+    // above) is that neither segment's encode declared an explicit H.264
+    // level, leaving strict device decoders a legitimate reason to
+    // reject the file regardless of how it's joined. Re-encoding at this
+    // step is kept anyway — concatenating two independently-encoded
+    // segments via a raw stream copy is still fragile on general
+    // principle (e.g. mismatched encoder settings), and +faststart here
+    // ensures the moov atom lands at the front of the final file
+    // regardless of what the two inputs did.
     await fs.writeFile(concatListPath, `file '${preConcatPath}'\nfile '${endCardPath}'\n`)
     await execFileAsync('ffmpeg', [
       '-y', '-f', 'concat', '-safe', '0', '-i', concatListPath,
-      '-c', 'copy', '-movflags', '+faststart',
+      '-r', '30', '-vsync', 'cfr',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-level', '4.2',
+      '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
+      '-movflags', '+faststart',
       outputPath,
-    ], { timeout: 60_000 })
+    ], { timeout: 600_000, maxBuffer: 1024 * 1024 * 20 })
 
     // 5. Upload to Supabase Storage (public bucket) and hand back the URL.
+    // Each run gets its own never-before-seen filename instead of reusing
+    // (and overwriting) the same `${reportId}.mp4` path every time. Found
+    // by direct testing: Supabase's storage CDN caches Range sub-requests
+    // (what every video player actually issues to start playback)
+    // separately and far more aggressively than whole-file requests, and
+    // that cache isn't reliably invalidated just because the underlying
+    // object was overwritten with upsert. A report that's been
+    // reprocessed more than once — exactly the case while debugging this
+    // pipeline — could keep serving stale cached bytes from an earlier,
+    // broken version at the old URL indefinitely. A fresh path per run
+    // sidesteps the whole problem instead of depending on cache
+    // invalidation working correctly.
     const fileBuffer = await fs.readFile(outputPath)
-    const storagePath = `watermarked/${reportId}.mp4`
+    const storagePath = `watermarked/${reportId}-${Date.now()}.mp4`
     const { error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET)
       .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true })

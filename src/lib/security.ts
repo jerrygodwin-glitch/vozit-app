@@ -454,7 +454,20 @@ export function getSecurityHeaders(): Record<string, string> {
       // trying to parse the raw manifest directly, and playback failed with
       // "DEMUXER_ERROR_COULD_NOT_PARSE" — same family of bug as the
       // connect-src gap that broke uploads earlier.
-      "media-src 'self' https://stream.mux.com https://*.mux.com blob:",
+      // https://*.supabase.co: the baked-in-watermark pipeline plays the
+      // burned video straight from Supabase Storage (watermarked_url),
+      // not from Mux, once watermarking finishes. That host was never
+      // added here, so the browser silently blocked every single one of
+      // those loads — no console-visible error reported back to the
+      // page, nothing in the Network tab beyond a blocked request, just
+      // a <video> with a source it was never allowed to fetch. That
+      // produces exactly a native "can't play this" icon and explains
+      // why every previous fix to the video file itself made no
+      // difference: confirmed directly — the exact same file plays
+      // perfectly when opened as a standalone link (CSP only applies to
+      // resources a page loads, not to direct navigation), but fails
+      // identically in-app on every device, independent of the file.
+      "media-src 'self' https://stream.mux.com https://*.mux.com https://*.supabase.co blob:",
       "font-src 'self' https://fonts.gstatic.com",
       // *.mux.com, not just api.mux.com — direct video uploads go straight
       // from the browser to a regional storage host (e.g.
