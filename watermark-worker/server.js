@@ -307,24 +307,32 @@ app.post('/process', async (req, res) => {
       // genuinely hung process, not a budget to encode within.
     ], { timeout: 600_000, maxBuffer: 1024 * 1024 * 20 })
 
-    // 3. End card (Layer 3) — 1.5s orange bumper with the real logo,
-    // rendered with a matching silent audio track so the concat step
-    // below doesn't choke on mismatched stream layouts.
-    const logoSize = Math.round(Math.min(width, height) * 0.25)
+    // 3. End card (Layer 3) — 1.5s orange bumper, rendered with a
+    // matching silent audio track so the concat step below doesn't
+    // choke on mismatched stream layouts.
+    //
+    // Previously overlaid the actual app icon image (logo.png) here.
+    // Reported directly, comparing side by side against the DOM-overlay
+    // end card (ReportDetailClient.tsx's Layer 3, which never went
+    // through this worker): that one draws bold "VozIt!" WORD TEXT, not
+    // an icon — a different, simpler look this never matched. Switched
+    // to text so the baked-in end card actually looks like the design
+    // it was meant to mirror, and dropped the logo image input/overlay
+    // step entirely since nothing here needs it anymore.
     const fontSizeEnd = Math.max(20, Math.round(height * 0.035))
+    const brandSizeEnd = Math.max(28, Math.round(height * 0.045))
     await execFileAsync('ffmpeg', [
       '-y',
       '-f', 'lavfi', '-i', `color=c=0xFE3D07:size=${width}x${height}:duration=1.5:rate=30`,
       '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-      '-i', LOGO_PATH,
-      '-filter_complex',
-      `[2:v]scale=${logoSize}:${logoSize}[logo];` +
-      `[0:v][logo]overlay=(W-w)/2:(H-h)/2-${Math.round(fontSizeEnd * 0.8)}[bg];` +
-      `[bg]drawtext=text='I was there...':fontsize=${fontSizeEnd}:fontcolor=white@0.92:fontfile=${FONT_ITALIC}:` +
-        `x=(w-text_w)/2:y=(h/2)+${Math.round(logoSize / 2)}+${Math.round(fontSizeEnd * 0.3)}[t1];` +
-      `[t1]drawtext=text='vozit.app':fontsize=${Math.round(fontSizeEnd * 0.6)}:fontcolor=white@0.4:fontfile=${FONT_REGULAR}:` +
-        `x=(w-text_w)/2:y=(h/2)+${Math.round(logoSize / 2)}+${Math.round(fontSizeEnd * 1.8)}[vout]`,
-      '-map', '[vout]', '-map', '1:a',
+      '-vf',
+      `drawtext=text='VozIt!':fontsize=${brandSizeEnd}:fontcolor=white:fontfile=${FONT_BOLD}:` +
+        `x=(w-text_w)/2:y=(h/2)-${Math.round(brandSizeEnd * 1.2)},` +
+      `drawtext=text='I was there...':fontsize=${fontSizeEnd}:fontcolor=white@0.92:fontfile=${FONT_ITALIC}:` +
+        `x=(w-text_w)/2:y=(h/2)+${Math.round(brandSizeEnd * 0.3)},` +
+      `drawtext=text='vozit.app':fontsize=${Math.round(fontSizeEnd * 0.6)}:fontcolor=white@0.4:fontfile=${FONT_REGULAR}:` +
+        `x=(w-text_w)/2:y=(h/2)+${Math.round(brandSizeEnd * 0.3) + Math.round(fontSizeEnd * 1.6)}`,
+      '-map', '0:v', '-map', '1:a',
       '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-level', '4.2',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
       '-shortest', '-t', '1.5',
