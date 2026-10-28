@@ -149,11 +149,34 @@ app.post('/process', async (req, res) => {
     const barHeight = Math.max(36, Math.round(height * 0.05))
     const fontSize = Math.max(14, Math.round(height * 0.02))
 
+    // Reported directly, comparing against the DOM-overlay version: that
+    // one wraps this same text in a faint orange backing box
+    // (rgba(254,61,7,0.18), padded, rounded corners) — the baked-in
+    // version only ever drew bare text with nothing behind it, which is
+    // why it read as "very faint" even at the same text opacity. Adding
+    // a matching box here. Positions are now plain computed pixel
+    // numbers instead of FFmpeg expressions like "w-text_w-w*0.10" —
+    // drawbox has no "text_w" variable to align itself against (that's
+    // the same self-reference trap the username/tier bug turned out to
+    // be), so the box and the text need a shared, pre-computed position
+    // to actually line up, which only works cleanly in JS since this
+    // text's content — and therefore its width — never changes.
+    const STAMP_TEXT = 'VozIt! — I was there...'
+    const STAMP_CHAR_WIDTH_RATIO = 0.54 // DejaVu Sans regular weight, narrower than the Bold ratio used above
+    const stampTextWidth = Math.round(STAMP_TEXT.length * fontSize * STAMP_CHAR_WIDTH_RATIO)
+    const stampPadX = Math.round(fontSize * 0.45)
+    const stampPadY = Math.round(fontSize * 0.3)
+    const stampBoxW = stampTextWidth + stampPadX * 2
+    const stampBoxH = fontSize + stampPadY * 2
+
     const positions = [
-      { x: 'w*0.08', y: 'h*0.15' }, { x: 'w-text_w-w*0.10', y: 'h*0.22' },
-      { x: 'w*0.15', y: 'h*0.40' }, { x: 'w-text_w-w*0.06', y: 'h*0.45' },
-      { x: 'w*0.40', y: 'h*0.12' }, { x: 'w*0.30', y: 'h*0.38' },
-      { x: 'w-text_w-w*0.22', y: 'h*0.18' },
+      { x: Math.round(width * 0.08), y: Math.round(height * 0.15) },
+      { x: Math.round(width - stampTextWidth - width * 0.10), y: Math.round(height * 0.22) },
+      { x: Math.round(width * 0.15), y: Math.round(height * 0.40) },
+      { x: Math.round(width - stampTextWidth - width * 0.06), y: Math.round(height * 0.45) },
+      { x: Math.round(width * 0.40), y: Math.round(height * 0.12) },
+      { x: Math.round(width * 0.30), y: Math.round(height * 0.38) },
+      { x: Math.round(width - stampTextWidth - width * 0.22), y: Math.round(height * 0.18) },
     ]
     // Drift interval widened from 4s to 8s: every drawtext filter in this
     // chain gets evaluated on every single frame regardless of whether its
@@ -167,9 +190,13 @@ app.post('/process', async (req, res) => {
     for (let t = 0; t < videoDuration; t += STAMP_INTERVAL) {
       const pos = positions[Math.floor(t / STAMP_INTERVAL) % positions.length]
       const tEnd = Math.min(t + STAMP_INTERVAL, videoDuration)
+      const enable = `enable='between(t\\,${t}\\,${tEnd})'`
       stampFilters.push(
-        `drawtext=text='VozIt! — I was there...':fontsize=${fontSize}:fontcolor=white@0.50:` +
-        `fontfile=${FONT_REGULAR}:x=${pos.x}:y=${pos.y}:enable='between(t\\,${t}\\,${tEnd})'`
+        `drawbox=x=${pos.x - stampPadX}:y=${pos.y - stampPadY}:w=${stampBoxW}:h=${stampBoxH}:color=0xFE3D07@0.18:t=fill:${enable}`
+      )
+      stampFilters.push(
+        `drawtext=text='${STAMP_TEXT}':fontsize=${fontSize}:fontcolor=white@0.50:` +
+        `fontfile=${FONT_REGULAR}:x=${pos.x}:y=${pos.y}:${enable}`
       )
     }
 
