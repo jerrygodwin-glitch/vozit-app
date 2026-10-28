@@ -219,6 +219,21 @@ app.post('/process', async (req, res) => {
       middleText = `· @${trimmed}… · I was there...`
     }
 
+    // Still reported as hard to read after the black@0.75/bold/opacity
+    // pass above, compared against the crisp DOM-overlay version. That
+    // earlier fix was verified against a frame pulled straight from the
+    // source-resolution file, where it did look legible — the gap is
+    // what happens after: video compression softens flat-colored text
+    // edges, and a real device then scales the whole frame down further
+    // to fit its screen, compounding the softening. A translucent
+    // background bar alone can't fully compensate for that. Adding a
+    // solid dark outline/stroke directly on the glyphs — the standard
+    // technique broadcast captions and subtitles use for exactly this
+    // reason — holds up under both compression and scaling in a way
+    // background opacity alone doesn't, since it's contrast baked into
+    // the letterforms themselves rather than relying on what's visible
+    // around them.
+    const TEXT_BORDER = `borderw=2:bordercolor=black@0.85`
     const mainFilter = [
       // Bumped from black@0.55: reported directly against a bright
       // outdoor scene (green foliage, white sky) the bar let enough of
@@ -228,7 +243,7 @@ app.post('/process', async (req, res) => {
       // the same way. drawbox correctly keeps iw/ih — that's the filter
       // that actually defines them.
       `drawbox=x=0:y=ih-${barHeight}:w=iw:h=${barHeight}:color=black@0.75:t=fill`,
-      `drawtext=text='VozIt!':fontsize=${fontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:` +
+      `drawtext=text='VozIt!':fontsize=${fontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
         `x=14:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
       // No backslash before the middle dot — only :, ' and \ itself are
       // actual FFmpeg drawtext escape characters. A backslash in front of
@@ -239,9 +254,9 @@ app.post('/process', async (req, res) => {
       // real computed offset (see middleStartX above), not the broken
       // self-referential tw. Size/content are whatever the width-fitting
       // above decided.
-      `drawtext=text='${middleText}':fontsize=${middleFontSize}:fontcolor=white@0.95:` +
+      `drawtext=text='${middleText}':fontsize=${middleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
         `fontfile=${FONT_BOLD}:x=${Math.round(middleStartX)}:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
-      `drawtext=text='${tierLabel}':fontsize=${tierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:` +
+      `drawtext=text='${tierLabel}':fontsize=${tierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
         `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - tierFontSize / 2)}`,
       ...stampFilters,
     ].join(',')
