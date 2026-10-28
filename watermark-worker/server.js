@@ -173,6 +173,38 @@ app.post('/process', async (req, res) => {
       )
     }
 
+    // Switching the username/tagline text to FONT_BOLD for contrast (see
+    // below) made it meaningfully wider — confirmed directly from a
+    // rendered frame: for this particular username it now ran far enough
+    // right to collide with the right-aligned tier badge, "★ Starter"
+    // and "...there..." overlapping into an unreadable jumble. A fixed
+    // font size can never be safe here since usernames are arbitrary
+    // length; instead, size the middle text to whatever room is actually
+    // left between the fixed "VozIt!" mark and the tier badge, shrinking
+    // it (and, as a last resort for an extreme-length username, eliding
+    // the username itself) until it provably fits.
+    const AVG_CHAR_WIDTH_RATIO = 0.62 // DejaVu Sans Bold, rough but safe
+    const estimateTextWidth = (text, size) => text.length * size * AVG_CHAR_WIDTH_RATIO
+    const tierFontSize = fontSize - 3
+    const brandWidth = estimateTextWidth('VozIt!', fontSize)
+    const tierWidth = estimateTextWidth(tierLabel, tierFontSize)
+    const leftMargin = 14, midGap = 10, tierGap = 14, rightMargin = 14
+    const availableForMiddle = width - leftMargin - brandWidth - midGap - tierGap - tierWidth - rightMargin
+
+    let middleText = `· @${safeUsername} · I was there...`
+    let middleFontSize = fontSize - 1
+    const MIN_MIDDLE_FONT = 11
+    while (estimateTextWidth(middleText, middleFontSize) > availableForMiddle && middleFontSize > MIN_MIDDLE_FONT) {
+      middleFontSize -= 1
+    }
+    if (estimateTextWidth(middleText, middleFontSize) > availableForMiddle) {
+      let trimmed = safeUsername
+      while (trimmed.length > 3 && estimateTextWidth(`· @${trimmed}… · I was there...`, middleFontSize) > availableForMiddle) {
+        trimmed = trimmed.slice(0, -1)
+      }
+      middleText = `· @${trimmed}… · I was there...`
+    }
+
     const mainFilter = [
       // Bumped from black@0.55: reported directly against a bright
       // outdoor scene (green foliage, white sky) the bar let enough of
@@ -189,11 +221,12 @@ app.post('/process', async (req, res) => {
       // any other character (like the \· this line used to have) isn't a
       // real escape sequence.
       // FONT_BOLD + fuller opacity (was FONT_REGULAR @0.82) — same
-      // legibility reasoning as the background bar above.
-      `drawtext=text='· @${safeUsername} · I was there...':fontsize=${fontSize - 1}:fontcolor=white@0.95:` +
-        `fontfile=${FONT_BOLD}:x=14+tw+10:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
-      `drawtext=text='${tierLabel}':fontsize=${fontSize - 3}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:` +
-        `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - (fontSize - 3) / 2)}`,
+      // legibility reasoning as the background bar above. Size/content
+      // are now whatever the width-fitting above decided, not fixed.
+      `drawtext=text='${middleText}':fontsize=${middleFontSize}:fontcolor=white@0.95:` +
+        `fontfile=${FONT_BOLD}:x=14+tw+10:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
+      `drawtext=text='${tierLabel}':fontsize=${tierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:` +
+        `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - tierFontSize / 2)}`,
       ...stampFilters,
     ].join(',')
 
