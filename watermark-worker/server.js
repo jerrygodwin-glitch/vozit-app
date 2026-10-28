@@ -173,23 +173,37 @@ app.post('/process', async (req, res) => {
       )
     }
 
-    // Switching the username/tagline text to FONT_BOLD for contrast (see
-    // below) made it meaningfully wider — confirmed directly from a
-    // rendered frame: for this particular username it now ran far enough
-    // right to collide with the right-aligned tier badge, "★ Starter"
-    // and "...there..." overlapping into an unreadable jumble. A fixed
-    // font size can never be safe here since usernames are arbitrary
-    // length; instead, size the middle text to whatever room is actually
-    // left between the fixed "VozIt!" mark and the tier badge, shrinking
-    // it (and, as a last resort for an extreme-length username, eliding
-    // the username itself) until it provably fits.
-    const AVG_CHAR_WIDTH_RATIO = 0.62 // DejaVu Sans Bold, rough but safe
-    const estimateTextWidth = (text, size) => text.length * size * AVG_CHAR_WIDTH_RATIO
+    // THE ACTUAL bug behind the username/tier overlap, found by having
+    // FFmpeg itself print the real text_w of each piece of text (not
+    // guesswork): the middle text's old position, "x=14+tw+10", was
+    // written to mean "14px + the width of 'VozIt!' before it + 10px
+    // gap" — but `tw` inside a drawtext filter is that filter's OWN
+    // rendered text width, not a preceding filter's. So the middle text
+    // was actually positioning itself at (14 + ITS OWN full width + 10),
+    // pushing it further right the longer it is, with nothing stopping
+    // it from running past the right-aligned tier badge. This was
+    // always wrong, for every username — it just never surfaced as a
+    // visible bug until contrast/playback were fixed enough to actually
+    // see a frame clearly. The tier badge's own "x=w-tw-14" is a
+    // DIFFERENT, correct use of the same variable (deliberately
+    // self-referential, for right-aligning against its own width).
+    //
+    // Fix: compute "VozIt!"'s real width and use that literal number to
+    // place the middle text, instead of relying on tw to mean something
+    // it doesn't. Character-width ratio below (~0.58) is calibrated from
+    // FFmpeg's own measured text_w for this exact font/weight, not an
+    // assumption — confirmed against three real samples. Still sizes the
+    // middle text down (and, as a last resort for an extreme-length
+    // username, elides it) if it would run past the tier badge, since
+    // usernames are arbitrary length and no fixed size can be safe.
+    const CHAR_WIDTH_RATIO = 0.58 // DejaVu Sans Bold, measured via FFmpeg's own text_w debug output
+    const estimateTextWidth = (text, size) => text.length * size * CHAR_WIDTH_RATIO
     const tierFontSize = fontSize - 3
     const brandWidth = estimateTextWidth('VozIt!', fontSize)
     const tierWidth = estimateTextWidth(tierLabel, tierFontSize)
     const leftMargin = 14, midGap = 10, tierGap = 14, rightMargin = 14
-    const availableForMiddle = width - leftMargin - brandWidth - midGap - tierGap - tierWidth - rightMargin
+    const middleStartX = leftMargin + brandWidth + midGap
+    const availableForMiddle = width - middleStartX - tierGap - tierWidth - rightMargin
 
     let middleText = `· @${safeUsername} · I was there...`
     let middleFontSize = fontSize - 1
@@ -221,10 +235,12 @@ app.post('/process', async (req, res) => {
       // any other character (like the \· this line used to have) isn't a
       // real escape sequence.
       // FONT_BOLD + fuller opacity (was FONT_REGULAR @0.82) — same
-      // legibility reasoning as the background bar above. Size/content
-      // are now whatever the width-fitting above decided, not fixed.
+      // legibility reasoning as the background bar above. x is now a
+      // real computed offset (see middleStartX above), not the broken
+      // self-referential tw. Size/content are whatever the width-fitting
+      // above decided.
       `drawtext=text='${middleText}':fontsize=${middleFontSize}:fontcolor=white@0.95:` +
-        `fontfile=${FONT_BOLD}:x=14+tw+10:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
+        `fontfile=${FONT_BOLD}:x=${Math.round(middleStartX)}:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
       `drawtext=text='${tierLabel}':fontsize=${tierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:` +
         `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - tierFontSize / 2)}`,
       ...stampFilters,
