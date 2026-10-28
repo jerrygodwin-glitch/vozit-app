@@ -227,6 +227,15 @@ const WELL_RATED_MIN_RATINGS=5,WELL_RATED_RATIO=0.6
 function isWellRated(n:any){return n.total_ratings>=WELL_RATED_MIN_RATINGS&&(n.helpful_count/n.total_ratings)>=WELL_RATED_RATIO}
 const confirmedBadge=fieldNotes.visible.some((n:any)=>n.category==='confirms_location'&&isWellRated(n))
 const contradictedBadge=fieldNotes.visible.some((n:any)=>n.category==='contradicts'&&isWellRated(n))
+// Layers 1-3 below are a LIVE re-creation of the same bottom bar/stamp/
+// end-card the watermark worker already burns into pixels, meant only
+// as a stand-in for the raw Mux fallback while that baked file isn't
+// ready yet. Once it is, rendering both at once draws two independently
+// positioned copies of the same text directly on top of each other —
+// confirmed directly from a report: the "·", "@username", "I was
+// there...", and tier badge overlapping and unreadable. The baked video
+// already has this burned in, so the live copy has nothing left to add.
+const showLiveOverlay=!(r.watermark_applied&&r.watermarked_url)
 return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{background:'linear-gradient(to right,#f0e8d8,#b8d8f0 25%,#50b0e8 50%,#18a0e8 75%,#0a3ff1)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}><span onClick={()=>router.back()} style={{cursor:'pointer',color:'#0a3ff1',fontSize:18}}>{'\u2039'}</span><span style={{fontSize:14,fontWeight:600,color:'#0a3ff1',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.title}</span></div>
 {r.playback_id?<div id={`vz-player-${r.id}`} style={{position:'relative',overflow:'hidden'}}>
   {/* Once the watermark worker has burned the username/VozIt branding
@@ -269,20 +278,20 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
   </div>}
 
   {/* Layer 1 — persistent bottom bar */}
-  <div style={{position:'absolute',bottom:0,left:0,right:0,height:'8%',minHeight:28,background:'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',display:'flex',alignItems:'center',padding:'0 10px',pointerEvents:'none'}}>
+  {showLiveOverlay&&<div style={{position:'absolute',bottom:0,left:0,right:0,height:'8%',minHeight:28,background:'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',display:'flex',alignItems:'center',padding:'0 10px',pointerEvents:'none'}}>
     <span style={{fontSize:12,fontWeight:700,color:'#FE3D07'}}>VozIt!</span>
     <span style={{fontSize:11,color:'rgba(255,255,255,0.85)',marginLeft:6}}>· @{r.user?.username} · I was there...</span>
     <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:'#fff'}}>{'★'} {t.l}</span>
-  </div>
+  </div>}
 
   {/* Layer 2 — floating stamp, drifts to a new position every 4s
       (anti-scraping: hard to crop out consistently) */}
-  {!showEndCard&&<div style={{position:'absolute',...floatPos,padding:'3px 8px',borderRadius:4,background:'rgba(254,61,7,0.18)',pointerEvents:'none',transition:'top 0.6s ease,left 0.6s ease,right 0.6s ease'}}>
+  {showLiveOverlay&&!showEndCard&&<div style={{position:'absolute',...floatPos,padding:'3px 8px',borderRadius:4,background:'rgba(254,61,7,0.18)',pointerEvents:'none',transition:'top 0.6s ease,left 0.6s ease,right 0.6s ease'}}>
     <span style={{fontSize:11,color:'rgba(255,255,255,0.5)',textShadow:'0 1px 2px rgba(0,0,0,0.5)'}}>VozIt! — I was there...</span>
   </div>}
 
   {/* Layer 3 — end card bumper, last 1.5s */}
-  {showEndCard&&<div style={{position:'absolute',inset:0,background:'#FE3D07',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',animation:'vzEndCardIn 0.4s ease',pointerEvents:'none'}}>
+  {showLiveOverlay&&showEndCard&&<div style={{position:'absolute',inset:0,background:'#FE3D07',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',animation:'vzEndCardIn 0.4s ease',pointerEvents:'none'}}>
     <div style={{fontSize:32,fontWeight:800,color:'#fff',animation:'vzEndCardScale 0.5s ease'}}>VozIt!</div>
     <div style={{fontSize:15,fontStyle:'italic',color:'rgba(255,255,255,0.92)',marginTop:6,animation:'vzEndCardFade 0.6s ease 0.2s both'}}>I was there...</div>
     <div style={{fontSize:11,color:'rgba(255,255,255,0.4)',marginTop:10,animation:'vzEndCardFade 0.6s ease 0.35s both'}}>vozit.app</div>
