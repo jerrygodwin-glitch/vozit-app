@@ -270,13 +270,23 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
         actual file instead, which already has the watermark burned in
         from t=0 — so the branding is visible immediately, not just
         once playback starts. */}
-    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>
+    {/* Background switches to the end-card orange for the video's last
+        1.5s. The orange bumper is baked into the video's own pixels, so
+        it only fills the video's actual rendered frame — a portrait
+        video in a wider player still leaves the surrounding letterbox
+        bars showing whatever this background is. Matching it to the
+        same orange makes those bars disappear into the bumper instead
+        of showing as a dark gap around it. */}
+    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:showEndCard?'#FE3D07':'#0a1e30'}}/>
     {/* MuxPlayer (the other branch below) draws its own big center play
         button automatically; a plain <video> tag doesn't, which made
         the two players look inconsistent side by side. This matches
         that look and hides itself the instant playback actually
-        starts. */}
-    {!videoPlaying&&<div onClick={()=>playerRef.current?.play?.()} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+        starts — and also while the end card is showing, since a video
+        that just finished and shows its own orange bumper doesn't need
+        a redundant play button sitting on top of it (confirmed directly:
+        it was rendering right over the end-card logo, overlapping it). */}
+    {!videoPlaying&&!showEndCard&&<div onClick={()=>playerRef.current?.play?.()} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
       <div style={{width:64,height:64,borderRadius:32,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center'}}>
         <div style={{width:0,height:0,marginLeft:4,borderTop:'12px solid transparent',borderBottom:'12px solid transparent',borderLeft:'20px solid #fff'}}/>
       </div>
