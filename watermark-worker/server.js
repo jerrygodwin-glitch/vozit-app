@@ -174,18 +174,25 @@ app.post('/process', async (req, res) => {
     }
 
     const mainFilter = [
-      // drawbox correctly keeps iw/ih — that's the filter that actually
-      // defines them.
-      `drawbox=x=0:y=ih-${barHeight}:w=iw:h=${barHeight}:color=black@0.55:t=fill`,
+      // Bumped from black@0.55: reported directly against a bright
+      // outdoor scene (green foliage, white sky) the bar let enough of
+      // the video show through that the white text on top washed out —
+      // legible as a crisp DOM overlay on-screen, but a compressed video
+      // frame has softer edges and needs more contrast margin to read
+      // the same way. drawbox correctly keeps iw/ih — that's the filter
+      // that actually defines them.
+      `drawbox=x=0:y=ih-${barHeight}:w=iw:h=${barHeight}:color=black@0.75:t=fill`,
       `drawtext=text='VozIt!':fontsize=${fontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:` +
         `x=14:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
       // No backslash before the middle dot — only :, ' and \ itself are
       // actual FFmpeg drawtext escape characters. A backslash in front of
       // any other character (like the \· this line used to have) isn't a
       // real escape sequence.
-      `drawtext=text='· @${safeUsername} · I was there...':fontsize=${fontSize - 1}:fontcolor=white@0.82:` +
-        `fontfile=${FONT_REGULAR}:x=14+tw+10:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
-      `drawtext=text='${tierLabel}':fontsize=${fontSize - 3}:fontcolor=white@0.9:fontfile=${FONT_BOLD}:` +
+      // FONT_BOLD + fuller opacity (was FONT_REGULAR @0.82) — same
+      // legibility reasoning as the background bar above.
+      `drawtext=text='· @${safeUsername} · I was there...':fontsize=${fontSize - 1}:fontcolor=white@0.95:` +
+        `fontfile=${FONT_BOLD}:x=14+tw+10:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
+      `drawtext=text='${tierLabel}':fontsize=${fontSize - 3}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:` +
         `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - (fontSize - 3) / 2)}`,
       ...stampFilters,
     ].join(',')
