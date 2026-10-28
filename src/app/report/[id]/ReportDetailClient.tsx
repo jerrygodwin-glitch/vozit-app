@@ -57,6 +57,12 @@ const[showEndCard,setShowEndCard]=useState(false)
 // sizing the box to match avoids pillarboxing a portrait video down to
 // a thin strip inside a wide, mostly-black landscape frame.
 const[videoAspect,setVideoAspect]=useState('16/9')
+// MuxPlayer draws its own big center play button automatically; a plain
+// <video> tag (the baked-in-watermark path) doesn't, so the two players
+// looked inconsistent side by side. Tracked here so a matching custom
+// button can be drawn over the plain <video> instead, hidden once
+// playback has actually started.
+const[videoPlaying,setVideoPlaying]=useState(false)
 
 // Mid-roll ad break at ~45s — client-side insertion (not full server-side
 // ad insertion), since VozIt's video runs on Mux, not an AWS-based stack.
@@ -81,14 +87,20 @@ useEffect(()=>{
       el.pause()
     }
   }
-  const onEnded=()=>setShowEndCard(true)
+  const onEnded=()=>{setShowEndCard(true);setVideoPlaying(false)}
+  const onPlay=()=>setVideoPlaying(true)
+  const onPause=()=>setVideoPlaying(false)
   el.addEventListener('timeupdate',onTime)
   el.addEventListener('loadedmetadata',onTime)
   el.addEventListener('ended',onEnded)
+  el.addEventListener('play',onPlay)
+  el.addEventListener('pause',onPause)
   return()=>{
     el.removeEventListener('timeupdate',onTime)
     el.removeEventListener('loadedmetadata',onTime)
     el.removeEventListener('ended',onEnded)
+    el.removeEventListener('play',onPlay)
+    el.removeEventListener('pause',onPause)
   }
 },[r.playback_id,adUrl,adState])
 
@@ -249,7 +261,27 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
       processing (non-blocking, shouldn't delay anyone watching) or if
       the worker isn't configured at all. */}
   {r.watermark_applied&&r.watermarked_url?
-    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" poster={r.thumbnail_url||undefined} style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>
+    <>
+    {/* No poster here on purpose — r.thumbnail_url is a frame Mux
+        captured from the raw, UNwatermarked source before this file
+        ever existed, so it showed a plain unbranded image (no VozIt
+        bar, no username) for as long as the video sat paused. Leaving
+        poster unset lets the browser show the real first frame of the
+        actual file instead, which already has the watermark burned in
+        from t=0 — so the branding is visible immediately, not just
+        once playback starts. */}
+    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>
+    {/* MuxPlayer (the other branch below) draws its own big center play
+        button automatically; a plain <video> tag doesn't, which made
+        the two players look inconsistent side by side. This matches
+        that look and hides itself the instant playback actually
+        starts. */}
+    {!videoPlaying&&<div onClick={()=>playerRef.current?.play?.()} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+      <div style={{width:64,height:64,borderRadius:32,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <div style={{width:0,height:0,marginLeft:4,borderTop:'12px solid transparent',borderBottom:'12px solid transparent',borderLeft:'20px solid #fff'}}/>
+      </div>
+    </div>}
+    </>
   :
   /* fullscreenElement tells Mux Player to fullscreen THIS wrapper div
       instead of just its own internal video element — otherwise the
