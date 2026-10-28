@@ -161,9 +161,18 @@ app.post('/process', async (req, res) => {
     // be), so the box and the text need a shared, pre-computed position
     // to actually line up, which only works cleanly in JS since this
     // text's content — and therefore its width — never changes.
-    const STAMP_TEXT = 'VozIt! — I was there...'
+    // "I was there..." requested in italics here too — split into a
+    // regular-weight prefix and an italic suffix, drawn as two adjacent
+    // drawtext calls rather than one. Their x positions are computed in
+    // JS (prefix's own estimated width decides where the suffix starts)
+    // for the same reason the box position above is — no FFmpeg
+    // cross-filter reference to lean on.
+    const STAMP_PREFIX = 'VozIt! — '
+    const STAMP_SUFFIX = 'I was there...'
+    const STAMP_TEXT = STAMP_PREFIX + STAMP_SUFFIX
     const STAMP_CHAR_WIDTH_RATIO = 0.54 // DejaVu Sans regular weight, narrower than the Bold ratio used above
     const stampTextWidth = Math.round(STAMP_TEXT.length * fontSize * STAMP_CHAR_WIDTH_RATIO)
+    const stampPrefixWidth = Math.round(STAMP_PREFIX.length * fontSize * STAMP_CHAR_WIDTH_RATIO)
     const stampPadX = Math.round(fontSize * 0.45)
     const stampPadY = Math.round(fontSize * 0.3)
     const stampBoxW = stampTextWidth + stampPadX * 2
@@ -195,8 +204,12 @@ app.post('/process', async (req, res) => {
         `drawbox=x=${pos.x - stampPadX}:y=${pos.y - stampPadY}:w=${stampBoxW}:h=${stampBoxH}:color=0xFE3D07@0.18:t=fill:${enable}`
       )
       stampFilters.push(
-        `drawtext=text='${STAMP_TEXT}':fontsize=${fontSize}:fontcolor=white@0.50:` +
+        `drawtext=text='${STAMP_PREFIX}':fontsize=${fontSize}:fontcolor=white@0.50:` +
         `fontfile=${FONT_REGULAR}:x=${pos.x}:y=${pos.y}:${enable}`
+      )
+      stampFilters.push(
+        `drawtext=text='${STAMP_SUFFIX}':fontsize=${fontSize}:fontcolor=white@0.50:` +
+        `fontfile=${FONT_ITALIC}:x=${pos.x + stampPrefixWidth}:y=${pos.y}:${enable}`
       )
     }
 
@@ -245,6 +258,15 @@ app.post('/process', async (req, res) => {
       }
       middleText = `· @${trimmed}… · I was there...`
     }
+    // "I was there..." requested in italics here too — the fitting logic
+    // above still treats middleText as one string (the combined width is
+    // what actually has to fit, regardless of how it's drawn), but it
+    // always ends with this exact suffix, so it can be split safely
+    // after sizing is decided. Same reasoning as the drifting stamp
+    // above: x positions computed in JS, not a cross-filter tw reference.
+    const MIDDLE_SUFFIX = 'I was there...'
+    const middlePrefix = middleText.slice(0, middleText.length - MIDDLE_SUFFIX.length)
+    const middleSuffixX = Math.round(middleStartX) + Math.round(estimateTextWidth(middlePrefix, middleFontSize))
 
     // Still reported as hard to read after the black@0.75/bold/opacity
     // pass above, compared against the crisp DOM-overlay version. That
@@ -279,10 +301,13 @@ app.post('/process', async (req, res) => {
       // FONT_BOLD + fuller opacity (was FONT_REGULAR @0.82) — same
       // legibility reasoning as the background bar above. x is now a
       // real computed offset (see middleStartX above), not the broken
-      // self-referential tw. Size/content are whatever the width-fitting
-      // above decided.
-      `drawtext=text='${middleText}':fontsize=${middleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
+      // self-referential tw. Size is whatever the width-fitting above
+      // decided. "I was there..." split out into its own italic
+      // drawtext — see middlePrefix/middleSuffixX above.
+      `drawtext=text='${middlePrefix}':fontsize=${middleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
         `fontfile=${FONT_BOLD}:x=${Math.round(middleStartX)}:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
+      `drawtext=text='${MIDDLE_SUFFIX}':fontsize=${middleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
+        `fontfile=${FONT_ITALIC}:x=${middleSuffixX}:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
       `drawtext=text='${tierLabel}':fontsize=${tierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
         `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - tierFontSize / 2)}`,
       ...stampFilters,
