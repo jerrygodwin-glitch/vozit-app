@@ -57,7 +57,7 @@ export async function autoDistributeToVozItChannels(params: {
   // otherwise this posts the raw, unbranded master to VozIt's own public
   // channels with zero VozIt/reporter credit visible.
   const videoUrl = params.watermarkedUrl || `https://stream.mux.com/${params.playbackId}/high.mp4`
-  const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app'}/report/${params.reportId}`
+  const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.net'}/report/${params.reportId}`
   const tags = ['VozIt', 'citizenjournalism', 'IWasThere', 'eyewitness', params.locationName || ''].filter(Boolean)
 
   const description = [

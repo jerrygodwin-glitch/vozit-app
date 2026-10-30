@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         pricing: LICENSE_TIERS,
         note: 'All prices in USD. VozIt shares licensing revenue with the citizen reporter who captured the footage.',
-        contact: 'licensing@vozit.app',
+        contact: 'licensing@vozit.net',
       })
     }
 
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
       },
       pricing: LICENSE_TIERS,
       existingLicenses: (licenses || []).length,
-      embedCode: `<iframe src="${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app'}/embed/${reportId}" width="640" height="400" frameborder="0" allowfullscreen></iframe>`,
+      embedCode: `<iframe src="${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.net'}/embed/${reportId}" width="640" height="400" frameborder="0" allowfullscreen></iframe>`,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         license: { id: license.id, status: 'active', tier, type: license_type, price: 0, expires: expiresAt.toISOString() },
-        embedCode: `<iframe src="${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app'}/embed/${report_id}" width="640" height="400" frameborder="0" allowfullscreen></iframe>`,
+        embedCode: `<iframe src="${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.net'}/embed/${report_id}" width="640" height="400" frameborder="0" allowfullscreen></iframe>`,
         message: 'Editorial embed license activated. Credit VozIt + reporter.',
       })
     }
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         license: { id: license.id, status: 'pending_payment', tier, type: license_type, price, expires: expiresAt.toISOString() },
-        payment: { method: 'Invoice', contact: 'licensing@vozit.app', note: 'Online payment is not configured yet — we\'ll follow up to invoice you.' },
+        payment: { method: 'Invoice', contact: 'licensing@vozit.net', note: 'Online payment is not configured yet — we\'ll follow up to invoice you.' },
       })
     }
 

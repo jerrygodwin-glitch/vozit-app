@@ -39,7 +39,7 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
     })
   })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.net'
   const reportUrl = `${appUrl}/report/${report.id}`
   // External embeds are exactly where a baked-in watermark matters most —
   // prefer the burned-in copy once it exists; the CSS watermark div below

@@ -342,7 +342,7 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
   {showLiveOverlay&&showEndCard&&<div style={{position:'absolute',inset:0,background:'#FE3D07',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',animation:'vzEndCardIn 0.4s ease',pointerEvents:'none'}}>
     <div style={{fontSize:32,fontWeight:800,color:'#fff',animation:'vzEndCardScale 0.5s ease'}}>VozIt!</div>
     <div style={{fontSize:15,fontStyle:'italic',color:'rgba(255,255,255,0.92)',marginTop:6,animation:'vzEndCardFade 0.6s ease 0.2s both'}}>I was there...</div>
-    <div style={{fontSize:11,color:'rgba(255,255,255,0.4)',marginTop:10,animation:'vzEndCardFade 0.6s ease 0.35s both'}}>vozit.app</div>
+    <div style={{fontSize:11,color:'rgba(255,255,255,0.4)',marginTop:10,animation:'vzEndCardFade 0.6s ease 0.35s both'}}>vozit.net</div>
   </div>}
   <style>{`
     @keyframes vzEndCardIn{from{opacity:0}to{opacity:1}}

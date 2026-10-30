@@ -64,7 +64,7 @@ export async function postToYouTube(params: {
         body: JSON.stringify({
           snippet: {
             title: `[VozIt] ${params.title}`,
-            description: `${params.description}\n\n---\nReported via VozIt — Citizen Journalism\nhttps://vozit.app`,
+            description: `${params.description}\n\n---\nReported via VozIt — Citizen Journalism\nhttps://vozit.net`,
             tags: ['VozIt', 'citizen journalism', 'eyewitness', ...params.tags],
             categoryId: '25', // News & Politics
           },

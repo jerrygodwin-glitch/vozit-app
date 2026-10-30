@@ -382,7 +382,7 @@ app.post('/process', async (req, res) => {
         `x=(w-text_w)/2:y=(h/2)-${Math.round(brandSizeEnd * 1.2)},` +
       `drawtext=text='I was there...':fontsize=${fontSizeEnd}:fontcolor=white@0.92:fontfile=${FONT_ITALIC}:` +
         `x=(w-text_w)/2:y=(h/2)+${Math.round(brandSizeEnd * 0.3)},` +
-      `drawtext=text='vozit.app':fontsize=${Math.round(fontSizeEnd * 0.6)}:fontcolor=white@0.4:fontfile=${FONT_REGULAR}:` +
+      `drawtext=text='vozit.net':fontsize=${Math.round(fontSizeEnd * 0.6)}:fontcolor=white@0.4:fontfile=${FONT_REGULAR}:` +
         `x=(w-text_w)/2:y=(h/2)+${Math.round(brandSizeEnd * 0.3) + Math.round(fontSizeEnd * 1.6)}`,
       '-map', '0:v', '-map', '1:a',
       '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-level', '4.2',

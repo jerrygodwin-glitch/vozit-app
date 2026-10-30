@@ -158,7 +158,7 @@ function buildEndCardCommand(config: WatermarkConfig): string {
   // Step 1: Create orange gradient background video
   // Step 2: Overlay logo at center
   // Step 3: Add "I was there..." text below
-  // Step 4: Add "vozit.app" URL text
+  // Step 4: Add "vozit.net" URL text
   return [
     'ffmpeg -y',
     // Input 1: Orange gradient color source
@@ -177,7 +177,7 @@ function buildEndCardCommand(config: WatermarkConfig): string {
         `font=Arial:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf:` +
         `x=(w-text_w)/2:y=(h/2)+${Math.round(logoSize / 2)}+${Math.round(fontSize * 0.3)},` +
       // Add URL
-      `drawtext=text='vozit.app':` +
+      `drawtext=text='vozit.net':` +
         `fontsize=${Math.round(fontSize * 0.6)}:fontcolor=white@0.4:` +
         `font=Arial:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:` +
         `x=(w-text_w)/2:y=(h/2)+${Math.round(logoSize / 2)}+${Math.round(fontSize * 1.8)}"`,

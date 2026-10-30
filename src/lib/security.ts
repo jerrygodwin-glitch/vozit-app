@@ -144,7 +144,13 @@ export async function verifyStripeSignature(
 
 // ── 3. CORS CONFIGURATION ────────────────────────────────────
 const ALLOWED_ORIGINS = [
-  process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app',
+  process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.net',
+  // Explicit apex + www — NEXT_PUBLIC_APP_URL is only ever set to one of
+  // these, but vozit.net redirects to www.vozit.net at the HTTP level,
+  // not before the browser's Origin header is set, so a request can
+  // legitimately carry either one.
+  'https://vozit.net',
+  'https://www.vozit.net',
   'https://vozitvercel-v2-voz-it.vercel.app',
   'http://localhost:3000',
 ].filter(Boolean)

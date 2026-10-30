@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       const { data: accounts } = await query
       if (!accounts?.length) return NextResponse.json({ error: 'No connected social accounts' }, { status: 400 })
       const videoUrl = `https://stream.mux.com/${report.playback_id}/high.mp4`
-      const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.app'}/report/${report_id}`
+      const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://vozit.net'}/report/${report_id}`
       const results = await distributeToAll({ reportId: report_id, title: report.title, description: report.what || report.title, videoUrl, reportUrl, tags: ['citizenjournalism', 'IWasThere', 'VozIt', report.location_name || ''].filter(Boolean), location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined, accounts: accounts as SocialAccount[] })
       for (const result of results) { await supabase.from('social_distributions').insert({ report_id, user_id: user.id, platform: result.platform, post_id: result.postId, post_url: result.postUrl, success: result.success, error: result.error, distributed_at: result.distributedAt }) }
       const successCount = results.filter(r => r.success).length
