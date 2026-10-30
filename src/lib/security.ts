@@ -70,7 +70,16 @@ export const RATE_LIMITS = {
   comment:      { max: 30,  window: 3600 },
   payout:       { max: 3,   window: 86400 },
   auth:         { max: 5,   window: 300 },     // 5 attempts per 5 min (tighter)
-  register:     { max: 3,   window: 3600 },    // 3 registrations per hour per IP
+  // Was 3/hour. Confirmed directly from a real signup: this counts every
+  // POST to /api/auth/register, including ones that fail for reasons that
+  // are nobody's fault — a username race, a transient email-service
+  // error — not just actual abuse. A real user hit exactly that: three
+  // honest, recoverable failures in a row, then got locked out of
+  // creating an account at all for an hour. A spam/bot attack looks
+  // nothing like 10 attempts — raising the ceiling here doesn't
+  // meaningfully weaken abuse protection, it just stops punishing people
+  // for the app's own transient failures.
+  register:     { max: 10,  window: 3600 },    // 10 registrations per hour per IP
   password_reset:{ max: 3,  window: 3600 },    // 3 reset emails per hour
   api_general:  { max: 300, window: 60 },
   licensing:    { max: 20,  window: 3600 },
