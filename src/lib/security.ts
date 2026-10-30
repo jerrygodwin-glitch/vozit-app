@@ -452,7 +452,16 @@ export function getSecurityHeaders(): Record<string, string> {
     'X-Permitted-Cross-Domain-Policies': 'none',
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com",
+      // https://*.googlesyndication.com / https://*.doubleclick.net:
+      // Google Ad Manager/AdSense signup — the site-ownership
+      // verification script alone needs pagead2.googlesyndication.com,
+      // and the actual ad-serving tag (once Ad Manager setup is further
+      // along) spans several more subdomains across these same two
+      // domains. Wildcarding both now instead of re-discovering each
+      // missing host one CSP break at a time, the way the Google login
+      // icon and the Supabase watermark host both had to be added after
+      // something silently failed first.
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://*.googlesyndication.com https://*.doubleclick.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https://image.mux.com https://*.supabase.co blob:",
       // https://stream.mux.com alone only covers the master playlist request
