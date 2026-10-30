@@ -43,6 +43,11 @@ export default function Landing() {
   const [groupBy, setGroupBy] = useState<'location' | 'category'>('location')
   const [reports, setReports] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
+  // Featured Assignments below was hardcoded placeholder data (fake
+  // Ukraine/Sudan/Venezuela entries) that never reflected anything
+  // actually in the database — a real $0 "coverage request" assignment
+  // created to test this would never have shown up here.
+  const [assignments, setAssignments] = useState<any[]>([])
 
   useEffect(() => {
     fetch('/api/reports?limit=50&sort=recent')
@@ -50,6 +55,10 @@ export default function Landing() {
       .then(data => setReports(data.reports || []))
       .catch(() => {})
       .finally(() => setLoaded(true))
+    fetch('/api/assignments?urgency=all')
+      .then(res => res.json())
+      .then(data => setAssignments((data.assignments || []).slice(0, 3)))
+      .catch(() => {})
   }, [])
 
   const groups = groupBy === 'location' ? REGIONS : CATEGORIES
@@ -196,20 +205,27 @@ export default function Landing() {
             ))}
           </div>
 
-          {/* Featured Assignments */}
+          {/* Featured Assignments — real data from /api/assignments (active,
+              most recent 3), not the old hardcoded Ukraine/Sudan/Venezuela
+              placeholders. No individual assignment detail page exists yet,
+              so each card links to the full /assignments list, same as
+              "more →". */}
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>Featured Assignments</div>
               <a href="/assignments" style={{ fontSize: 11, color: '#0a8fe8' }}>more →</a>
             </div>
-            {[{ t: 'Ukraine — frontline', b: 2400, u: 'Critical' }, { t: 'Sudan — humanitarian', b: 3000, u: 'Critical' }, { t: 'Venezuela — protests', b: 1200, u: 'High' }].map(a => (
-              <div key={a.t} style={{ padding: '8px 0', borderBottom: '1px solid #f5f5f5' }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{a.t}</div>
+            {assignments.length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 0' }}>No open assignments right now.</div>}
+            {assignments.map(a => (
+              <a key={a.id} href="/assignments" style={{ display: 'block', padding: '8px 0', borderBottom: '1px solid #f5f5f5', textDecoration: 'none', color: 'inherit' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{a.title}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 600 }}>{a.u}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#065F46' }}>${a.b.toLocaleString()}</span>
+                  <span style={{ fontSize: 11, color: a.urgency === 'critical' || a.urgency === 'high' ? '#DC2626' : '#999', fontWeight: 600, textTransform: 'capitalize' }}>{a.urgency}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: a.assignment_fee_pool_usd > 0 ? '#065F46' : '#999' }}>
+                    {a.assignment_fee_pool_usd > 0 ? `$${Number(a.assignment_fee_pool_usd).toLocaleString()}` : 'Coverage request'}
+                  </span>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
 
