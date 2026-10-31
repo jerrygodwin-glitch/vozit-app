@@ -12,12 +12,26 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname
 
   // Skip static assets entirely
+  // robots.txt/ads.txt: confirmed directly — these never existed as real
+  // files, so requests for them fell through to the auth check below like
+  // any other unrecognized path and got redirected to /auth/login. Any
+  // crawler checking robots.txt first (standard practice, and exactly
+  // what Google's AdSense review does) would see a redirect to a login
+  // page instead of real content — a very plausible cause of the site
+  // being reported as "down or unavailable" despite working fine for
+  // actual visitors. Real files now exist in /public, but listing these
+  // paths explicitly here too means this class of bug can't recur for
+  // this or similar root-level crawler files regardless of how static
+  // file serving and middleware ordering interact.
   if (
     path.startsWith('/_next') ||
     path.startsWith('/favicon') ||
     path.startsWith('/brand/') ||
     path.startsWith('/icons/') ||
-    path === '/manifest.json'
+    path === '/manifest.json' ||
+    path === '/robots.txt' ||
+    path === '/ads.txt' ||
+    path === '/sitemap.xml'
   ) {
     return NextResponse.next()
   }

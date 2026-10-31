@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /settings
+Disallow: /payouts
+Disallow: /earnings
+Disallow: /api/
+Disallow: /auth/
