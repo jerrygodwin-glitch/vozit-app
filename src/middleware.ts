@@ -6,7 +6,7 @@ import { getCorsHeaders, getEmbedCorsHeaders, getSecurityHeaders } from '@/lib/s
 const SUPABASE_URL = 'https://mfanqkbhegxppyitxtye.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mYW5xa2JoZWd4cHB5aXR4dHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDc2NDYsImV4cCI6MjEwMzcyMzY0Nn0.83-3UqR1BH2uaVoTO7Gta0l3lxVlkh7qSZ0b20aszdw'
 
-const PUBLIC = ['/auth', '/feed', '/api/mux-webhook', '/api/stripe', '/api/og', '/api/licensing', '/embed', '/search', '/assignments', '/licensing']
+const PUBLIC = ['/auth', '/feed', '/api/mux-webhook', '/api/stripe', '/api/og', '/api/licensing', '/embed', '/search', '/assignments', '/licensing', '/privacy', '/terms']
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname

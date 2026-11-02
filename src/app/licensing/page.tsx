@@ -130,7 +130,7 @@ function Licensing() {
             <input
               value={url}
               onChange={e => setUrl(e.target.value)}
-              placeholder="https://vozit-app-v2-voz-it.vercel.app/report/..."
+              placeholder="https://vozit.net/report/..."
               style={{ flex: 1, fontSize: 14 }}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
             />
@@ -227,7 +227,7 @@ function Licensing() {
         <div className="card card-lg" style={{ textAlign: 'center', marginTop: 8, background: 'linear-gradient(135deg, #065F46, #0a8fe8)', color: '#fff', border: 'none' }}>
           <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Media organization?</div>
           <p style={{ fontSize: 13, opacity: 0.8, marginBottom: 16 }}>Set up a wire service account for volume licensing with priority access to breaking content.</p>
-          <a href="mailto:licensing@vozit.com" className="btn" style={{ background: '#fff', color: '#065F46', fontSize: 14, fontWeight: 600, padding: '12px 28px' }}>Contact licensing team</a>
+          <a href="mailto:licensing@vozit.net" className="btn" style={{ background: '#fff', color: '#065F46', fontSize: 14, fontWeight: 600, padding: '12px 28px' }}>Contact licensing team</a>
         </div>
       </div>
       <Nav active="/licensing" />

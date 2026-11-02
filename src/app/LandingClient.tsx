@@ -219,14 +219,11 @@ export function LandingClient({ reports, assignments }: { reports: any[]; assign
             ))}
           </div>
 
-          {/* Get the App */}
-          <div className="card">
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Get the App</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <a href="#" style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#000', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center' }}>App Store</a>
-              <a href="#" style={{ flex: 1, padding: '10px', borderRadius: 8, background: '#000', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center' }}>Google Play</a>
-            </div>
-          </div>
+          {/* "Get the App" card removed — the mobile app doesn't exist yet,
+              so these buttons were dead href="#" links advertising
+              something that isn't real, not just a broken link. Bring
+              this back once there's an actual App Store/Google Play
+              listing to point to. */}
 
           {/* Social */}
           <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'center' }}>
@@ -257,12 +254,12 @@ export function LandingClient({ reports, assignments }: { reports: any[]; assign
             <img src={LOGO} style={{ height: 28, width: 28, borderRadius: 6 }} alt="VozIt" />
             <span style={{ color: '#fff', fontWeight: 700 }}>VozIt!</span>
           </div>
-          <div style={{ display: 'flex', gap: 20 }}>
-            {['Feed', 'Assignments', 'Licensing', 'About'].map(l => (
-              <a key={l} href={l === 'About' ? '#about' : '/' + l.toLowerCase()} style={{ color: '#999', fontSize: 12 }}>{l}</a>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[{ l: 'Feed', h: '/feed' }, { l: 'Assignments', h: '/assignments' }, { l: 'Licensing', h: '/licensing' }, { l: 'About', h: '#about' }, { l: 'Privacy', h: '/privacy' }, { l: 'Terms', h: '/terms' }].map(t => (
+              <a key={t.l} href={t.h} style={{ color: '#999', fontSize: 12 }}>{t.l}</a>
             ))}
           </div>
-          <div style={{ color: '#666' }}>© 2024 VozIt! — Citizen Journalism</div>
+          <div style={{ color: '#666' }}>© {new Date().getFullYear()} VozIt! — Citizen Journalism</div>
         </div>
       </footer>
     </div>
