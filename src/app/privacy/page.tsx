@@ -130,7 +130,7 @@ export default function PrivacyPage() {
         <h2 style={S.h2}>Contact us</h2>
         <p style={S.p}>
           Questions about this policy or your data? Email{' '}
-          <a href="mailto:privacy@vozit.net" style={{ color: '#0a8fe8' }}>privacy@vozit.net</a>.
+          <a href="mailto:vozitnews@gmail.com" style={{ color: '#0a8fe8' }}>vozitnews@gmail.com</a>.
         </p>
       </div>
       <Nav />

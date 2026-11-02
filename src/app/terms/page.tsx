@@ -107,7 +107,7 @@ export default function TermsPage() {
         <h2 style={S.h2}>Contact us</h2>
         <p style={S.p}>
           Questions about these terms? Email{' '}
-          <a href="mailto:legal@vozit.net" style={{ color: '#0a8fe8' }}>legal@vozit.net</a>.
+          <a href="mailto:vozitnews@gmail.com" style={{ color: '#0a8fe8' }}>vozitnews@gmail.com</a>.
           For privacy-specific questions, see our{' '}
           <a href="/privacy" style={{ color: '#0a8fe8' }}>Privacy Policy</a>.
         </p>
