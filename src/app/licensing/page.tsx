@@ -3,7 +3,16 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Top, Nav } from '@/lib/ui'
 
-function Licensing() {
+// Isolated so ONLY this small piece depends on useSearchParams(). When
+// Next can't resolve search params during server rendering, it bails
+// the nearest Suspense boundary to client-only rendering — previously
+// that boundary wrapped the ENTIRE page (see LicensingPage below), so a
+// crawler that doesn't run JS got nothing at all: no pricing tiers, no
+// contact info, nothing. Confirmed directly on the live site (raw HTML
+// response was a near-empty BAILOUT_TO_CLIENT_SIDE_RENDERING shell).
+// Keeping this hook's blast radius to just the checkout-status banner
+// means everything else below renders normally in the static HTML.
+function CheckoutStatusBanner() {
   const params = useSearchParams()
   const [checkoutStatus, setCheckoutStatus] = useState<any>(null)
   useEffect(() => {
@@ -30,6 +39,23 @@ function Licensing() {
     poll()
   }, [])
 
+  if (!checkoutStatus) return null
+  return (
+    <div className="card card-lg" style={{ marginBottom: 24, textAlign: 'center' }}>
+      {checkoutStatus.state === 'checking' && <p style={{ fontSize: 13, color: '#666' }}>Confirming your payment...</p>}
+      {checkoutStatus.state === 'canceled' && <p style={{ fontSize: 13, color: '#DC2626' }}>Payment was canceled — no charge was made.</p>}
+      {checkoutStatus.state === 'pending' && <p style={{ fontSize: 13, color: '#CA8A04' }}>Payment received — still confirming on our end. Refresh in a moment.</p>}
+      {checkoutStatus.state === 'active' && (
+        <>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#065F46', marginBottom: 8 }}>✓ Payment confirmed</p>
+          <a href={`/api/licensing/download?license_id=${checkoutStatus.licenseId}&email=${encodeURIComponent(checkoutStatus.email)}`} className="btn btn-primary">Download your licensed footage</a>
+        </>
+      )}
+    </div>
+  )
+}
+
+function Licensing() {
   const [url, setUrl] = useState('')
   const [result, setResult] = useState<any>(null)
   const [searching, setSearching] = useState(false)
@@ -108,19 +134,9 @@ function Licensing() {
           <p style={{ fontSize: 13, color: '#0a8fe8', marginTop: 4 }}>Revenue shared with the reporter</p>
         </div>
 
-        {checkoutStatus && (
-          <div className="card card-lg" style={{ marginBottom: 24, textAlign: 'center' }}>
-            {checkoutStatus.state === 'checking' && <p style={{ fontSize: 13, color: '#666' }}>Confirming your payment...</p>}
-            {checkoutStatus.state === 'canceled' && <p style={{ fontSize: 13, color: '#DC2626' }}>Payment was canceled — no charge was made.</p>}
-            {checkoutStatus.state === 'pending' && <p style={{ fontSize: 13, color: '#CA8A04' }}>Payment received — still confirming on our end. Refresh in a moment.</p>}
-            {checkoutStatus.state === 'active' && (
-              <>
-                <p style={{ fontSize: 15, fontWeight: 700, color: '#065F46', marginBottom: 8 }}>✓ Payment confirmed</p>
-                <a href={`/api/licensing/download?license_id=${checkoutStatus.licenseId}&email=${encodeURIComponent(checkoutStatus.email)}`} className="btn btn-primary">Download your licensed footage</a>
-              </>
-            )}
-          </div>
-        )}
+        <Suspense fallback={null}>
+          <CheckoutStatusBanner />
+        </Suspense>
 
         {/* URL PASTE BAR */}
         <div className="card card-lg" style={{ marginBottom: 24, border: '2px solid #0a8fe8' }}>
@@ -236,5 +252,5 @@ function Licensing() {
 }
 
 export default function LicensingPage() {
-  return <Suspense><Licensing /></Suspense>
+  return <Licensing />
 }
