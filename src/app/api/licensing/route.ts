@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { calculateReporterShare } from '@/lib/payouts'
+import { captureError } from '@/lib/monitoring'
 import type { ReporterTier } from '@/types'
 
 // ── LICENSING TIERS ──────────────────────────────────────────────────
@@ -82,13 +83,18 @@ export async function GET(req: NextRequest) {
 
     // Return specific report licensing info
     const supabase = createServerClient()
-    const { data: report } = await supabase
+    const { data: report, error: reportError } = await supabase
       .from('reports')
-      .select('id, title, playback_id, thumbnail_url, location_name, duration, created_at, status, user:users(username, tier)')
+      .select('id, title, playback_id, thumbnail_url, location_name, duration_seconds, created_at, status, user:users(username, tier)')
       .eq('id', reportId)
       .eq('status', 'published')
       .single()
 
+    // A real query error (bad column, RLS misconfig, etc.) looks identical
+    // to a legitimate "not found" to the caller unless logged separately —
+    // this is exactly how a now-fixed column-name typo here went unnoticed
+    // and silently broke every licensing search.
+    if (reportError && reportError.code !== 'PGRST116') captureError(reportError, { route: 'GET /api/licensing', reportId })
     if (!report) {
       return NextResponse.json({ error: 'Report not found or not published' }, { status: 404 })
     }
@@ -116,7 +122,7 @@ export async function GET(req: NextRequest) {
         title: report.title,
         thumbnail: report.thumbnail_url,
         location: report.location_name,
-        duration: report.duration,
+        duration: report.duration_seconds,
         reporter: (report.user as any)?.username,
         isBreaking,
         hoursOld: Math.round(hoursOld),
@@ -152,13 +158,14 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient()
 
     // Get report + reporter info for revenue split
-    const { data: report } = await supabase
+    const { data: report, error: reportError } = await supabase
       .from('reports')
       .select('id, user_id, title, status, user:users(tier)')
       .eq('id', report_id)
       .eq('status', 'published')
       .single()
 
+    if (reportError && reportError.code !== 'PGRST116') captureError(reportError, { route: 'POST /api/licensing', report_id })
     if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
     // Check exclusivity — admin client, see note in GET above
