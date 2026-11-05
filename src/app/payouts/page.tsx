@@ -19,7 +19,7 @@ const COUNTRIES = [
   { code: 'IN', label: 'India' }, { code: 'ID', label: 'Indonesia' }, { code: 'IQ', label: 'Iraq' },
   { code: 'IL', label: 'Israel' }, { code: 'JP', label: 'Japan' }, { code: 'JO', label: 'Jordan' },
   { code: 'KE', label: 'Kenya' }, { code: 'KW', label: 'Kuwait' }, { code: 'LB', label: 'Lebanon' },
-  { code: 'MX', label: 'Mexico' }, { code: 'NZ', label: 'New Zealand' }, { code: 'NI', label: 'Nicaragua' },
+  { code: 'MX', label: 'Mexico' }, { code: 'MD', label: 'Moldova' }, { code: 'NZ', label: 'New Zealand' }, { code: 'NI', label: 'Nicaragua' },
   { code: 'NG', label: 'Nigeria' }, { code: 'OM', label: 'Oman' }, { code: 'PA', label: 'Panama' },
   { code: 'PY', label: 'Paraguay' }, { code: 'PE', label: 'Peru' }, { code: 'PH', label: 'Philippines' },
   { code: 'QA', label: 'Qatar' }, { code: 'RW', label: 'Rwanda' }, { code: 'SA', label: 'Saudi Arabia' },
