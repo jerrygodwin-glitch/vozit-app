@@ -137,6 +137,15 @@ function suggestProviderIds(country: string): string[] {
   // currency — AMD, AZN). Payoneer has decent supporting evidence too,
   // including a specific local bank partnership in Armenia.
   if (['AM', 'AZ'].includes(country)) return ['wise', 'payoneer', 'crypto']
+  // Full audit pass (2026-11-05): checked PayPal's own official developer
+  // docs (the "Country and feature support" reference table) against
+  // every country then sitting on the generic default below. 17 came
+  // back genuinely fine (Argentina, Colombia, Chile, Peru, Ecuador,
+  // Uruguay, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman, Jordan, Turkey,
+  // Israel, India, Indonesia, Philippines) — no change needed for those.
+  // These 5 are NOT in PayPal's own eligible-countries table at all —
+  // Payoneer is confirmed as a receive-capable alternative for all five.
+  if (['BO', 'PY', 'GY', 'SR', 'UA'].includes(country)) return ['wise', 'payoneer', 'crypto']
   return ['wise', 'paypal', 'crypto']
 }
 
