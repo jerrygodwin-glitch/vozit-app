@@ -26,7 +26,9 @@ const COUNTRIES = [
   { code: 'PY', label: 'Paraguay' }, { code: 'PE', label: 'Peru' }, { code: 'PH', label: 'Philippines' },
   { code: 'QA', label: 'Qatar' }, { code: 'RW', label: 'Rwanda' }, { code: 'SA', label: 'Saudi Arabia' },
   { code: 'SN', label: 'Senegal' }, { code: 'SC', label: 'Seychelles' }, { code: 'SG', label: 'Singapore' }, { code: 'ZA', label: 'South Africa' },
-  { code: 'SR', label: 'Suriname' }, { code: 'TZ', label: 'Tanzania' }, { code: 'TR', label: 'Turkey' },
+  { code: 'KR', label: 'South Korea' },
+  { code: 'SR', label: 'Suriname' }, { code: 'TW', label: 'Taiwan' }, { code: 'TZ', label: 'Tanzania' },
+  { code: 'TH', label: 'Thailand' }, { code: 'TR', label: 'Turkey' },
   { code: 'UG', label: 'Uganda' }, { code: 'UA', label: 'Ukraine' }, { code: 'AE', label: 'United Arab Emirates' },
   { code: 'GB', label: 'United Kingdom' }, { code: 'US', label: 'United States' }, { code: 'UY', label: 'Uruguay' },
   { code: 'VE', label: 'Venezuela' },
@@ -77,8 +79,13 @@ function suggestProviderIds(country: string): string[] {
   // Confirmed directly against Stripe's own supported-country list
   // (stripe.com/global) — Brazil, Mexico, and the UAE are all genuinely
   // Stripe-supported, same as the rest of this bucket, but were
-  // previously falling into the generic catch-all below instead.
-  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK', 'BR', 'MX', 'AE'].includes(country)) return ['stripe', 'paypal', 'wise']
+  // previously falling into the generic catch-all below instead. Thailand
+  // confirmed the same way. Taiwan and South Korea were NOT on that
+  // official list despite showing up in some PayPal/Stripe marketing
+  // material — that material conflates "we can charge your customers
+  // there" with "you can register a payout account there," which are
+  // different things; they use the generic default below instead.
+  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK', 'BR', 'MX', 'AE', 'TH'].includes(country)) return ['stripe', 'paypal', 'wise']
   if (['NG', 'KE', 'GH', 'ZA', 'TZ', 'UG', 'RW', 'CI', 'SN', 'CM', 'EG'].includes(country)) return ['flutterwave', 'chipper', 'worldremit']
   // Central America — these 7 countries were missing from the picker
   // entirely (confirmed directly: a real reporter in Honduras had no
