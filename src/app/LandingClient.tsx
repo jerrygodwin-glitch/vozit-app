@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { LOGO } from '@/lib/ui'
+import { useAuth } from '@/hooks/useAuth'
 
 const G = 'https://www.google.com/s2/favicons?domain=DOMAIN&sz=128'
 const TABS = [
@@ -50,6 +51,7 @@ function timeAgo(iso: string) {
 // HTML; groupBy stays client-side state since it's genuinely interactive.
 export function LandingClient({ reports, assignments }: { reports: any[]; assignments: any[] }) {
   const [groupBy, setGroupBy] = useState<'location' | 'category'>('location')
+  const { user, loading: authLoading } = useAuth()
 
   const groups = groupBy === 'location' ? REGIONS : CATEGORIES
   const matchName = (l: string) => (l || '').toLowerCase()
@@ -67,8 +69,17 @@ export function LandingClient({ reports, assignments }: { reports: any[]; assign
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <a href="/auth/login" className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 600, padding: '8px 20px' }}>Sign in</a>
-          <a href="/auth/register" className="btn btn-sm" style={{ background: '#FE3D07', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, padding: '8px 20px' }}>New Account</a>
+          {authLoading ? null : user ? (
+            <a href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 20, padding: '4px 14px 4px 4px' }}>
+              <span style={{ width: 24, height: 24, borderRadius: 12, background: TC[user.tier || 'starter']?.c || TC.starter.c, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{(user.display_name || user.username || '?').slice(0, 2).toUpperCase()}</span>
+              <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>@{user.username}</span>
+            </a>
+          ) : (
+            <>
+              <a href="/auth/login" className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 600, padding: '8px 20px' }}>Sign in</a>
+              <a href="/auth/register" className="btn btn-sm" style={{ background: '#FE3D07', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, padding: '8px 20px' }}>New Account</a>
+            </>
+          )}
         </div>
       </header>
 
