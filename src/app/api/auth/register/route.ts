@@ -66,20 +66,34 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Account setup failed. Please try again.' }, { status: 500 })
       }
 
-      const { error: profileError } = await admin.from('users').insert({
-        id: authData.user.id, email: emailClean, username: usernameCheck.cleaned,
-        display_name: sanitizeInput(display_name || username, 50),
-        tier: 'starter', report_count: 0, credibility_score: 0, total_earned: 0, is_admin: false, is_banned: false,
-      })
-      if (profileError) {
-        captureError(profileError, { route: 'POST /api/auth/register (profile insert)', userId: authData.user.id })
-        // The username is DB-unique, so a race between the availability
-        // check above and this insert (two people submitting the same
-        // username at once) surfaces here as a 23505 violation. Clean up
+      // A DB trigger (handle_new_user, on auth.users) already creates this
+      // row the instant signUp() succeeds, using the same username/
+      // display_name passed above — confirmed directly: this used to be an
+      // .insert() here, which collided with the trigger's row on the
+      // primary key on every single registration, no exceptions, and the
+      // 23505 from that collision was being misreported as "username
+      // taken" regardless of what actually conflicted. Email/password
+      // signup was fully broken because of this; OAuth worked because that
+      // path never attempted a second insert. Updating the row the trigger
+      // already made, rather than inserting a new one, fixes this.
+      const { data: updated, error: profileError } = await admin.from('users')
+        .update({
+          email: emailClean, username: usernameCheck.cleaned,
+          display_name: sanitizeInput(display_name || username, 50),
+          tier: 'starter', credibility_score: 0, total_earned: 0, is_admin: false, is_banned: false,
+        })
+        .eq('id', authData.user.id)
+        .select()
+        .single()
+      if (profileError || !updated) {
+        captureError(profileError || new Error('profile update affected no rows'), { route: 'POST /api/auth/register (profile update)', userId: authData.user.id })
+        // A genuine username race (two people submitting the same username
+        // at once) still surfaces here as a real 23505 on the username
+        // column now, not a false positive from the primary key. Clean up
         // the auth user we just created so this isn't left as a dead,
         // profile-less account blocking that email address forever.
         await admin.auth.admin.deleteUser(authData.user.id).catch(() => {})
-        if (profileError.code === '23505') {
+        if (profileError?.code === '23505') {
           return NextResponse.json({ error: 'That username was just taken. Please choose another.' }, { status: 409 })
         }
         return NextResponse.json({ error: 'Account setup failed. Please try again.' }, { status: 500 })
