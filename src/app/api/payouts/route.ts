@@ -106,12 +106,32 @@ export async function POST(req: NextRequest) {
         let accountId = profile.stripe_account_id
 
         if (!accountId) {
-          const account = await stripe.accounts.create({
-            type: 'express',
-            country: profile.country || 'US',
-            capabilities: { transfers: { requested: true } },
+          // Stripe retired Accounts v1 (stripe.accounts.create) for new
+          // Connect platforms — confirmed directly against the live API,
+          // which now requires the v2 Core Accounts endpoint instead. The
+          // installed `stripe` package (v14) predates v2 support, so this
+          // goes straight to the REST API rather than the SDK.
+          const v2Res = await fetch('https://api.stripe.com/v2/core/accounts', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+              'Stripe-Version': '2026-10-28.endive',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contact_email: user.email,
+              identity: { country: profile.country || 'US' },
+              dashboard: 'express',
+              defaults: { responsibilities: { fees_collector: 'application', losses_collector: 'application' } },
+              configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
+            }),
           })
-          accountId = account.id
+          const v2Account = await v2Res.json()
+          if (!v2Res.ok) {
+            captureError(new Error(v2Account?.error?.message || 'Stripe v2 account creation failed'), { route: '/api/payouts (connect)', stripeError: v2Account?.error })
+            return NextResponse.json({ error: v2Account?.error?.message || 'Could not create Stripe account' }, { status: 502 })
+          }
+          accountId = v2Account.id
           await supabase.from('users').update({
             stripe_account_id: accountId,
             payout_provider: 'stripe',
