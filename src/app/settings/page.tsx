@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 const TC: Record<string, { c: string; rate: string }> = { starter: { c: '#22C55E', rate: '40%' }, silver: { c: '#64748B', rate: '45%' }, gold: { c: '#CA8A04', rate: '50%' }, platinum: { c: '#7C3AED', rate: '55%' } }
 
 export default function Settings() {
-  const { user, loading } = useAuth()
+  const { user, loading, signOut } = useAuth()
   const t = TC[user?.tier || 'starter'] || TC.starter
   return (
     <div className="page">
@@ -42,6 +42,16 @@ export default function Settings() {
             <span style={{ color: '#ccc', fontSize: 18 }}>›</span>
           </a>
         ))}
+        {/* Every "signed in" indicator across the app (the shared Top
+            header, the homepage's own header) links here — confirmed
+            directly there was no sign-out control reachable from this
+            page at all, only from a separate /profile screen behind the
+            bottom nav's "More" tab, which isn't even shown on the
+            homepage. */}
+        <button onClick={signOut} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#DC2626', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <span style={{ fontSize: 28 }}>🚪</span>
+          <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>Sign out</span>
+        </button>
       </div>
       <Nav active="/settings" />
     </div>
