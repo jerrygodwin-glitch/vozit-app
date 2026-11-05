@@ -48,7 +48,7 @@ async function saveTopics(){setLoading(true);try{const{data:{user}}=await sb.aut
 // collected later, on the Payouts page, only once there's real money to
 // set up for). Asking for bank/wallet details this early measurably hurts
 // signup completion for the majority who haven't earned anything yet.
-async function saveRevenue(){setLoading(true);try{const{data:{user}}=await sb.auth.getUser();if(!user)return;await sb.from('users').update({revenue_enabled:optIn}).eq('id',user.id);setStep('complete')}finally{setLoading(false)}}
+async function saveRevenue(){setLoading(true);try{const{data:{user}}=await sb.auth.getUser();if(!user)return;await sb.from('users').update({revenue_enabled:optIn,onboarding_completed:true}).eq('id',user.id);setStep('complete')}finally{setLoading(false)}}
 const cs={p:{minHeight:'100vh',background:'#f5f5f5',display:'flex'as const,alignItems:'center'as const,justifyContent:'center'as const,padding:24},c:{maxWidth:440,width:'100%'},o:{padding:12,borderRadius:10,border:'1px solid #eee',background:'#fff',cursor:'pointer',marginBottom:8,color:'#333',fontSize:13,transition:'border-color 0.15s'}}
 if(step==='username')return(<div style={cs.p}><div className='card' style={{...cs.c,padding:28}}><div style={{textAlign:'center',marginBottom:20}}><img src={VOZIT_LOGO} alt='VozIt' style={{height:48,width:48,borderRadius:10,margin:'0 auto 8px'}}/></div><h2 style={{color:'#1a1a1a',fontSize:18,marginBottom:4}}>Choose your username</h2><p style={{color:'#888',fontSize:12,marginBottom:16}}>This is how you'll appear on VozIt — including on your video watermarks</p>
 {usernameErr&&<div style={{background:'#FEF2F2',color:'#DC2626',padding:10,borderRadius:8,fontSize:12,marginBottom:12}}>{usernameErr}</div>}

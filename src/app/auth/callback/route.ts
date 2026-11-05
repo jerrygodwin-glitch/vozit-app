@@ -39,23 +39,23 @@ export async function GET(req: NextRequest) {
     if (!error && data.user) {
       if (explicitNext) return NextResponse.redirect(new URL(explicitNext, req.url))
 
-      // This callback runs on every Google/Facebook sign-in, not just the
-      // first one — confirmed directly (Jerry hit this signing back into
-      // an existing account): with no "next" param, every single OAuth
-      // login was unconditionally sent through the full 5-step onboarding
-      // flow (username, reporter type, topics, revenue) again, forever,
-      // because there was no check for whether that flow had already been
-      // completed. reporter_type looked like a natural "has this person
-      // onboarded before" signal (it's only set by finishing step 2, no
-      // skip option on it) but isn't safe to use — confirmed directly that
-      // real, long-established, active accounts can have it null (never
-      // went through that specific step). Account age is the reliable
-      // signal instead: a brand-new sign-up and a returning sign-in both
-      // hit this same route, but only the former has created_at within
-      // moments of right now.
-      const createdAt = new Date(data.user.created_at).getTime()
-      const isBrandNewSignup = Date.now() - createdAt < 60_000
-      const dest = isBrandNewSignup ? '/auth/profile-setup' : '/feed'
+      // This callback runs on every Google/Facebook sign-in AND on the
+      // signup email-confirmation link, not just the first one — confirmed
+      // directly (Jerry hit this signing back into an existing account):
+      // with no "next" param, every single OAuth login was unconditionally
+      // sent through the full 5-step onboarding flow (username, reporter
+      // type, topics, revenue) again, forever, because there was no check
+      // for whether that flow had already been completed.
+      // reporter_type looked like a natural completion signal (only set by
+      // finishing step 2, no skip option on it) but isn't safe — confirmed
+      // directly that real, long-established, active accounts can have it
+      // null. An account-age cutoff isn't safe either — a confirmation
+      // email realistically gets clicked minutes or hours later, not
+      // within seconds, so that would also misroute real first-time users.
+      // onboarding_completed (set at the end of profile-setup's flow) is
+      // the one unambiguous, explicit signal for this.
+      const { data: profile } = await supabase.from('users').select('onboarding_completed').eq('id', data.user.id).single()
+      const dest = profile?.onboarding_completed ? '/feed' : '/auth/profile-setup'
       return NextResponse.redirect(new URL(dest, req.url))
     }
   }
