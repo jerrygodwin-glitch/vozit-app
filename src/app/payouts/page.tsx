@@ -16,6 +16,9 @@ const COUNTRIES = [
   { code: 'CM', label: 'Cameroon' }, { code: 'EG', label: 'Egypt' },
   { code: 'IN', label: 'India' }, { code: 'BR', label: 'Brazil' }, { code: 'MX', label: 'Mexico' },
   { code: 'PH', label: 'Philippines' }, { code: 'ID', label: 'Indonesia' }, { code: 'UA', label: 'Ukraine' },
+  { code: 'GT', label: 'Guatemala' }, { code: 'SV', label: 'El Salvador' }, { code: 'HN', label: 'Honduras' },
+  { code: 'BZ', label: 'Belize' }, { code: 'NI', label: 'Nicaragua' }, { code: 'CR', label: 'Costa Rica' },
+  { code: 'PA', label: 'Panama' },
   { code: 'other', label: 'Other / not listed' },
 ]
 
@@ -57,6 +60,13 @@ const PROVIDER_LOGOS: Record<string, JSX.Element> = {
 function suggestProviderIds(country: string): string[] {
   if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK'].includes(country)) return ['stripe', 'paypal', 'wise']
   if (['NG', 'KE', 'GH', 'ZA', 'TZ', 'UG', 'RW', 'CI', 'SN', 'CM', 'EG'].includes(country)) return ['flutterwave', 'chipper', 'worldremit']
+  // Central America — these 7 countries were missing from the picker
+  // entirely (confirmed directly: a real reporter in Honduras had no
+  // option to select her own country). WorldRemit has the most concretely
+  // verified cash-pickup coverage here (named partner banks in Honduras:
+  // Elektra-Banco Azteca, Banco Ficohsa, Banco Atlántida, Davivienda);
+  // Payoneer also checks out across multiple sources for this region.
+  if (['GT', 'SV', 'HN', 'BZ', 'NI', 'CR', 'PA'].includes(country)) return ['worldremit', 'payoneer', 'crypto']
   return ['wise', 'paypal', 'crypto']
 }
 
