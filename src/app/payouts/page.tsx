@@ -6,26 +6,24 @@ import { createBrowserClient } from '@/lib/supabase'
 // Compact country list grouped by which providers actually serve them —
 // enough to smart-default without building a full 195-country picker.
 // Matches PAYOUT_PROVIDERS' own `regions` arrays in src/lib/payouts.ts.
+// Alphabetical by label (verified with a sort, not by hand) — "Other /
+// not listed" stays pinned at the end regardless, as the catch-all.
 const COUNTRIES = [
-  { code: 'US', label: 'United States' }, { code: 'CA', label: 'Canada' }, { code: 'GB', label: 'United Kingdom' },
-  { code: 'EU', label: 'European Union' }, { code: 'AU', label: 'Australia' }, { code: 'NZ', label: 'New Zealand' },
-  { code: 'JP', label: 'Japan' }, { code: 'SG', label: 'Singapore' }, { code: 'HK', label: 'Hong Kong' },
-  { code: 'NG', label: 'Nigeria' }, { code: 'KE', label: 'Kenya' }, { code: 'GH', label: 'Ghana' },
-  { code: 'ZA', label: 'South Africa' }, { code: 'TZ', label: 'Tanzania' }, { code: 'UG', label: 'Uganda' },
-  { code: 'RW', label: 'Rwanda' }, { code: 'CI', label: "Côte d'Ivoire" }, { code: 'SN', label: 'Senegal' },
-  { code: 'CM', label: 'Cameroon' }, { code: 'EG', label: 'Egypt' },
-  { code: 'IN', label: 'India' }, { code: 'BR', label: 'Brazil' }, { code: 'MX', label: 'Mexico' },
-  { code: 'PH', label: 'Philippines' }, { code: 'ID', label: 'Indonesia' }, { code: 'UA', label: 'Ukraine' },
-  { code: 'GT', label: 'Guatemala' }, { code: 'SV', label: 'El Salvador' }, { code: 'HN', label: 'Honduras' },
-  { code: 'BZ', label: 'Belize' }, { code: 'NI', label: 'Nicaragua' }, { code: 'CR', label: 'Costa Rica' },
-  { code: 'PA', label: 'Panama' },
-  // Rest of South America — same gap as Central America (confirmed
-  // directly: only Brazil was listed), using the same country set the
-  // Feed/homepage's own region-matching already recognizes as "Americas".
-  { code: 'AR', label: 'Argentina' }, { code: 'CO', label: 'Colombia' }, { code: 'CL', label: 'Chile' },
-  { code: 'PE', label: 'Peru' }, { code: 'VE', label: 'Venezuela' }, { code: 'EC', label: 'Ecuador' },
-  { code: 'BO', label: 'Bolivia' }, { code: 'PY', label: 'Paraguay' }, { code: 'UY', label: 'Uruguay' },
-  { code: 'GY', label: 'Guyana' }, { code: 'SR', label: 'Suriname' },
+  { code: 'AR', label: 'Argentina' }, { code: 'AU', label: 'Australia' }, { code: 'BZ', label: 'Belize' },
+  { code: 'BO', label: 'Bolivia' }, { code: 'BR', label: 'Brazil' }, { code: 'CM', label: 'Cameroon' },
+  { code: 'CA', label: 'Canada' }, { code: 'CL', label: 'Chile' }, { code: 'CO', label: 'Colombia' },
+  { code: 'CR', label: 'Costa Rica' }, { code: 'CI', label: "Côte d'Ivoire" }, { code: 'EC', label: 'Ecuador' },
+  { code: 'EG', label: 'Egypt' }, { code: 'SV', label: 'El Salvador' }, { code: 'EU', label: 'European Union' },
+  { code: 'GH', label: 'Ghana' }, { code: 'GT', label: 'Guatemala' }, { code: 'GY', label: 'Guyana' },
+  { code: 'HN', label: 'Honduras' }, { code: 'HK', label: 'Hong Kong' }, { code: 'IN', label: 'India' },
+  { code: 'ID', label: 'Indonesia' }, { code: 'JP', label: 'Japan' }, { code: 'KE', label: 'Kenya' },
+  { code: 'MX', label: 'Mexico' }, { code: 'NZ', label: 'New Zealand' }, { code: 'NI', label: 'Nicaragua' },
+  { code: 'NG', label: 'Nigeria' }, { code: 'PA', label: 'Panama' }, { code: 'PY', label: 'Paraguay' },
+  { code: 'PE', label: 'Peru' }, { code: 'PH', label: 'Philippines' }, { code: 'RW', label: 'Rwanda' },
+  { code: 'SN', label: 'Senegal' }, { code: 'SG', label: 'Singapore' }, { code: 'ZA', label: 'South Africa' },
+  { code: 'SR', label: 'Suriname' }, { code: 'TZ', label: 'Tanzania' }, { code: 'UG', label: 'Uganda' },
+  { code: 'UA', label: 'Ukraine' }, { code: 'GB', label: 'United Kingdom' }, { code: 'US', label: 'United States' },
+  { code: 'UY', label: 'Uruguay' }, { code: 'VE', label: 'Venezuela' },
   { code: 'other', label: 'Other / not listed' },
 ]
 
