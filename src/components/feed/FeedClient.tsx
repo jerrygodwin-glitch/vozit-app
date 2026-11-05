@@ -62,6 +62,7 @@ export function FeedClient({reports:initialReports,pageSize=30}:{reports:any[],p
             <div style={{fontSize:11,color:'#888',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.what||r.title}</div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:2}}>
               <span style={{fontSize:11,color:'#00AACC',fontWeight:500}}>{new Date(r.created_at).toLocaleDateString()}</span>
+              <span style={{fontSize:11,color:'#16A34A',fontWeight:600}}>{'\u25b2'} {r.upvotes||0}</span>
               <span style={{fontSize:11,fontWeight:500,display:'flex',alignItems:'center',gap:3}}>@{r.user?.username} <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:3,background:t.bg,color:t.c}}>{'\u2605'} {t.l}</span></span>
             </div>
           </div>

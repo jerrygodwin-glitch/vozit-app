@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       // onboarding_completed (set at the end of profile-setup's flow) is
       // the one unambiguous, explicit signal for this.
       const { data: profile } = await supabase.from('users').select('onboarding_completed').eq('id', data.user.id).single()
-      const dest = profile?.onboarding_completed ? '/feed' : '/auth/profile-setup'
+      const dest = profile?.onboarding_completed ? '/' : '/auth/profile-setup'
       return NextResponse.redirect(new URL(dest, req.url))
     }
   }

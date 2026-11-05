@@ -26,7 +26,7 @@ export default function Login() {
       if (!res.ok) {
         if (data.requiresVerification) window.location.href = `/auth/verify?email=${encodeURIComponent(data.email || email)}`
         else setMsg(data.error || 'Something went wrong. Please try again.')
-      } else window.location.href = '/feed'
+      } else window.location.href = '/'
     } catch (e: any) { setMsg(e.message) }
     setLoading(false)
   }
