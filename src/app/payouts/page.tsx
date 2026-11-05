@@ -12,6 +12,7 @@ const COUNTRIES = [
   { code: 'AR', label: 'Argentina' }, { code: 'AU', label: 'Australia' }, { code: 'BH', label: 'Bahrain' },
   { code: 'BZ', label: 'Belize' }, { code: 'BO', label: 'Bolivia' }, { code: 'BR', label: 'Brazil' },
   { code: 'CM', label: 'Cameroon' }, { code: 'CA', label: 'Canada' }, { code: 'CL', label: 'Chile' },
+  { code: 'CN', label: 'China' },
   { code: 'CO', label: 'Colombia' }, { code: 'CR', label: 'Costa Rica' }, { code: 'CI', label: "Côte d'Ivoire" },
   { code: 'EC', label: 'Ecuador' }, { code: 'EG', label: 'Egypt' }, { code: 'SV', label: 'El Salvador' },
   { code: 'EU', label: 'European Union' }, { code: 'GH', label: 'Ghana' }, { code: 'GT', label: 'Guatemala' },
@@ -109,6 +110,17 @@ function suggestProviderIds(country: string): string[] {
   // waitlisted). Crypto has no such limitation, so it's included
   // alongside both rather than in place of them.
   if (country === 'MV') return ['wise', 'paypal', 'payoneer', 'crypto']
+  // China — confirmed directly: PayPal's own individual (non-business)
+  // accounts in China cannot receive payments at all, only send, so it's
+  // excluded rather than offered as a dead end. Wise works but is
+  // meaningfully limited there (routes through Alipay, per-transfer caps,
+  // no business accounts). Payoneer has the strongest evidence — eBay's
+  // own developer docs name it as the only payout provider they support
+  // for mainland China sellers. Crypto is deliberately left off too:
+  // mainland China has banned cryptocurrency transactions domestically
+  // since 2021, so recommending it here wouldn't just be unreliable, it'd
+  // point someone toward something illegal under their own law.
+  if (country === 'CN') return ['payoneer', 'wise']
   return ['wise', 'paypal', 'crypto']
 }
 
