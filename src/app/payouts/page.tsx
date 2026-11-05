@@ -85,6 +85,19 @@ function suggestProviderIds(country: string): string[] {
   // Elektra-Banco Azteca, Banco Ficohsa, Banco Atlántida, Davivienda);
   // Payoneer also checks out across multiple sources for this region.
   if (['GT', 'SV', 'HN', 'BZ', 'NI', 'CR', 'PA'].includes(country)) return ['worldremit', 'payoneer', 'crypto']
+  // Iraq — checked specifically after Jerry asked: PayPal doesn't
+  // actually operate there (there's a real, active petition asking
+  // PayPal to add it), and Wise appears to have the same gap. Payoneer
+  // is confirmed to support Iraqi banks directly, so it replaces both
+  // here rather than Iraq silently falling into the generic default
+  // below, which would have recommended two providers that don't work.
+  if (country === 'IQ') return ['payoneer', 'crypto']
+  // Lebanon — PayPal confirmed not supported there (two independent
+  // sources agree directly, including PayPal's own stated country
+  // count). No specific evidence against Wise for Lebanon, so leaving
+  // that in rather than guessing a replacement with the same
+  // uncertainty this whole check started from.
+  if (country === 'LB') return ['wise', 'payoneer', 'crypto']
   return ['wise', 'paypal', 'crypto']
 }
 
