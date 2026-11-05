@@ -3,6 +3,10 @@
 import{useState}from'react'
 import Link from'next/link'
 const TC:Record<string,{c:string,bg:string,l:string}>={starter:{c:'#22C55E',bg:'#ECFDF5',l:'Starter'},silver:{c:'#94A3B8',bg:'#F0F4F8',l:'Silver'},gold:{c:'#EAB308',bg:'#FFF8E6',l:'Gold'},platinum:{c:'#8B5CF6',bg:'#F5F0FF',l:'Platinum'}}
+// Same relative-time format the homepage card uses — this card is being
+// brought in line with that one, so the two reporter identity/credibility
+// stats should read on the feed exactly how they already do there.
+function timeAgo(iso:string){if(!iso)return'';const mins=Math.floor((Date.now()-new Date(iso).getTime())/60000);if(mins<1)return'just now';if(mins<60)return`${mins}m ago`;const hrs=Math.floor(mins/60);if(hrs<24)return`${hrs}h ago`;return`${Math.floor(hrs/24)}d ago`}
 const REGIONS=['America','Europe','Middle East','Asia','Africa']
 // Matching only the literal region name missed almost everything, since
 // location text is normally "City, State, Country" (e.g. "Rockville,
@@ -59,12 +63,13 @@ export function FeedClient({reports:initialReports,pageSize=30}:{reports:any[],p
           </div>
           <div style={{flex:1,padding:'3px 10px 4px',minWidth:0}}>
             <div style={{fontSize:13,fontWeight:700,color:'#1a1a1a',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.update_count>1&&<span style={{color:'#FE3D07',marginRight:4}}>{'\u{1F534}'} {r.update_count} updates {'·'} </span>}{r.title}</div>
-            <div style={{fontSize:11,color:'#888',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.what||r.title}</div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:2}}>
-              <span style={{fontSize:11,color:'#00AACC',fontWeight:500}}>{new Date(r.created_at).toLocaleDateString()}</span>
+            <div style={{fontSize:11,color:'#0a8fe8',lineHeight:1.3,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.location_name}{r.location_name&&' \u00b7 '}{timeAgo(r.created_at)}</div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:3}}>
               <span style={{fontSize:11,color:'#16A34A',fontWeight:600}}>{'\u25b2'} {r.upvotes||0}</span>
-              <span style={{fontSize:11,fontWeight:500,display:'flex',alignItems:'center',gap:3}}>@{r.user?.username} <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:3,background:t.bg,color:t.c}}>{'\u2605'} {t.l}</span></span>
+              <span style={{fontSize:11,color:'#666'}}>{r.credibility_pct}% credibility</span>
+              <span style={{fontSize:9,fontWeight:600,padding:'1px 6px',borderRadius:8,background:t.bg,color:t.c,marginLeft:'auto'}}>{'\u2605'} {t.l}</span>
             </div>
+            <div style={{fontSize:11,color:'#666',marginTop:2}}>by <span style={{fontWeight:600}}>@{r.user?.username}</span></div>
           </div>
         </Link>
       )}):<div style={{padding:'16px 12px',fontSize:13,color:'#999',textAlign:'center'}}>No reports yet from this region</div>}
