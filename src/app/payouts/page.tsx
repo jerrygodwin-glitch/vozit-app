@@ -19,11 +19,12 @@ const COUNTRIES = [
   { code: 'IN', label: 'India' }, { code: 'ID', label: 'Indonesia' }, { code: 'IQ', label: 'Iraq' },
   { code: 'IL', label: 'Israel' }, { code: 'JP', label: 'Japan' }, { code: 'JO', label: 'Jordan' },
   { code: 'KE', label: 'Kenya' }, { code: 'KW', label: 'Kuwait' }, { code: 'LB', label: 'Lebanon' },
+  { code: 'MV', label: 'Maldives' }, { code: 'MU', label: 'Mauritius' },
   { code: 'MX', label: 'Mexico' }, { code: 'MD', label: 'Moldova' }, { code: 'NZ', label: 'New Zealand' }, { code: 'NI', label: 'Nicaragua' },
   { code: 'NG', label: 'Nigeria' }, { code: 'OM', label: 'Oman' }, { code: 'PA', label: 'Panama' },
   { code: 'PY', label: 'Paraguay' }, { code: 'PE', label: 'Peru' }, { code: 'PH', label: 'Philippines' },
   { code: 'QA', label: 'Qatar' }, { code: 'RW', label: 'Rwanda' }, { code: 'SA', label: 'Saudi Arabia' },
-  { code: 'SN', label: 'Senegal' }, { code: 'SG', label: 'Singapore' }, { code: 'ZA', label: 'South Africa' },
+  { code: 'SN', label: 'Senegal' }, { code: 'SC', label: 'Seychelles' }, { code: 'SG', label: 'Singapore' }, { code: 'ZA', label: 'South Africa' },
   { code: 'SR', label: 'Suriname' }, { code: 'TZ', label: 'Tanzania' }, { code: 'TR', label: 'Turkey' },
   { code: 'UG', label: 'Uganda' }, { code: 'UA', label: 'Ukraine' }, { code: 'AE', label: 'United Arab Emirates' },
   { code: 'GB', label: 'United Kingdom' }, { code: 'US', label: 'United States' }, { code: 'UY', label: 'Uruguay' },
@@ -98,6 +99,16 @@ function suggestProviderIds(country: string): string[] {
   // that in rather than guessing a replacement with the same
   // uncertainty this whole check started from.
   if (country === 'LB') return ['wise', 'payoneer', 'crypto']
+  // Maldives — researched specifically since both the usual defaults
+  // have real, confirmed limitations here (not excluded, just flagged):
+  // PayPal could only SEND to Maldives, not receive, until a local
+  // telecom's mobile wallet got licensed for inward transfers in October
+  // 2025 — and multiple reports describe that rollout as still
+  // inconsistent. Wise's support depends heavily on which country the
+  // transfer originates from (some corridors work, others are still
+  // waitlisted). Crypto has no such limitation, so it's included
+  // alongside both rather than in place of them.
+  if (country === 'MV') return ['wise', 'paypal', 'payoneer', 'crypto']
   return ['wise', 'paypal', 'crypto']
 }
 
