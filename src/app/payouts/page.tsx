@@ -19,6 +19,13 @@ const COUNTRIES = [
   { code: 'GT', label: 'Guatemala' }, { code: 'SV', label: 'El Salvador' }, { code: 'HN', label: 'Honduras' },
   { code: 'BZ', label: 'Belize' }, { code: 'NI', label: 'Nicaragua' }, { code: 'CR', label: 'Costa Rica' },
   { code: 'PA', label: 'Panama' },
+  // Rest of South America — same gap as Central America (confirmed
+  // directly: only Brazil was listed), using the same country set the
+  // Feed/homepage's own region-matching already recognizes as "Americas".
+  { code: 'AR', label: 'Argentina' }, { code: 'CO', label: 'Colombia' }, { code: 'CL', label: 'Chile' },
+  { code: 'PE', label: 'Peru' }, { code: 'VE', label: 'Venezuela' }, { code: 'EC', label: 'Ecuador' },
+  { code: 'BO', label: 'Bolivia' }, { code: 'PY', label: 'Paraguay' }, { code: 'UY', label: 'Uruguay' },
+  { code: 'GY', label: 'Guyana' }, { code: 'SR', label: 'Suriname' },
   { code: 'other', label: 'Other / not listed' },
 ]
 
@@ -58,7 +65,11 @@ const PROVIDER_LOGOS: Record<string, JSX.Element> = {
 }
 
 function suggestProviderIds(country: string): string[] {
-  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK'].includes(country)) return ['stripe', 'paypal', 'wise']
+  // Confirmed directly against Stripe's own supported-country list
+  // (stripe.com/global) — Brazil and Mexico are both genuinely Stripe-
+  // supported, same as the rest of this bucket, but were previously
+  // falling into the generic catch-all below instead.
+  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK', 'BR', 'MX'].includes(country)) return ['stripe', 'paypal', 'wise']
   if (['NG', 'KE', 'GH', 'ZA', 'TZ', 'UG', 'RW', 'CI', 'SN', 'CM', 'EG'].includes(country)) return ['flutterwave', 'chipper', 'worldremit']
   // Central America — these 7 countries were missing from the picker
   // entirely (confirmed directly: a real reporter in Honduras had no
