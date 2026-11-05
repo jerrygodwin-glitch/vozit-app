@@ -9,21 +9,30 @@ import { createBrowserClient } from '@/lib/supabase'
 // Alphabetical by label (verified with a sort, not by hand) — "Other /
 // not listed" stays pinned at the end regardless, as the catch-all.
 const COUNTRIES = [
-  { code: 'AR', label: 'Argentina' }, { code: 'AU', label: 'Australia' }, { code: 'BZ', label: 'Belize' },
-  { code: 'BO', label: 'Bolivia' }, { code: 'BR', label: 'Brazil' }, { code: 'CM', label: 'Cameroon' },
-  { code: 'CA', label: 'Canada' }, { code: 'CL', label: 'Chile' }, { code: 'CO', label: 'Colombia' },
-  { code: 'CR', label: 'Costa Rica' }, { code: 'CI', label: "Côte d'Ivoire" }, { code: 'EC', label: 'Ecuador' },
-  { code: 'EG', label: 'Egypt' }, { code: 'SV', label: 'El Salvador' }, { code: 'EU', label: 'European Union' },
-  { code: 'GH', label: 'Ghana' }, { code: 'GT', label: 'Guatemala' }, { code: 'GY', label: 'Guyana' },
-  { code: 'HN', label: 'Honduras' }, { code: 'HK', label: 'Hong Kong' }, { code: 'IN', label: 'India' },
-  { code: 'ID', label: 'Indonesia' }, { code: 'JP', label: 'Japan' }, { code: 'KE', label: 'Kenya' },
+  { code: 'AR', label: 'Argentina' }, { code: 'AU', label: 'Australia' }, { code: 'BH', label: 'Bahrain' },
+  { code: 'BZ', label: 'Belize' }, { code: 'BO', label: 'Bolivia' }, { code: 'BR', label: 'Brazil' },
+  { code: 'CM', label: 'Cameroon' }, { code: 'CA', label: 'Canada' }, { code: 'CL', label: 'Chile' },
+  { code: 'CO', label: 'Colombia' }, { code: 'CR', label: 'Costa Rica' }, { code: 'CI', label: "Côte d'Ivoire" },
+  { code: 'EC', label: 'Ecuador' }, { code: 'EG', label: 'Egypt' }, { code: 'SV', label: 'El Salvador' },
+  { code: 'EU', label: 'European Union' }, { code: 'GH', label: 'Ghana' }, { code: 'GT', label: 'Guatemala' },
+  { code: 'GY', label: 'Guyana' }, { code: 'HN', label: 'Honduras' }, { code: 'HK', label: 'Hong Kong' },
+  { code: 'IN', label: 'India' }, { code: 'ID', label: 'Indonesia' }, { code: 'IQ', label: 'Iraq' },
+  { code: 'IL', label: 'Israel' }, { code: 'JP', label: 'Japan' }, { code: 'JO', label: 'Jordan' },
+  { code: 'KE', label: 'Kenya' }, { code: 'KW', label: 'Kuwait' }, { code: 'LB', label: 'Lebanon' },
   { code: 'MX', label: 'Mexico' }, { code: 'NZ', label: 'New Zealand' }, { code: 'NI', label: 'Nicaragua' },
-  { code: 'NG', label: 'Nigeria' }, { code: 'PA', label: 'Panama' }, { code: 'PY', label: 'Paraguay' },
-  { code: 'PE', label: 'Peru' }, { code: 'PH', label: 'Philippines' }, { code: 'RW', label: 'Rwanda' },
+  { code: 'NG', label: 'Nigeria' }, { code: 'OM', label: 'Oman' }, { code: 'PA', label: 'Panama' },
+  { code: 'PY', label: 'Paraguay' }, { code: 'PE', label: 'Peru' }, { code: 'PH', label: 'Philippines' },
+  { code: 'QA', label: 'Qatar' }, { code: 'RW', label: 'Rwanda' }, { code: 'SA', label: 'Saudi Arabia' },
   { code: 'SN', label: 'Senegal' }, { code: 'SG', label: 'Singapore' }, { code: 'ZA', label: 'South Africa' },
-  { code: 'SR', label: 'Suriname' }, { code: 'TZ', label: 'Tanzania' }, { code: 'UG', label: 'Uganda' },
-  { code: 'UA', label: 'Ukraine' }, { code: 'GB', label: 'United Kingdom' }, { code: 'US', label: 'United States' },
-  { code: 'UY', label: 'Uruguay' }, { code: 'VE', label: 'Venezuela' },
+  { code: 'SR', label: 'Suriname' }, { code: 'TZ', label: 'Tanzania' }, { code: 'TR', label: 'Turkey' },
+  { code: 'UG', label: 'Uganda' }, { code: 'UA', label: 'Ukraine' }, { code: 'AE', label: 'United Arab Emirates' },
+  { code: 'GB', label: 'United Kingdom' }, { code: 'US', label: 'United States' }, { code: 'UY', label: 'Uruguay' },
+  { code: 'VE', label: 'Venezuela' },
+  // Deliberately not listed yet: Iran, Syria, Yemen — real, unresolved
+  // sanctions complexity (Iran is comprehensively embargoed; Syria's
+  // status is actively disputed/changing; Yemen carries targeted
+  // sanctions from the ongoing conflict). Same "confirm before guessing"
+  // treatment as Venezuela — see the open item on the running list.
   { code: 'other', label: 'Other / not listed' },
 ]
 
@@ -64,10 +73,10 @@ const PROVIDER_LOGOS: Record<string, JSX.Element> = {
 
 function suggestProviderIds(country: string): string[] {
   // Confirmed directly against Stripe's own supported-country list
-  // (stripe.com/global) — Brazil and Mexico are both genuinely Stripe-
-  // supported, same as the rest of this bucket, but were previously
-  // falling into the generic catch-all below instead.
-  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK', 'BR', 'MX'].includes(country)) return ['stripe', 'paypal', 'wise']
+  // (stripe.com/global) — Brazil, Mexico, and the UAE are all genuinely
+  // Stripe-supported, same as the rest of this bucket, but were
+  // previously falling into the generic catch-all below instead.
+  if (['US', 'CA', 'GB', 'EU', 'AU', 'NZ', 'JP', 'SG', 'HK', 'BR', 'MX', 'AE'].includes(country)) return ['stripe', 'paypal', 'wise']
   if (['NG', 'KE', 'GH', 'ZA', 'TZ', 'UG', 'RW', 'CI', 'SN', 'CM', 'EG'].includes(country)) return ['flutterwave', 'chipper', 'worldremit']
   // Central America — these 7 countries were missing from the picker
   // entirely (confirmed directly: a real reporter in Honduras had no
