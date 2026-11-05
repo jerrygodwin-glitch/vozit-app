@@ -37,6 +37,7 @@ export default function Payouts() {
   const [payoutLoading, setPayoutLoading] = useState(false)
   const [showAllProviders, setShowAllProviders] = useState(false)
   const [settingCountry, setSettingCountry] = useState(false)
+  const [editingCountry, setEditingCountry] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -61,6 +62,7 @@ export default function Payouts() {
       if (!user) { setConnectMsg('Not signed in — please refresh and try again.'); return }
       const { error } = await sb.from('users').update({ country }).eq('id', user.id)
       if (error) setConnectMsg(`Could not save your country: ${error.message}`)
+      else setEditingCountry(false)
     } catch (e: any) {
       setConnectMsg(`Could not save your country: ${e.message}`)
     } finally { setSettingCountry(false) }
@@ -158,22 +160,32 @@ export default function Payouts() {
           </div>
         )}
 
-        {!country && (
+        {(!country || editingCountry) && (
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Where are you located?</div>
             <div style={{ fontSize: 11, color: '#666', marginBottom: 10 }}>So we can show the payout methods that actually work where you are.</div>
-            <select onChange={e => e.target.value && setCountry(e.target.value)} disabled={settingCountry} defaultValue="" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }}>
+            <select onChange={e => e.target.value && setCountry(e.target.value)} disabled={settingCountry} defaultValue={country || ''} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }}>
               <option value="" disabled>Select your country...</option>
               {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
+            {editingCountry && (
+              <span onClick={() => setEditingCountry(false)} style={{ fontSize: 12, color: '#666', cursor: 'pointer', display: 'inline-block', marginTop: 8 }}>Cancel</span>
+            )}
           </div>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{country && !showAllProviders ? 'Recommended for you' : 'Payout providers'}</div>
-          {country && suggested.length > 0 && others.length > 0 && (
-            <span onClick={() => setShowAllProviders(s => !s)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>{showAllProviders ? 'Show recommended only' : 'Show all methods'}</span>
-          )}
+          <div style={{ display: 'flex', gap: 12 }}>
+            {country && !editingCountry && (
+              <span onClick={() => setEditingCountry(true)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>
+                {COUNTRIES.find(c => c.code === country)?.label || country} · Change
+              </span>
+            )}
+            {country && suggested.length > 0 && others.length > 0 && (
+              <span onClick={() => setShowAllProviders(s => !s)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>{showAllProviders ? 'Show recommended only' : 'Show all methods'}</span>
+            )}
+          </div>
         </div>
         {connectMsg && <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 10 }}>{connectMsg}</div>}
         {providersToShow.map((p: any) => (
