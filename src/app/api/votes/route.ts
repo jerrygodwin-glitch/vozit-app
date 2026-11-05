@@ -175,11 +175,20 @@ export async function POST(req: NextRequest) {
     const displayDownvotes = downvoters.length > 0 ? Math.max(1, Math.round(downvotes)) : 0
     const credibility = total > 0 ? Math.round((upvotes / total) * 100) : 80
 
-    await supabase.from('reports').update({
+    // This is the write that actually controls what a fresh page load
+    // shows (the report's own stored upvotes/downvotes columns) — the
+    // JSON response below reflects displayUpvotes regardless of whether
+    // this succeeds, so an unchecked failure here would look exactly like
+    // "voted successfully, then the count reverted on the next visit."
+    // Checking it now rather than assuming it always lands.
+    const { error: reportUpdateError } = await supabase.from('reports').update({
       upvotes: displayUpvotes,
       downvotes: displayDownvotes,
       credibility_pct: credibility,
     }).eq('id', report_id)
+    if (reportUpdateError) {
+      captureError(reportUpdateError, { route: 'POST /api/votes (report count update)', userId: user.id, report_id })
+    }
 
     // Update reporter's credibility score
     const { data: report } = await supabase.from('reports').select('user_id').eq('id', report_id).single()
