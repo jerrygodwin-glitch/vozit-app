@@ -9,7 +9,8 @@ import { createBrowserClient } from '@/lib/supabase'
 // Alphabetical by label (verified with a sort, not by hand) — "Other /
 // not listed" stays pinned at the end regardless, as the catch-all.
 const COUNTRIES = [
-  { code: 'AR', label: 'Argentina' }, { code: 'AU', label: 'Australia' }, { code: 'BH', label: 'Bahrain' },
+  { code: 'AR', label: 'Argentina' }, { code: 'AM', label: 'Armenia' }, { code: 'AU', label: 'Australia' },
+  { code: 'AZ', label: 'Azerbaijan' }, { code: 'BH', label: 'Bahrain' },
   { code: 'BZ', label: 'Belize' }, { code: 'BO', label: 'Bolivia' }, { code: 'BR', label: 'Brazil' },
   { code: 'CM', label: 'Cameroon' }, { code: 'CA', label: 'Canada' }, { code: 'CL', label: 'Chile' },
   { code: 'CN', label: 'China' },
@@ -128,6 +129,14 @@ function suggestProviderIds(country: string): string[] {
   // since 2021, so recommending it here wouldn't just be unreliable, it'd
   // point someone toward something illegal under their own law.
   if (country === 'CN') return ['payoneer', 'wise']
+  // Armenia and Azerbaijan — PayPal confirmed broken for both, same
+  // "send only" problem as China's individual accounts: multiple
+  // independent sources for each country agree users cannot receive or
+  // withdraw PayPal funds there at all. Wise confirmed working for both
+  // (explicit local bank account payouts in each country's own
+  // currency — AMD, AZN). Payoneer has decent supporting evidence too,
+  // including a specific local bank partnership in Armenia.
+  if (['AM', 'AZ'].includes(country)) return ['wise', 'payoneer', 'crypto']
   return ['wise', 'paypal', 'crypto']
 }
 
