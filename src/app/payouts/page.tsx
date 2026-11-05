@@ -19,12 +19,15 @@ const COUNTRIES = [
   { code: 'other', label: 'Other / not listed' },
 ]
 
-// Official marks for the 4 providers with a verified, accurate source
-// (simple-icons, an open-source library of exact brand SVGs — colors
-// pulled from the same source's published hex values). The other 4
-// providers (Flutterwave, Chipper Cash, WorldRemit, Crypto) aren't in
-// that library, so they keep their emoji placeholder rather than risk
-// a hand-drawn, inaccurate knockoff logo.
+// Official marks for providers with a verified, accurate source.
+// Stripe/PayPal/Wise/Payoneer: simple-icons (open-source exact brand
+// SVGs, colors from that same source's published hex values).
+// WorldRemit: the real logo's icon-mark paths, isolated and cropped from
+// its official SVG (Wikimedia Commons, purple #813fd6) — the source file
+// is a full wordmark logo, so only the compact geometric mark is used
+// here rather than squishing the whole wide wordmark into a small slot.
+// Flutterwave and Chipper Cash have no verified source and keep their
+// emoji placeholder rather than risk a hand-drawn, inaccurate knockoff.
 const PROVIDER_LOGOS: Record<string, JSX.Element> = {
   stripe: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="#635BFF"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/></svg>
@@ -39,6 +42,15 @@ const PROVIDER_LOGOS: Record<string, JSX.Element> = {
   ),
   paypal: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="#002991"><path d="M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"/></svg>
+  ),
+  worldremit: (
+    <svg width="22" height="22" viewBox="50 50 220 220" fill="#813fd6">
+      <path d="M175.36,63.74a2.39,2.39,0,0,1,1.16.3L240,100a2.33,2.33,0,0,1,1.11,1.42l19.51,70.29a2.31,2.31,0,0,1-.22,1.78L224.47,237a2.34,2.34,0,0,1-1.41,1.11l-70.29,19.5a2.28,2.28,0,0,1-.63.09,2.33,2.33,0,0,1-1.16-.3L87.49,221.42a2.31,2.31,0,0,1-1.1-1.42L66.88,149.71a2.31,2.31,0,0,1,.22-1.78L103,84.44a2.36,2.36,0,0,1,1.42-1.11l70.29-19.51a2.72,2.72,0,0,1,.63-.08m0-7.05a9.32,9.32,0,0,0-2.51.34L102.56,76.54A9.36,9.36,0,0,0,96.89,81L61,144.45a9.44,9.44,0,0,0-.88,7.15l19.51,70.29A9.43,9.43,0,0,0,84,227.56l63.49,35.92a9.41,9.41,0,0,0,7.14.88l70.29-19.51a9.39,9.39,0,0,0,5.67-4.43l35.93-63.49a9.37,9.37,0,0,0,.87-7.14L247.91,99.5a9.43,9.43,0,0,0-4.43-5.67L180,57.91a9.37,9.37,0,0,0-4.63-1.22Z"/>
+      <path opacity="0.7" d="M151,125.84l-.6,0-10.11,29.67-1.23,3.6a5.41,5.41,0,0,0,0,3.51l9.86,28.91a5.5,5.5,0,0,0,3.17,3.32l1.89.7,10.16-29.79,1.39-4.06a5.29,5.29,0,0,0,0-3.47l-9.84-28.75A5.38,5.38,0,0,0,151,125.84Z"/>
+      <path d="M220.7,123.88H199.41a2.85,2.85,0,0,0-2.7,1.94l-9.88,29-.81,2.4a8.21,8.21,0,0,0,0,5.36l10.67,31.29a2.64,2.64,0,0,0,2.65,1.78l.95-.1,23.14-67.88A2.89,2.89,0,0,0,220.7,123.88Z"/>
+      <path d="M151.25,197.51H130a2.86,2.86,0,0,1-2.71-1.94l-23.16-67.91a2.86,2.86,0,0,1,2.7-3.78h21.29a2.86,2.86,0,0,1,2.71,1.94L154,193.73A2.86,2.86,0,0,1,151.25,197.51Z"/>
+      <path d="M197.54,197.51H176.25a2.85,2.85,0,0,1-2.7-1.94l-23.16-67.91a2.86,2.86,0,0,1,2.7-3.78h21.32a2.86,2.86,0,0,1,2.7,1.94l23.16,67.91A2.88,2.88,0,0,1,197.54,197.51Z"/>
+    </svg>
   ),
 }
 
