@@ -42,6 +42,7 @@ export async function postToYouTube(params: {
   title: string
   description: string
   videoUrl: string // Mux download URL
+  reportUrl: string
   tags: string[]
   location?: { lat: number; lng: number }
 }): Promise<DistributionResult> {
@@ -64,7 +65,10 @@ export async function postToYouTube(params: {
         body: JSON.stringify({
           snippet: {
             title: `[VozIt] ${params.title}`,
-            description: `${params.description}\n\n---\nReported via VozIt — Citizen Journalism\nhttps://vozit.net`,
+            // Previously linked to the generic vozit.net homepage — a
+            // viewer who clicked through had to go hunting for the exact
+            // report they just watched. Links straight to it instead.
+            description: `${params.description}\n\n---\nFull report: ${params.reportUrl}\nReported via VozIt — Citizen Journalism`,
             tags: ['VozIt', 'citizen journalism', 'eyewitness', ...params.tags],
             categoryId: '25', // News & Politics
           },
@@ -115,9 +119,16 @@ export async function postToTikTok(params: {
   accessToken: string
   title: string
   videoUrl: string
+  reportUrl: string
 }): Promise<DistributionResult> {
   try {
     // 1. Initialize upload
+    // TikTok captions aren't clickable text (the real click-through paths
+    // are the account's one bio link, or a link sticker placed on the
+    // video — neither controlled from here), but including the URL still
+    // gives viewers something to copy, and it's one more place the real
+    // destination is visible.
+    const caption = `${params.title}\n\n${params.reportUrl}`
     const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
       method: 'POST',
       headers: {
@@ -126,7 +137,7 @@ export async function postToTikTok(params: {
       },
       body: JSON.stringify({
         post_info: {
-          title: params.title.slice(0, 150),
+          title: caption.slice(0, 150),
           privacy_level: 'PUBLIC_TO_EVERYONE',
           disable_duet: false,
           disable_stitch: false,
@@ -162,10 +173,15 @@ export async function postToInstagram(params: {
   igUserId: string
   caption: string
   videoUrl: string
+  reportUrl: string
   location?: { lat: number; lng: number }
 }): Promise<DistributionResult> {
   try {
     // 1. Create media container (Reels)
+    // Instagram captions aren't clickable text either (same story as
+    // TikTok — the real paths are the bio link or a link sticker on the
+    // video), but the caption previously had no URL at all, not even as
+    // a reference. Fixed.
     const containerRes = await fetch(
       `https://graph.facebook.com/v19.0/${params.igUserId}/media`, {
         method: 'POST',
@@ -173,7 +189,7 @@ export async function postToInstagram(params: {
         body: JSON.stringify({
           media_type: 'REELS',
           video_url: params.videoUrl,
-          caption: `${params.caption}\n\n📹 Reported via @vozit_app #citizenjournalism #IWasThere`,
+          caption: `${params.caption}\n\n📹 Full report: ${params.reportUrl}\nReported via @vozit_app #citizenjournalism #IWasThere`,
           access_token: params.accessToken,
           share_to_feed: true,
         }),
@@ -218,8 +234,13 @@ export async function postToFacebook(params: {
   title: string
   description: string
   videoUrl: string
+  reportUrl: string
 }): Promise<DistributionResult> {
   try {
+    // Facebook post descriptions render URLs as real clickable links
+    // (unlike Instagram/TikTok captions) — this previously had no link
+    // at all, so it was the one platform where a link WOULD have worked
+    // but simply wasn't included.
     const res = await fetch(
       `https://graph-video.facebook.com/v19.0/${params.pageId}/videos`, {
         method: 'POST',
@@ -227,7 +248,7 @@ export async function postToFacebook(params: {
         body: JSON.stringify({
           file_url: params.videoUrl,
           title: params.title,
-          description: `${params.description}\n\n📹 Reported via VozIt — Citizen Journalism`,
+          description: `${params.description}\n\n📹 Full report: ${params.reportUrl}\nReported via VozIt — Citizen Journalism`,
           access_token: params.accessToken,
         }),
       }
@@ -319,6 +340,7 @@ export async function distributeToAll(params: {
           title: params.title,
           description: params.description,
           videoUrl: params.videoUrl,
+          reportUrl: params.reportUrl,
           tags: params.tags,
           location: params.location,
         })
@@ -328,6 +350,7 @@ export async function distributeToAll(params: {
           accessToken: account.accessToken,
           title: params.title,
           videoUrl: params.videoUrl,
+          reportUrl: params.reportUrl,
         })
         break
       case 'instagram':
@@ -336,6 +359,7 @@ export async function distributeToAll(params: {
           igUserId: account.accountId,
           caption: params.title,
           videoUrl: params.videoUrl,
+          reportUrl: params.reportUrl,
           location: params.location,
         })
         break
@@ -346,6 +370,7 @@ export async function distributeToAll(params: {
           title: params.title,
           description: params.description,
           videoUrl: params.videoUrl,
+          reportUrl: params.reportUrl,
         })
         break
       case 'x':
