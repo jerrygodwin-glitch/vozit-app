@@ -12,6 +12,7 @@ interface Props {
     source: 'live' | 'upload'
   }) => void
   maxDuration?: number
+  minDuration?: number
 }
 
 // 5W teleprompter prompts — timed coaching during recording
@@ -39,7 +40,7 @@ const PROMPTS = [
   { startSec: 82, endSec: 90, label: 'SIGN OFF', text: 'Say: "I was there" — your name, your city', color: '#FE3D07' },
 ]
 
-export function CameraRecorder({ onVideoReady, maxDuration = 90 }: Props) {
+export function CameraRecorder({ onVideoReady, maxDuration = 90, minDuration = 61 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -137,8 +138,12 @@ export function CameraRecorder({ onVideoReady, maxDuration = 90 }: Props) {
     }, 1000)
   }
 
-  // Stop recording
+  // Stop recording — blocked before minDuration (see Props.minDuration;
+  // TikTok's better-paying Creativity Program requires videos over 60s,
+  // so every VozIt video needs to actually clear that bar, not just
+  // optionally reach it).
   function stopRecording() {
+    if (elapsed < minDuration) return
     if (timerRef.current) clearInterval(timerRef.current)
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop()
@@ -172,6 +177,11 @@ export function CameraRecorder({ onVideoReady, maxDuration = 90 }: Props) {
 
     if (duration > maxDuration + 5) {
       alert(`Video is ${Math.round(duration)}s — max is ${maxDuration}s. Please trim it first.`)
+      setUploading(false)
+      return
+    }
+    if (duration < minDuration) {
+      alert(`Video is ${Math.round(duration)}s — minimum is ${minDuration}s.`)
       setUploading(false)
       return
     }
@@ -281,13 +291,20 @@ export function CameraRecorder({ onVideoReady, maxDuration = 90 }: Props) {
           </div>
 
           {/* Record button */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0', background: '#000' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', background: '#000' }}>
+            {recording && elapsed < minDuration && (
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 10 }}>
+                Keep going — {minDuration - elapsed}s more needed
+              </div>
+            )}
             <div
               onClick={recording ? stopRecording : startRecording}
               style={{
                 width: 72, height: 72, borderRadius: 36,
                 border: `3px solid ${recording ? '#FF0000' : BRAND.orange}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: recording && elapsed < minDuration ? 'default' : 'pointer',
+                opacity: recording && elapsed < minDuration ? 0.6 : 1,
                 transition: 'all 0.2s',
               }}
             >

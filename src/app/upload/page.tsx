@@ -328,7 +328,7 @@ if(step==='record')return(<div style={{minHeight:'100vh',display:'flex',flexDire
 <button onClick={discardDraft} style={{padding:'8px 14px',borderRadius:8,border:'1px solid #FED7AA',background:'transparent',color:'#92400E',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Discard</button>
 </div>
 </div>}
-<CameraRecorder onVideoReady={handleVideoReady} maxDuration={90}/>
+<CameraRecorder onVideoReady={handleVideoReady} maxDuration={90} minDuration={61}/>
 <NavBar/>
 </div>)
 
