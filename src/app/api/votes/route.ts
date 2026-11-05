@@ -123,15 +123,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, message: 'Already voted' })
       }
       // Update vote direction
-      await supabase.from('votes').update({
+      const { error: updateError } = await supabase.from('votes').update({
         value,
         weight,
         device_fingerprint: fingerprint,
         ip_address: ip,
       }).eq('id', existingVote.id)
+      // Confirmed live: a real user's vote appeared to register (the API
+      // returned ok:true) but was never actually saved — this write was
+      // never checked for an error, same silent-failure pattern already
+      // fixed in other routes this session. Whatever the real cause turns
+      // out to be, it now surfaces instead of lying about success.
+      if (updateError) {
+        captureError(updateError, { route: 'POST /api/votes (update)', userId: user.id, report_id })
+        return NextResponse.json({ error: 'Could not save your vote. Please try again.' }, { status: 500 })
+      }
     } else {
       // Insert new vote with weight + fingerprint
-      await supabase.from('votes').insert({
+      const { error: insertError } = await supabase.from('votes').insert({
         report_id,
         user_id: user.id,
         value,
@@ -139,6 +148,10 @@ export async function POST(req: NextRequest) {
         device_fingerprint: fingerprint,
         ip_address: ip,
       })
+      if (insertError) {
+        captureError(insertError, { route: 'POST /api/votes (insert)', userId: user.id, report_id })
+        return NextResponse.json({ error: 'Could not save your vote. Please try again.' }, { status: 500 })
+      }
     }
 
     // Update report vote counts using weighted values
