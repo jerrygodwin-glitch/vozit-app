@@ -1,15 +1,24 @@
-// VozIt watermark worker — burns the 3-layer design (persistent bottom
-// bar, drifting anti-scrape stamp, orange end-card bumper) into published
-// videos. Ported from the filter specs in the main app's
-// src/lib/watermark.ts, which had the exact design written out as FFmpeg
-// filter strings but never actually executed them.
+// VozIt watermark worker — burns the brand/caption design into published
+// videos: a compact top-left brand badge, a short-lived title banner
+// stacked beneath it, burned-in captions from the reporter's own
+// transcript in a center-safe band, a drifting anti-scrape stamp, and an
+// orange end-card bumper.
 //
-// Deliberately kept simpler than the original spec in one place: the
-// bottom bar and floating stamp use styled TEXT (no image overlay), which
-// matches what viewers already see in the in-app CSS overlay and avoids
-// chaining a second image input through the main video's filter graph.
-// The end card keeps the real logo image, since that's a bigger, more
-// impactful bumper moment worth the extra complexity.
+// Layout was redesigned around real per-platform safe-zone conflicts:
+// TikTok reserves its own top ~120 screen-px for nav AND has an unusually
+// wide right-side icon column; Meta (Reels/Facebook) and TikTok both
+// crowd the bottom ~25-33% with caption/follow/engagement UI. Top-left is
+// the one corner all four distribution platforms leave clearest, so the
+// old full-width bottom bar moved there and shrank to fit its content
+// instead of spanning the frame.
+//
+// Deliberately kept simpler than a fancier spec in one place: the badge,
+// title banner, captions and floating stamp all use styled TEXT (no image
+// overlay), which matches what viewers already see in the in-app CSS
+// overlay and avoids chaining a second image input through the main
+// video's filter graph. The end card keeps the real logo image, since
+// that's a bigger, more impactful bumper moment worth the extra
+// complexity.
 const express = require('express')
 const { createClient } = require('@supabase/supabase-js')
 const { execFile } = require('child_process')
@@ -54,7 +63,7 @@ app.post('/process', async (req, res) => {
     return res.status(500).json({ error: 'Worker missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY' })
   }
 
-  const { reportId, playbackId, username, tier, duration } = req.body || {}
+  const { reportId, playbackId, username, tier, duration, title, transcript } = req.body || {}
   const videoDuration = Number(duration) || 90
 
   if (!reportId || !playbackId) {
@@ -132,8 +141,10 @@ app.post('/process', async (req, res) => {
     const safeUsername = String(username || 'reporter').replace(/['":,\\]/g, '').slice(0, 40)
     const tierLabel = `★ ${TIER_LABELS[tier] || 'Starter'}`
 
-    // 2. Bottom bar (Layer 1) + drifting stamp (Layer 2), applied to the
-    // main video as one filter chain.
+    // 2. Brand badge (Layer 1, compact/top-left) + title banner (Layer 1b,
+    // fades after ~5s) + burned-in captions (Layer 1c, center-safe band) +
+    // drifting stamp (Layer 2), applied to the main video as one filter
+    // chain.
     //
     // ROOT CAUSE of every "Undefined constant or missing '('" crash this
     // feature ever hit, confirmed by direct, isolated testing on the live
@@ -142,50 +153,194 @@ app.post('/process', async (req, res) => {
     // *different* filter's variables (drawbox, scale, crop...) and are
     // simply undefined inside drawtext. Every x/y expression below that
     // used iw/ih failed the instant it was evaluated, regardless of how
-    // simple or complex the surrounding arithmetic was — confirmed
-    // multi-operator chains (including chained subtraction) parse fine
-    // once the variable name itself is correct. drawbox two lines down
-    // correctly keeps iw/ih — that filter actually defines them.
-    const barHeight = Math.max(36, Math.round(height * 0.05))
-    const fontSize = Math.max(14, Math.round(height * 0.02))
+    // simple or complex the surrounding arithmetic was. drawbox calls
+    // below correctly keep iw/ih — that filter actually defines them;
+    // every position fed to a drawtext call is a plain pre-computed pixel
+    // number instead, since w/h being constant for the whole video means
+    // JS can just do this math once up front.
+    const CHAR_WIDTH_RATIO_BOLD = 0.58 // DejaVu Sans Bold, measured via FFmpeg's own text_w debug output
+    const CHAR_WIDTH_RATIO_REG = 0.54  // DejaVu Sans regular, narrower than Bold
+    const estimateTextWidth = (text, size, ratio = CHAR_WIDTH_RATIO_BOLD) => text.length * size * ratio
+    // Standard broadcast-caption technique: a solid dark outline baked
+    // into the glyphs themselves holds up under video compression and
+    // on-device scaling in a way translucent background boxes alone
+    // don't — confirmed directly against a bright outdoor source clip
+    // where box-only contrast washed out but this didn't.
+    const TEXT_BORDER = `borderw=2:bordercolor=black@0.85`
 
-    // Reported directly, comparing against the DOM-overlay version: that
-    // one wraps this same text in a faint orange backing box
-    // (rgba(254,61,7,0.18), padded, rounded corners) — the baked-in
-    // version only ever drew bare text with nothing behind it, which is
-    // why it read as "very faint" even at the same text opacity. Adding
-    // a matching box here. Positions are now plain computed pixel
-    // numbers instead of FFmpeg expressions like "w-text_w-w*0.10" —
-    // drawbox has no "text_w" variable to align itself against (that's
-    // the same self-reference trap the username/tier bug turned out to
-    // be), so the box and the text need a shared, pre-computed position
-    // to actually line up, which only works cleanly in JS since this
-    // text's content — and therefore its width — never changes.
-    // "I was there..." requested in italics here too — split into a
-    // regular-weight prefix and an italic suffix, drawn as two adjacent
-    // drawtext calls rather than one. Their x positions are computed in
-    // JS (prefix's own estimated width decides where the suffix starts)
-    // for the same reason the box position above is — no FFmpeg
-    // cross-filter reference to lean on.
+    // ── LAYER 1: BRAND BADGE (compact, top-left) ──────────────────
+    // Replaces the old full-width bottom bar. TikTok reserves roughly its
+    // own top ~120 screen-px for nav; scaled to this video's own height
+    // with real headroom, 0.09H clears that with margin on every
+    // platform reviewed. Sized to its own content (not full-width) per
+    // the "compact" brief — "I was there..." dropped from this line to
+    // keep it tight; it still appears in the drifting stamp and end card.
+    const badgeFontSize = Math.max(14, Math.round(height * 0.02))
+    const badgeUserFontSize = badgeFontSize - 1
+    const badgeTierFontSize = badgeFontSize - 3
+    const badgeY0 = Math.round(height * 0.09)
+    const badgeHeight = Math.max(36, Math.round(height * 0.05))
+    const badgeX0 = 14
+    const badgePadX = 12
+    const badgeGap = 8
+    const MAX_BADGE_WIDTH = Math.round(width * 0.72)
+
+    let badgeUser = safeUsername
+    const badgeFits = (user) =>
+      estimateTextWidth('VozIt!', badgeFontSize) + badgeGap +
+      estimateTextWidth(`@${user}`, badgeUserFontSize) + badgeGap +
+      estimateTextWidth(tierLabel, badgeTierFontSize) + badgePadX * 2
+    while (badgeFits(badgeUser) > MAX_BADGE_WIDTH && badgeUser.length > 3) {
+      badgeUser = badgeUser.slice(0, -1)
+    }
+    if (badgeUser.length < safeUsername.length) badgeUser = badgeUser.slice(0, -1) + '…'
+    const badgeUserText = `@${badgeUser}`
+
+    const badgeBrandWidth = estimateTextWidth('VozIt!', badgeFontSize)
+    const badgeUserWidth = estimateTextWidth(badgeUserText, badgeUserFontSize)
+    const badgeTierWidth = estimateTextWidth(tierLabel, badgeTierFontSize)
+    const badgeContentWidth = badgeBrandWidth + badgeGap + badgeUserWidth + badgeGap + badgeTierWidth
+    const badgeWidth = Math.min(MAX_BADGE_WIDTH, Math.round(badgeContentWidth) + badgePadX * 2)
+
+    const badgeBrandX = badgeX0 + badgePadX
+    const badgeUserX = badgeBrandX + Math.round(badgeBrandWidth) + badgeGap
+    const badgeTierX = badgeUserX + Math.round(badgeUserWidth) + badgeGap
+    const badgeTextY = (fontSize) => badgeY0 + Math.round(badgeHeight / 2 - fontSize / 2)
+
+    const badgeFilters = [
+      `drawbox=x=${badgeX0}:y=${badgeY0}:w=${badgeWidth}:h=${badgeHeight}:color=black@0.60:t=fill`,
+      `drawtext=text='VozIt!':fontsize=${badgeFontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
+        `x=${badgeBrandX}:y=${badgeTextY(badgeFontSize)}`,
+      `drawtext=text='${badgeUserText}':fontsize=${badgeUserFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
+        `fontfile=${FONT_BOLD}:x=${badgeUserX}:y=${badgeTextY(badgeUserFontSize)}`,
+      `drawtext=text='${tierLabel}':fontsize=${badgeTierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
+        `x=${badgeTierX}:y=${badgeTextY(badgeTierFontSize)}`,
+    ]
+
+    // ── LAYER 1b: TITLE BANNER (stacked below badge, fades ~4-5s) ──
+    // Uses the reporter's own Title field — already reviewed before
+    // publish, already proven as the bold first line on report/feed
+    // cards — rather than any AI-generated text. Visible full-strength
+    // for TITLE_VISIBLE_SECONDS, then a 1s linear fade, then gone;
+    // avoids permanently occupying frame space for the whole clip.
+    const titleFilters = []
+    const safeTitle0 = String(title || '').replace(/['":,\\]/g, '').slice(0, 120)
+    if (safeTitle0) {
+      const TITLE_VISIBLE_SECONDS = 4
+      const TITLE_FADE_SECONDS = 1
+      const titleFontSize = Math.max(15, Math.round(height * 0.022))
+      const titleY0 = badgeY0 + badgeHeight + 8
+      const titleHeight = Math.max(32, Math.round(height * 0.045))
+      const titlePadX = 12
+      const MAX_TITLE_WIDTH = Math.round(width * 0.86)
+
+      let safeTitle = safeTitle0
+      let titleTruncated = false
+      while (estimateTextWidth(safeTitle, titleFontSize) + titlePadX * 2 > MAX_TITLE_WIDTH && safeTitle.length > 3) {
+        safeTitle = safeTitle.slice(0, -1)
+        titleTruncated = true
+      }
+      if (titleTruncated) safeTitle = safeTitle.trimEnd() + '…'
+      const titleTextWidth = estimateTextWidth(safeTitle, titleFontSize)
+      const titleBoxWidth = Math.min(MAX_TITLE_WIDTH, Math.round(titleTextWidth) + titlePadX * 2)
+
+      const cutoff = TITLE_VISIBLE_SECONDS + TITLE_FADE_SECONDS
+      const titleEnable = `enable='lt(t\\,${cutoff})'`
+      // FFmpeg expression commas need escaping the same way the stamp's
+      // enable=between(...) below does, since this whole expression sits
+      // inside one comma-joined filter chain.
+      const titleAlpha = `alpha='if(lt(t\\,${TITLE_VISIBLE_SECONDS})\\,1\\,(${cutoff}-t))'`
+
+      titleFilters.push(
+        `drawbox=x=${badgeX0}:y=${titleY0}:w=${titleBoxWidth}:h=${titleHeight}:color=black@0.55:t=fill:${titleEnable}`
+      )
+      titleFilters.push(
+        `drawtext=text='${safeTitle}':fontsize=${titleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
+        `fontfile=${FONT_BOLD}:x=${badgeX0 + titlePadX}:y=${titleY0 + Math.round(titleHeight / 2 - titleFontSize / 2)}:` +
+        `${titleAlpha}:${titleEnable}`
+      )
+    }
+
+    // ── LAYER 1c: BURNED-IN CAPTIONS (center-safe band) ─────────────
+    // The reporter's own Whisper transcript, until now only ever shown
+    // as click-to-reveal text on VozIt's own site — never burned into
+    // the video itself, so social viewers never saw it. No per-word
+    // timestamps are captured today (see /api/ai-transcribe), so this
+    // divides the flat transcript into short word-chunks spread evenly
+    // across the real video duration rather than word-perfect sync —
+    // an approximation, not true ASR timing, but still real spoken
+    // content on screen instead of none. Positioned around 0.58H: clear
+    // of the badge/title zone above (ends ~0.19H) and clear of the
+    // bottom ~25-33% every platform reviewed crowds with its own UI.
+    const captionFilters = []
+    const rawTranscript = String(transcript || '').trim()
+    if (rawTranscript) {
+      const CAPTION_MIN_CHUNK_SECONDS = 1.6
+      const captionFontSize = Math.max(16, Math.round(height * 0.024))
+      const captionY = Math.round(height * 0.58)
+      const captionPadX = Math.round(captionFontSize * 0.5)
+      const captionPadY = Math.round(captionFontSize * 0.35)
+      const MAX_CAPTION_WIDTH = Math.round(width * 0.84)
+
+      const words = rawTranscript.replace(/['":,\\]/g, '').split(/\s+/).filter(Boolean)
+      // Bounds the chunk count by the clip's own length regardless of
+      // transcript length (a dense/long monologue packs more words per
+      // chunk instead of growing the filter chain without limit).
+      const maxChunks = Math.max(1, Math.floor(videoDuration / CAPTION_MIN_CHUNK_SECONDS))
+      const wordsPerChunk = Math.max(1, Math.ceil(words.length / maxChunks))
+      const chunks = []
+      for (let i = 0; i < words.length; i += wordsPerChunk) {
+        chunks.push(words.slice(i, i + wordsPerChunk).join(' ').slice(0, 70))
+      }
+
+      if (chunks.length > 0) {
+        const chunkDuration = videoDuration / chunks.length
+        chunks.forEach((text, idx) => {
+          if (!text) return
+          const start = idx * chunkDuration
+          const end = Math.min(start + chunkDuration, videoDuration)
+          const enable = `enable='between(t\\,${start.toFixed(2)}\\,${end.toFixed(2)})'`
+          const textWidth = estimateTextWidth(text, captionFontSize, CHAR_WIDTH_RATIO_REG)
+          const boxWidth = Math.min(MAX_CAPTION_WIDTH, Math.round(textWidth) + captionPadX * 2)
+          const boxX = Math.round((width - boxWidth) / 2)
+          captionFilters.push(
+            `drawbox=x=${boxX}:y=${captionY - captionPadY}:w=${boxWidth}:h=${captionFontSize + captionPadY * 2}:color=black@0.55:t=fill:${enable}`
+          )
+          captionFilters.push(
+            `drawtext=text='${text}':fontsize=${captionFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
+            `fontfile=${FONT_REGULAR}:x=(w-text_w)/2:y=${captionY}:${enable}`
+          )
+        })
+      }
+    }
+
+    // ── LAYER 2: DRIFTING STAMP (anti-scrape) ───────────────────────
+    // Wander zone tightened from the original spec: right-edge margin
+    // widened from 6-10% to 20% of frame width, clearing TikTok's
+    // unusually wide right-side icon column (its equivalent is ~2x
+    // Meta's). Positions also avoid the top ~20% (now occupied by the
+    // badge/title) and the ~0.52-0.65 center band (now occupied by
+    // captions) — and can now use lower-frame space the old full-width
+    // bottom bar used to occupy.
     const STAMP_PREFIX = 'VozIt! — '
     const STAMP_SUFFIX = 'I was there...'
     const STAMP_TEXT = STAMP_PREFIX + STAMP_SUFFIX
-    const STAMP_CHAR_WIDTH_RATIO = 0.54 // DejaVu Sans regular weight, narrower than the Bold ratio used above
-    const stampTextWidth = Math.round(STAMP_TEXT.length * fontSize * STAMP_CHAR_WIDTH_RATIO)
-    const stampPrefixWidth = Math.round(STAMP_PREFIX.length * fontSize * STAMP_CHAR_WIDTH_RATIO)
-    const stampPadX = Math.round(fontSize * 0.45)
-    const stampPadY = Math.round(fontSize * 0.3)
+    const stampFontSize = Math.max(12, Math.round(height * 0.017))
+    const stampTextWidth = Math.round(STAMP_TEXT.length * stampFontSize * CHAR_WIDTH_RATIO_REG)
+    const stampPrefixWidth = Math.round(STAMP_PREFIX.length * stampFontSize * CHAR_WIDTH_RATIO_REG)
+    const stampPadX = Math.round(stampFontSize * 0.45)
+    const stampPadY = Math.round(stampFontSize * 0.3)
     const stampBoxW = stampTextWidth + stampPadX * 2
-    const stampBoxH = fontSize + stampPadY * 2
+    const stampBoxH = stampFontSize + stampPadY * 2
 
     const positions = [
-      { x: Math.round(width * 0.08), y: Math.round(height * 0.15) },
-      { x: Math.round(width - stampTextWidth - width * 0.10), y: Math.round(height * 0.22) },
-      { x: Math.round(width * 0.15), y: Math.round(height * 0.40) },
-      { x: Math.round(width - stampTextWidth - width * 0.06), y: Math.round(height * 0.45) },
-      { x: Math.round(width * 0.40), y: Math.round(height * 0.12) },
-      { x: Math.round(width * 0.30), y: Math.round(height * 0.38) },
-      { x: Math.round(width - stampTextWidth - width * 0.22), y: Math.round(height * 0.18) },
+      { x: Math.round(width * 0.08), y: Math.round(height * 0.26) },
+      { x: Math.round(width - stampTextWidth - width * 0.20), y: Math.round(height * 0.30) },
+      { x: Math.round(width * 0.10), y: Math.round(height * 0.42) },
+      { x: Math.round(width - stampTextWidth - width * 0.20), y: Math.round(height * 0.46) },
+      { x: Math.round(width * 0.08), y: Math.round(height * 0.72) },
+      { x: Math.round(width - stampTextWidth - width * 0.20), y: Math.round(height * 0.76) },
+      { x: Math.round(width * 0.08), y: Math.round(height * 0.84) },
     ]
     // Drift interval widened from 4s to 8s: every drawtext filter in this
     // chain gets evaluated on every single frame regardless of whether its
@@ -204,112 +359,19 @@ app.post('/process', async (req, res) => {
         `drawbox=x=${pos.x - stampPadX}:y=${pos.y - stampPadY}:w=${stampBoxW}:h=${stampBoxH}:color=0xFE3D07@0.18:t=fill:${enable}`
       )
       stampFilters.push(
-        `drawtext=text='${STAMP_PREFIX}':fontsize=${fontSize}:fontcolor=white@0.50:` +
+        `drawtext=text='${STAMP_PREFIX}':fontsize=${stampFontSize}:fontcolor=white@0.50:` +
         `fontfile=${FONT_REGULAR}:x=${pos.x}:y=${pos.y}:${enable}`
       )
       stampFilters.push(
-        `drawtext=text='${STAMP_SUFFIX}':fontsize=${fontSize}:fontcolor=white@0.50:` +
+        `drawtext=text='${STAMP_SUFFIX}':fontsize=${stampFontSize}:fontcolor=white@0.50:` +
         `fontfile=${FONT_ITALIC}:x=${pos.x + stampPrefixWidth}:y=${pos.y}:${enable}`
       )
     }
 
-    // THE ACTUAL bug behind the username/tier overlap, found by having
-    // FFmpeg itself print the real text_w of each piece of text (not
-    // guesswork): the middle text's old position, "x=14+tw+10", was
-    // written to mean "14px + the width of 'VozIt!' before it + 10px
-    // gap" — but `tw` inside a drawtext filter is that filter's OWN
-    // rendered text width, not a preceding filter's. So the middle text
-    // was actually positioning itself at (14 + ITS OWN full width + 10),
-    // pushing it further right the longer it is, with nothing stopping
-    // it from running past the right-aligned tier badge. This was
-    // always wrong, for every username — it just never surfaced as a
-    // visible bug until contrast/playback were fixed enough to actually
-    // see a frame clearly. The tier badge's own "x=w-tw-14" is a
-    // DIFFERENT, correct use of the same variable (deliberately
-    // self-referential, for right-aligning against its own width).
-    //
-    // Fix: compute "VozIt!"'s real width and use that literal number to
-    // place the middle text, instead of relying on tw to mean something
-    // it doesn't. Character-width ratio below (~0.58) is calibrated from
-    // FFmpeg's own measured text_w for this exact font/weight, not an
-    // assumption — confirmed against three real samples. Still sizes the
-    // middle text down (and, as a last resort for an extreme-length
-    // username, elides it) if it would run past the tier badge, since
-    // usernames are arbitrary length and no fixed size can be safe.
-    const CHAR_WIDTH_RATIO = 0.58 // DejaVu Sans Bold, measured via FFmpeg's own text_w debug output
-    const estimateTextWidth = (text, size) => text.length * size * CHAR_WIDTH_RATIO
-    const tierFontSize = fontSize - 3
-    const brandWidth = estimateTextWidth('VozIt!', fontSize)
-    const tierWidth = estimateTextWidth(tierLabel, tierFontSize)
-    const leftMargin = 14, midGap = 10, tierGap = 14, rightMargin = 14
-    const middleStartX = leftMargin + brandWidth + midGap
-    const availableForMiddle = width - middleStartX - tierGap - tierWidth - rightMargin
-
-    let middleText = `· @${safeUsername} · I was there...`
-    let middleFontSize = fontSize - 1
-    const MIN_MIDDLE_FONT = 11
-    while (estimateTextWidth(middleText, middleFontSize) > availableForMiddle && middleFontSize > MIN_MIDDLE_FONT) {
-      middleFontSize -= 1
-    }
-    if (estimateTextWidth(middleText, middleFontSize) > availableForMiddle) {
-      let trimmed = safeUsername
-      while (trimmed.length > 3 && estimateTextWidth(`· @${trimmed}… · I was there...`, middleFontSize) > availableForMiddle) {
-        trimmed = trimmed.slice(0, -1)
-      }
-      middleText = `· @${trimmed}… · I was there...`
-    }
-    // "I was there..." requested in italics here too — the fitting logic
-    // above still treats middleText as one string (the combined width is
-    // what actually has to fit, regardless of how it's drawn), but it
-    // always ends with this exact suffix, so it can be split safely
-    // after sizing is decided. Same reasoning as the drifting stamp
-    // above: x positions computed in JS, not a cross-filter tw reference.
-    const MIDDLE_SUFFIX = 'I was there...'
-    const middlePrefix = middleText.slice(0, middleText.length - MIDDLE_SUFFIX.length)
-    const middleSuffixX = Math.round(middleStartX) + Math.round(estimateTextWidth(middlePrefix, middleFontSize))
-
-    // Still reported as hard to read after the black@0.75/bold/opacity
-    // pass above, compared against the crisp DOM-overlay version. That
-    // earlier fix was verified against a frame pulled straight from the
-    // source-resolution file, where it did look legible — the gap is
-    // what happens after: video compression softens flat-colored text
-    // edges, and a real device then scales the whole frame down further
-    // to fit its screen, compounding the softening. A translucent
-    // background bar alone can't fully compensate for that. Adding a
-    // solid dark outline/stroke directly on the glyphs — the standard
-    // technique broadcast captions and subtitles use for exactly this
-    // reason — holds up under both compression and scaling in a way
-    // background opacity alone doesn't, since it's contrast baked into
-    // the letterforms themselves rather than relying on what's visible
-    // around them.
-    const TEXT_BORDER = `borderw=2:bordercolor=black@0.85`
     const mainFilter = [
-      // Bumped from black@0.55: reported directly against a bright
-      // outdoor scene (green foliage, white sky) the bar let enough of
-      // the video show through that the white text on top washed out —
-      // legible as a crisp DOM overlay on-screen, but a compressed video
-      // frame has softer edges and needs more contrast margin to read
-      // the same way. drawbox correctly keeps iw/ih — that's the filter
-      // that actually defines them.
-      `drawbox=x=0:y=ih-${barHeight}:w=iw:h=${barHeight}:color=black@0.75:t=fill`,
-      `drawtext=text='VozIt!':fontsize=${fontSize}:fontcolor=0xFE3D07:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
-        `x=14:y=h-${barHeight}+${Math.round(barHeight / 2 - fontSize / 2)}`,
-      // No backslash before the middle dot — only :, ' and \ itself are
-      // actual FFmpeg drawtext escape characters. A backslash in front of
-      // any other character (like the \· this line used to have) isn't a
-      // real escape sequence.
-      // FONT_BOLD + fuller opacity (was FONT_REGULAR @0.82) — same
-      // legibility reasoning as the background bar above. x is now a
-      // real computed offset (see middleStartX above), not the broken
-      // self-referential tw. Size is whatever the width-fitting above
-      // decided. "I was there..." split out into its own italic
-      // drawtext — see middlePrefix/middleSuffixX above.
-      `drawtext=text='${middlePrefix}':fontsize=${middleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
-        `fontfile=${FONT_BOLD}:x=${Math.round(middleStartX)}:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
-      `drawtext=text='${MIDDLE_SUFFIX}':fontsize=${middleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
-        `fontfile=${FONT_ITALIC}:x=${middleSuffixX}:y=h-${barHeight}+${Math.round(barHeight / 2 - middleFontSize / 2)}`,
-      `drawtext=text='${tierLabel}':fontsize=${tierFontSize}:fontcolor=white@1.0:fontfile=${FONT_BOLD}:${TEXT_BORDER}:` +
-        `x=w-tw-14:y=h-${barHeight}+${Math.round(barHeight / 2 - tierFontSize / 2)}`,
+      ...badgeFilters,
+      ...titleFilters,
+      ...captionFilters,
       ...stampFilters,
     ].join(',')
 

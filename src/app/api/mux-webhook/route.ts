@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
 
       const { data: report } = await supabase
         .from('reports')
-        .select('id, user_id, title, what, status, location_name, location_lat, location_lng, playback_id, duration_seconds, user:users(username, tier)')
+        .select('id, user_id, title, what, transcript, status, location_name, location_lat, location_lng, playback_id, duration_seconds, user:users(username, tier)')
         .eq('mux_asset_id', assetId)
         .single()
 
@@ -299,6 +299,8 @@ export async function POST(req: NextRequest) {
         username: (report.user as any)?.username || 'reporter',
         tier: ((report.user as any)?.tier || 'starter') as any,
         duration: report.duration_seconds || 90,
+        title: report.title,
+        transcript: report.transcript || '',
       }).then(result => {
         if (result.success) {
           return supabase.from('reports').update({
