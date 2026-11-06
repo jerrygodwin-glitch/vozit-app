@@ -292,6 +292,8 @@ export async function processVideoWatermark(params: {
   height?: number
   title?: string       // reporter's own Title field — burned in as the fading title banner
   transcript?: string  // reporter's own Whisper transcript — burned in as captions, if present
+  location?: string    // report's location_name — shown under the title banner
+  capturedAt?: string  // report's created_at — formatted into the date shown under the title banner
 }): Promise<{
   watermarkedUrl: string
   success: boolean
@@ -318,6 +320,8 @@ export async function processVideoWatermark(params: {
         height: params.height || 1080,
         title: params.title || '',
         transcript: params.transcript || '',
+        location: params.location || '',
+        capturedAt: params.capturedAt || '',
       }),
       // Burning in a ~90s clip takes real time — give it room rather than
       // timing out a legitimately-still-running job.

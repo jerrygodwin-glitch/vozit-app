@@ -41,6 +41,18 @@ const FONT_REGULAR = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 const FONT_ITALIC = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf'
 
 const TIER_LABELS = { starter: 'Starter', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' }
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// Calendar date only (not time-of-day), so a UTC-vs-local mismatch only
+// risks being off by one day right at midnight — an acceptable tradeoff
+// for a display label, unlike the GPS/bearing/tilt telemetry elsewhere in
+// this app which must always be device-sourced.
+function formatDateLabel(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return `${MONTH_LABELS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`
+}
 
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
@@ -63,7 +75,7 @@ app.post('/process', async (req, res) => {
     return res.status(500).json({ error: 'Worker missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY' })
   }
 
-  const { reportId, playbackId, username, tier, duration, title, transcript } = req.body || {}
+  const { reportId, playbackId, username, tier, duration, title, transcript, location, capturedAt } = req.body || {}
   const videoDuration = Number(duration) || 90
 
   if (!reportId || !playbackId) {
@@ -227,31 +239,51 @@ app.post('/process', async (req, res) => {
     ]
 
     // ── LAYER 1b: TITLE BANNER (stacked below badge, fades ~4-5s) ──
-    // Uses the reporter's own Title field — already reviewed before
-    // publish, already proven as the bold first line on report/feed
-    // cards — rather than any AI-generated text. Visible full-strength
-    // for TITLE_VISIBLE_SECONDS, then a 1s linear fade, then gone;
-    // avoids permanently occupying frame space for the whole clip.
+    // Two lines: "RAW FOOTAGE: <title>" then "<location> · <date>" — the
+    // raw-footage framing from the Meta guidance review, using the
+    // reporter's own Title and the report's own location/date (never
+    // AI-generated text). Visible full-strength for TITLE_VISIBLE_SECONDS,
+    // then a 1s linear fade, then gone — reads as an establishing caption
+    // for the opening beat, not something that needs to stay up the whole
+    // clip.
     const titleFilters = []
     const safeTitle0 = String(title || '').replace(/['":,\\]/g, '').slice(0, 120)
     if (safeTitle0) {
       const TITLE_VISIBLE_SECONDS = 4
       const TITLE_FADE_SECONDS = 1
-      const titleFontSize = Math.max(15, Math.round(height * 0.022))
+      const line1FontSize = Math.max(15, Math.round(height * 0.022))
+      const line2FontSize = Math.max(13, Math.round(height * 0.018))
+      const lineGap = 4
       const titleY0 = badgeY0 + badgeHeight + 8
-      const titleHeight = Math.max(32, Math.round(height * 0.045))
       const titlePadX = 12
+      const titlePadY = 8
       const MAX_TITLE_WIDTH = Math.round(width * 0.86)
 
-      let safeTitle = safeTitle0
-      let titleTruncated = false
-      while (estimateTextWidth(safeTitle, titleFontSize) + titlePadX * 2 > MAX_TITLE_WIDTH && safeTitle.length > 3) {
-        safeTitle = safeTitle.slice(0, -1)
-        titleTruncated = true
+      const fitLine = (text, fontSize) => {
+        let t = text
+        let truncated = false
+        while (estimateTextWidth(t, fontSize) + titlePadX * 2 > MAX_TITLE_WIDTH && t.length > 3) {
+          t = t.slice(0, -1)
+          truncated = true
+        }
+        return truncated ? t.trimEnd() + '…' : t
       }
-      if (titleTruncated) safeTitle = safeTitle.trimEnd() + '…'
-      const titleTextWidth = estimateTextWidth(safeTitle, titleFontSize)
-      const titleBoxWidth = Math.min(MAX_TITLE_WIDTH, Math.round(titleTextWidth) + titlePadX * 2)
+
+      const line1 = fitLine(`RAW FOOTAGE: ${safeTitle0}`, line1FontSize)
+
+      const safeLocation = String(location || '').replace(/['":,\\]/g, '').slice(0, 60)
+      const dateLabel = formatDateLabel(capturedAt)
+      const line2Raw = [safeLocation, dateLabel].filter(Boolean).join(' · ')
+      const line2 = line2Raw ? fitLine(line2Raw, line2FontSize) : ''
+
+      const titleContentWidth = Math.max(
+        estimateTextWidth(line1, line1FontSize),
+        line2 ? estimateTextWidth(line2, line2FontSize) : 0
+      )
+      const titleBoxWidth = Math.min(MAX_TITLE_WIDTH, Math.round(titleContentWidth) + titlePadX * 2)
+      const titleBoxHeight = line2
+        ? titlePadY * 2 + line1FontSize + lineGap + line2FontSize
+        : titlePadY * 2 + line1FontSize
 
       const cutoff = TITLE_VISIBLE_SECONDS + TITLE_FADE_SECONDS
       const titleEnable = `enable='lt(t\\,${cutoff})'`
@@ -261,13 +293,20 @@ app.post('/process', async (req, res) => {
       const titleAlpha = `alpha='if(lt(t\\,${TITLE_VISIBLE_SECONDS})\\,1\\,(${cutoff}-t))'`
 
       titleFilters.push(
-        `drawbox=x=${badgeX0}:y=${titleY0}:w=${titleBoxWidth}:h=${titleHeight}:color=black@0.55:t=fill:${titleEnable}`
+        `drawbox=x=${badgeX0}:y=${titleY0}:w=${titleBoxWidth}:h=${titleBoxHeight}:color=black@0.55:t=fill:${titleEnable}`
       )
       titleFilters.push(
-        `drawtext=text='${safeTitle}':fontsize=${titleFontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
-        `fontfile=${FONT_BOLD}:x=${badgeX0 + titlePadX}:y=${titleY0 + Math.round(titleHeight / 2 - titleFontSize / 2)}:` +
+        `drawtext=text='${line1}':fontsize=${line1FontSize}:fontcolor=white@0.95:${TEXT_BORDER}:` +
+        `fontfile=${FONT_BOLD}:x=${badgeX0 + titlePadX}:y=${titleY0 + titlePadY}:` +
         `${titleAlpha}:${titleEnable}`
       )
+      if (line2) {
+        titleFilters.push(
+          `drawtext=text='${line2}':fontsize=${line2FontSize}:fontcolor=white@0.80:${TEXT_BORDER}:` +
+          `fontfile=${FONT_REGULAR}:x=${badgeX0 + titlePadX}:y=${titleY0 + titlePadY + line1FontSize + lineGap}:` +
+          `${titleAlpha}:${titleEnable}`
+        )
+      }
     }
 
     // ── LAYER 1c: BURNED-IN CAPTIONS (center-safe band) ─────────────
