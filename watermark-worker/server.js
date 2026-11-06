@@ -158,8 +158,17 @@ app.post('/process', async (req, res) => {
     // every position fed to a drawtext call is a plain pre-computed pixel
     // number instead, since w/h being constant for the whole video means
     // JS can just do this math once up front.
-    const CHAR_WIDTH_RATIO_BOLD = 0.58 // DejaVu Sans Bold, measured via FFmpeg's own text_w debug output
-    const CHAR_WIDTH_RATIO_REG = 0.54  // DejaVu Sans regular, narrower than Bold
+    // Bumped from the previously-measured 0.58/0.54: confirmed directly
+    // against a real rendered frame that those ratios under-measure real
+    // text_w enough, across several adjacent drawtext calls whose
+    // positions chain off each other's estimated width (brand->username,
+    // username->tier), for the accumulated error to visibly overlap two
+    // segments — the tier badge's star glyph landed on top of the
+    // username's last character. An overestimate here only adds a little
+    // harmless extra gap; an underestimate causes exactly this kind of
+    // silent, hard-to-spot overlap, so erring wide is the safer direction.
+    const CHAR_WIDTH_RATIO_BOLD = 0.66 // DejaVu Sans Bold
+    const CHAR_WIDTH_RATIO_REG = 0.60  // DejaVu Sans regular, narrower than Bold
     const estimateTextWidth = (text, size, ratio = CHAR_WIDTH_RATIO_BOLD) => text.length * size * ratio
     // Standard broadcast-caption technique: a solid dark outline baked
     // into the glyphs themselves holds up under video compression and
@@ -182,7 +191,7 @@ app.post('/process', async (req, res) => {
     const badgeHeight = Math.max(36, Math.round(height * 0.05))
     const badgeX0 = 14
     const badgePadX = 12
-    const badgeGap = 8
+    const badgeGap = 12
     const MAX_BADGE_WIDTH = Math.round(width * 0.72)
 
     let badgeUser = safeUsername
