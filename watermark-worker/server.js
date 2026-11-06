@@ -269,7 +269,14 @@ app.post('/process', async (req, res) => {
         return truncated ? t.trimEnd() + '…' : t
       }
 
-      const line1 = fitLine(`RAW FOOTAGE: ${safeTitle0}`, line1FontSize)
+      // A literal, unescaped ':' in drawtext's text value breaks FFmpeg's
+      // own option parsing (':' is the filter option separator, even
+      // inside single-quoted text) — confirmed directly: this crashed
+      // every single job with "Both text and text file provided" until
+      // escaped. Reporter-entered text never hits this (sanitized
+      // upstream to strip ':' entirely), but this literal label is
+      // authored here, so it needs its own escape.
+      const line1 = fitLine(`RAW FOOTAGE\\: ${safeTitle0}`, line1FontSize)
 
       const safeLocation = String(location || '').replace(/['":,\\]/g, '').slice(0, 60)
       const dateLabel = formatDateLabel(capturedAt)
