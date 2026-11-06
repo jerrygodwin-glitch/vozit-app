@@ -118,6 +118,7 @@ export async function getVideoTranscript(playbackId: string): Promise<string> {
 export async function reverseGeocode(lat: number, lng: number, lang?: string): Promise<{
   locationName: string
   city: string
+  state: string
   country: string
   countryCode: string
 }> {
@@ -135,9 +136,9 @@ export async function reverseGeocode(lat: number, lng: number, lang?: string): P
     const countryCode = addr.country_code?.toUpperCase() || ''
     const locationName = [city, state, country].filter(Boolean).join(', ')
 
-    return { locationName, city, country, countryCode }
+    return { locationName, city, state, country, countryCode }
   } catch {
-    return { locationName: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, city: '', country: '', countryCode: '' }
+    return { locationName: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, city: '', state: '', country: '', countryCode: '' }
   }
 }
 

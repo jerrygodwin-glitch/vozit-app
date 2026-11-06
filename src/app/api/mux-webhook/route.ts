@@ -5,11 +5,42 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
 import { applyStrike } from '@/lib/strikes'
 import { createCaptureManifest, addModerationAssertion, addPublishAssertion, signManifest, storeProvenance } from '@/lib/c2pa-provenance'
-import { generate5Ws, storeAnalysis } from '@/lib/ai-5w-analysis'
+import { generate5Ws, storeAnalysis, reverseGeocode } from '@/lib/ai-5w-analysis'
 import { assessGeoRisk } from '@/lib/security'
 import { processVideoWatermark } from '@/lib/watermark'
 import { autoDistributeToVozItChannels, logVozItDistribution } from '@/lib/auto-distribute'
 import { captureError, captureMessage } from '@/lib/monitoring'
+
+const US_STATE_ABBR: Record<string, string> = {
+  Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA',
+  Colorado: 'CO', Connecticut: 'CT', Delaware: 'DE', Florida: 'FL', Georgia: 'GA',
+  Hawaii: 'HI', Idaho: 'ID', Illinois: 'IL', Indiana: 'IN', Iowa: 'IA', Kansas: 'KS',
+  Kentucky: 'KY', Louisiana: 'LA', Maine: 'ME', Maryland: 'MD', Massachusetts: 'MA',
+  Michigan: 'MI', Minnesota: 'MN', Mississippi: 'MS', Missouri: 'MO', Montana: 'MT',
+  Nebraska: 'NE', Nevada: 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+  'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND',
+  Ohio: 'OH', Oklahoma: 'OK', Oregon: 'OR', Pennsylvania: 'PA', 'Rhode Island': 'RI',
+  'South Carolina': 'SC', 'South Dakota': 'SD', Tennessee: 'TN', Texas: 'TX', Utah: 'UT',
+  Vermont: 'VT', Virginia: 'VA', Washington: 'WA', 'West Virginia': 'WV',
+  Wisconsin: 'WI', Wyoming: 'WY', 'District of Columbia': 'DC',
+}
+
+// Formats a geocode result for the burned-in title banner: "City, ST" for
+// the US (matching how US locations are conventionally shown short-form),
+// "City, Country" everywhere else — the same shape for every country since
+// it's built from the geocoder's own city/country fields, not a per-country
+// rule. Falls back gracefully as fields go missing (e.g. a rural pin with
+// no matched city), down to an empty string rather than ever throwing.
+function formatBannerLocation(geo: { city: string; state: string; country: string; countryCode: string }): string {
+  const { city, state, country, countryCode } = geo
+  if (countryCode === 'US') {
+    if (city && state) return `${city}, ${US_STATE_ABBR[state] || state}`
+    if (city) return city
+    if (state) return state
+  }
+  if (city && country) return `${city}, ${country}`
+  return city || country || ''
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -293,17 +324,39 @@ export async function POST(req: NextRequest) {
       // Non-blocking, but NOT fire-and-forget — see the note on maxDuration
       // below for why waitUntil matters here (a bare un-awaited .then()
       // has no guarantee of surviving past this function's response).
-      waitUntil(processVideoWatermark({
-        playbackId: report.playback_id,
-        reportId: report.id,
-        username: (report.user as any)?.username || 'reporter',
-        tier: ((report.user as any)?.tier || 'starter') as any,
-        duration: report.duration_seconds || 90,
-        title: report.title,
-        transcript: report.transcript || '',
-        location: report.location_name || '',
-        capturedAt: report.created_at,
-      }).then(result => {
+      //
+      // Geocoding runs inside this same background chain (not before it)
+      // so it doesn't delay the webhook's own HTTP response. location_name
+      // is kept as the fallback: it's often just raw GPS numbers or
+      // whatever free text the reporter typed (the upload form never
+      // sends a clean geocoded value), so a fresh reverse-geocode off the
+      // report's own GPS — forced to English specifically here, since the
+      // Fly worker's font can't render non-Latin scripts — gives a
+      // consistent "City, ST" (US) / "City, Country" (everywhere else)
+      // label instead. Wrapped in its own try/catch so a geocoding
+      // failure falls back to the old value rather than blocking
+      // watermarking entirely.
+      waitUntil((async () => {
+        let bannerLocation = report.location_name || ''
+        if (report.location_lat != null && report.location_lng != null) {
+          try {
+            const geo = await reverseGeocode(report.location_lat, report.location_lng, 'en')
+            const formatted = formatBannerLocation(geo)
+            if (formatted) bannerLocation = formatted
+          } catch {}
+        }
+        return processVideoWatermark({
+          playbackId: report.playback_id,
+          reportId: report.id,
+          username: (report.user as any)?.username || 'reporter',
+          tier: ((report.user as any)?.tier || 'starter') as any,
+          duration: report.duration_seconds || 90,
+          title: report.title,
+          transcript: report.transcript || '',
+          location: bannerLocation,
+          capturedAt: report.created_at,
+        })
+      })().then(result => {
         if (result.success) {
           return supabase.from('reports').update({
             watermarked_url: result.watermarkedUrl,
