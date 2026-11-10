@@ -295,13 +295,13 @@ export async function postToFacebook(params: {
   title: string
   description: string
   videoUrl: string
-  reportUrl: string
 }): Promise<DistributionResult> {
   try {
-    // Facebook post descriptions render URLs as real clickable links
-    // (unlike Instagram/TikTok captions) — this previously had no link
-    // at all, so it was the one platform where a link WOULD have worked
-    // but simply wasn't included.
+    // The caller already builds a complete description (reporter credit,
+    // full report link, hashtags) — this used to append its own duplicate
+    // "Full report" line and signature on top of that, and referenced a
+    // reportUrl param the caller never actually passed, posting the
+    // literal text "undefined" into the live caption.
     const res = await fetch(
       `https://graph-video.facebook.com/v19.0/${params.pageId}/videos`, {
         method: 'POST',
@@ -309,7 +309,7 @@ export async function postToFacebook(params: {
         body: JSON.stringify({
           file_url: params.videoUrl,
           title: params.title,
-          description: `${params.description}\n\n📹 Full report: ${params.reportUrl}\nReported via VozIt — Citizen Journalism`,
+          description: params.description,
           access_token: params.accessToken,
         }),
       }
@@ -586,7 +586,6 @@ export async function distributeToAll(params: {
           title: params.title,
           description: params.description,
           videoUrl: params.videoUrl,
-          reportUrl: params.reportUrl,
         })
         break
       case 'x':
