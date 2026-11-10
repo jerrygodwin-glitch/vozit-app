@@ -11,11 +11,11 @@ import type { DistributionResult } from './social-distribution'
 // working. Instead this holds a refresh token (which doesn't expire under
 // normal use) and exchanges it for a fresh access token right before each
 // upload, via Google's own token endpoint.
-async function getYouTubeAccessToken(): Promise<string> {
+async function getYouTubeAccessToken(): Promise<{ token: string; error?: string }> {
   const refreshToken = process.env.VOZIT_YOUTUBE_REFRESH_TOKEN
   const clientId = process.env.VOZIT_YOUTUBE_CLIENT_ID
   const clientSecret = process.env.VOZIT_YOUTUBE_CLIENT_SECRET
-  if (!refreshToken || !clientId || !clientSecret) return ''
+  if (!refreshToken || !clientId || !clientSecret) return { token: '', error: 'Missing YouTube credentials' }
 
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -28,22 +28,23 @@ async function getYouTubeAccessToken(): Promise<string> {
         grant_type: 'refresh_token',
       }),
     })
-    if (!res.ok) return ''
-    const data = await res.json()
-    return data.access_token || ''
-  } catch {
-    return ''
+    const text = await res.text()
+    if (!res.ok) return { token: '', error: `Google token refresh failed (${res.status}): ${text.slice(0, 300)}` }
+    const data = JSON.parse(text)
+    return data.access_token ? { token: data.access_token } : { token: '', error: `Google response had no access_token: ${text.slice(0, 300)}` }
+  } catch (e: any) {
+    return { token: '', error: `Token refresh request threw: ${e.message}` }
   }
 }
 
 // TikTok access tokens expire in 24 hours — same reasoning as YouTube's
 // getYouTubeAccessToken() above, just a longer-lived token and a
 // different refresh endpoint.
-async function getTikTokAccessToken(): Promise<string> {
+async function getTikTokAccessToken(): Promise<{ token: string; error?: string }> {
   const refreshToken = process.env.VOZIT_TIKTOK_REFRESH_TOKEN
   const clientKey = process.env.VOZIT_TIKTOK_CLIENT_KEY
   const clientSecret = process.env.VOZIT_TIKTOK_CLIENT_SECRET
-  if (!refreshToken || !clientKey || !clientSecret) return ''
+  if (!refreshToken || !clientKey || !clientSecret) return { token: '', error: 'Missing TikTok credentials' }
 
   try {
     const res = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
@@ -56,11 +57,12 @@ async function getTikTokAccessToken(): Promise<string> {
         refresh_token: refreshToken,
       }),
     })
-    if (!res.ok) return ''
-    const data = await res.json()
-    return data.access_token || ''
-  } catch {
-    return ''
+    const text = await res.text()
+    if (!res.ok) return { token: '', error: `TikTok token refresh failed (${res.status}): ${text.slice(0, 300)}` }
+    const data = JSON.parse(text)
+    return data.access_token ? { token: data.access_token } : { token: '', error: `TikTok response had no access_token: ${text.slice(0, 300)}` }
+  } catch (e: any) {
+    return { token: '', error: `Token refresh request threw: ${e.message}` }
   }
 }
 
@@ -143,10 +145,10 @@ export async function autoDistributeToVozItChannels(params: {
 
   // YouTube — full video upload
   if (accounts.youtube.enabled) {
-    const youtubeToken = await getYouTubeAccessToken()
-    if (youtubeToken) {
+    const youtube = await getYouTubeAccessToken()
+    if (youtube.token) {
       const r = await postToYouTube({
-        accessToken: youtubeToken,
+        accessToken: youtube.token,
         title: `[EYEWITNESS] ${params.title}`,
         description,
         videoUrl,
@@ -158,7 +160,7 @@ export async function autoDistributeToVozItChannels(params: {
       results.push({
         platform: 'youtube',
         success: false,
-        error: 'Could not refresh YouTube access token',
+        error: youtube.error || 'Could not refresh YouTube access token',
         distributedAt: new Date().toISOString(),
       })
     }
@@ -166,10 +168,10 @@ export async function autoDistributeToVozItChannels(params: {
 
   // TikTok — post as TikTok video
   if (accounts.tiktok.enabled) {
-    const tiktokToken = await getTikTokAccessToken()
-    if (tiktokToken) {
+    const tiktok = await getTikTokAccessToken()
+    if (tiktok.token) {
       const r = await postToTikTok({
-        accessToken: tiktokToken,
+        accessToken: tiktok.token,
         title: `${params.title} #VozIt #IWasThere`,
         videoUrl,
         reportUrl,
@@ -179,7 +181,7 @@ export async function autoDistributeToVozItChannels(params: {
       results.push({
         platform: 'tiktok',
         success: false,
-        error: 'Could not refresh TikTok access token',
+        error: tiktok.error || 'Could not refresh TikTok access token',
         distributedAt: new Date().toISOString(),
       })
     }

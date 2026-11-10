@@ -138,22 +138,29 @@ export async function postToTikTok(params: {
     const caption = `${params.title}\n\n${params.reportUrl}`
 
     // Unaudited apps are restricted to private (SELF_ONLY) posts regardless
-    // of what privacy_level is requested, and the exact set of allowed
-    // levels can vary by account — querying creator_info first avoids
-    // hardcoding a level TikTok will reject.
-    const creatorRes = await fetch('https://open.tiktokapis.com/v2/post/publish/creator_info/query/', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${params.accessToken}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-    })
-    const creatorData = await creatorRes.json()
-    if (creatorData.error?.code && creatorData.error.code !== 'ok') throw new Error(creatorData.error.message)
-    const availableLevels: string[] = creatorData.data?.privacy_level_options || []
-    const privacyLevel = availableLevels.includes('PUBLIC_TO_EVERYONE')
-      ? 'PUBLIC_TO_EVERYONE'
-      : (availableLevels[0] || 'SELF_ONLY')
+    // of what privacy_level is requested — confirmed by a real rejection
+    // ("review our integration guidelines") even though Sandbox's own
+    // creator_info response listed PUBLIC_TO_EVERYONE as available. So
+    // until TikTok's Content Posting audit is actually approved, always
+    // post privately — set VOZIT_TIKTOK_AUDITED=true once that happens to
+    // switch back to posting publicly.
+    const isAudited = process.env.VOZIT_TIKTOK_AUDITED === 'true'
+    let privacyLevel = 'SELF_ONLY'
+    if (isAudited) {
+      const creatorRes = await fetch('https://open.tiktokapis.com/v2/post/publish/creator_info/query/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${params.accessToken}`,
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+      })
+      const creatorData = await creatorRes.json()
+      if (creatorData.error?.code && creatorData.error.code !== 'ok') throw new Error(creatorData.error.message)
+      const availableLevels: string[] = creatorData.data?.privacy_level_options || []
+      privacyLevel = availableLevels.includes('PUBLIC_TO_EVERYONE')
+        ? 'PUBLIC_TO_EVERYONE'
+        : (availableLevels[0] || 'SELF_ONLY')
+    }
 
     // The finished watermarked video lives on Supabase's storage domain,
     // not one VozIt has verified ownership of with TikTok, so "pull by
@@ -369,6 +376,24 @@ function buildOAuth1Header(
 
 // ── X (TWITTER) ──────────────────────────────────────────────────────
 // Post via X API: chunked media upload (v1.1) + tweet creation (v2)
+// Parses a response as JSON, but reads the body as text first so a
+// non-JSON or empty error body (auth failure, rate limit, gateway error)
+// surfaces as a readable message instead of a generic "Unexpected end of
+// JSON input" that hides what X actually said.
+async function parseXResponse(res: Response, label: string): Promise<any> {
+  const raw = await res.text()
+  let parsed: any = null
+  try {
+    parsed = raw ? JSON.parse(raw) : null
+  } catch {
+    throw new Error(`X ${label} returned non-JSON response (status ${res.status}): ${raw.slice(0, 300)}`)
+  }
+  if (!res.ok) {
+    throw new Error(`X ${label} failed (status ${res.status}): ${parsed?.errors?.[0]?.message || parsed?.detail || raw.slice(0, 300) || 'empty response'}`)
+  }
+  return parsed
+}
+
 export async function postToX(params: {
   consumerKey: string
   consumerSecret: string
@@ -416,8 +441,8 @@ export async function postToX(params: {
       },
       body: new URLSearchParams(initParams),
     })
-    const init = await initRes.json()
-    if (!init.media_id_string) throw new Error(`X media INIT failed: ${init.errors?.[0]?.message || JSON.stringify(init)}`)
+    const init = await parseXResponse(initRes, 'media INIT')
+    if (!init.media_id_string) throw new Error(`X media INIT returned no media_id_string: ${JSON.stringify(init)}`)
     const mediaId = init.media_id_string
 
     // 3. APPEND — the binary chunk goes in a multipart body, which (like
@@ -452,7 +477,7 @@ export async function postToX(params: {
       },
       body: new URLSearchParams(finalizeParams),
     })
-    const finalize = await finalizeRes.json()
+    const finalize = await parseXResponse(finalizeRes, 'media FINALIZE')
 
     // 5. Poll STATUS until X finishes processing the video server-side —
     // expected for anything beyond a trivially short clip, not an error case.
@@ -465,7 +490,7 @@ export async function postToX(params: {
         method: 'GET',
         headers: { 'Authorization': buildOAuth1Header('GET', uploadUrl, statusParams, creds) },
       })
-      const status = await statusRes.json()
+      const status = await parseXResponse(statusRes, 'media STATUS')
       processingInfo = status.processing_info
       if (processingInfo?.state === 'failed') {
         throw new Error(`X video processing failed: ${processingInfo.error?.message || 'unknown error'}`)
@@ -487,8 +512,8 @@ export async function postToX(params: {
         media: { media_ids: [mediaId] },
       }),
     })
-    const tweet = await tweetRes.json()
-    if (!tweet.data?.id) throw new Error(`X tweet creation failed: ${tweet.errors?.[0]?.message || tweet.detail || JSON.stringify(tweet)}`)
+    const tweet = await parseXResponse(tweetRes, 'tweet creation')
+    if (!tweet.data?.id) throw new Error(`X tweet creation returned no tweet id: ${JSON.stringify(tweet)}`)
 
     return {
       platform: 'x',
