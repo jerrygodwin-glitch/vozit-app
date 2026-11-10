@@ -240,16 +240,16 @@ export async function logVozItDistribution(
   results: DistributionResult[],
 ) {
   for (const result of results) {
-    await supabase.from('social_distributions').insert({
+    const { error } = await supabase.from('social_distributions').insert({
       report_id: reportId,
-      user_id: null, // VozIt's own channels, not a user's
       platform: result.platform,
-      post_id: result.postId,
+      platform_post_id: result.postId,
       post_url: result.postUrl,
-      success: result.success,
-      error: result.error,
-      distributed_at: result.distributedAt,
-      is_vozit_channel: true,
+      // The real table has no separate success/error columns — fold the
+      // failure reason into status so it isn't lost.
+      status: result.success ? 'success' : `failed: ${result.error || 'unknown error'}`,
+      created_at: result.distributedAt,
     })
+    if (error) console.error('[auto-distribute] failed to log distribution result', result.platform, error.message)
   }
 }
