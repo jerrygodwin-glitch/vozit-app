@@ -194,6 +194,7 @@ export async function autoDistributeToVozItChannels(params: {
       igUserId: accounts.instagram.igUserId,
       caption: `${params.title}\n\n📹 @${params.reporterUsername} via VozIt\n\n#VozIt #IWasThere #CitizenJournalism`,
       videoUrl,
+      reportUrl,
       location: params.location,
     })
     results.push(r)

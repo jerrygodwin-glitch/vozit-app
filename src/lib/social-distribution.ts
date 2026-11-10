@@ -50,7 +50,6 @@ export async function postToYouTube(params: {
   title: string
   description: string
   videoUrl: string // Mux download URL
-  reportUrl: string
   tags: string[]
   location?: { lat: number; lng: number }
 }): Promise<DistributionResult> {
@@ -73,10 +72,12 @@ export async function postToYouTube(params: {
         body: JSON.stringify({
           snippet: {
             title: `[VozIt] ${params.title}`,
-            // Previously linked to the generic vozit.net homepage — a
-            // viewer who clicked through had to go hunting for the exact
-            // report they just watched. Links straight to it instead.
-            description: `${params.description}\n\n---\nFull report: ${params.reportUrl}\nReported via VozIt — Citizen Journalism`,
+            // The caller already builds a complete description (reporter
+            // credit, full report link, hashtags) — this used to append
+            // its own duplicate link using a reportUrl param the caller
+            // never actually passed, posting the literal text "undefined"
+            // into the live description.
+            description: params.description,
             tags: ['VozIt', 'citizen journalism', 'eyewitness', ...params.tags],
             categoryId: '25', // News & Politics
           },
@@ -556,7 +557,6 @@ export async function distributeToAll(params: {
           title: params.title,
           description: params.description,
           videoUrl: params.videoUrl,
-          reportUrl: params.reportUrl,
           tags: params.tags,
           location: params.location,
         })
