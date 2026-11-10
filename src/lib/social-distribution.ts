@@ -71,7 +71,7 @@ export async function postToYouTube(params: {
         },
         body: JSON.stringify({
           snippet: {
-            title: `[VozIt] ${params.title}`,
+            title: params.title,
             // The caller already builds a complete description (reporter
             // credit, full report link, hashtags) — this used to append
             // its own duplicate link using a reportUrl param the caller
