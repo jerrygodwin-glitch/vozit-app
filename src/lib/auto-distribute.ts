@@ -63,8 +63,14 @@ function getVozItAccounts() {
       pageId: process.env.VOZIT_FACEBOOK_PAGE_ID || '',
     },
     x: {
-      enabled: !!process.env.VOZIT_X_TOKEN,
-      accessToken: process.env.VOZIT_X_TOKEN || '',
+      // X's media upload requires OAuth 1.0a signing (all 4 values
+      // together), not a single bearer token — see postToX in
+      // social-distribution.ts.
+      enabled: !!(process.env.VOZIT_X_CONSUMER_KEY && process.env.VOZIT_X_CONSUMER_SECRET && process.env.VOZIT_X_ACCESS_TOKEN && process.env.VOZIT_X_ACCESS_TOKEN_SECRET),
+      consumerKey: process.env.VOZIT_X_CONSUMER_KEY || '',
+      consumerSecret: process.env.VOZIT_X_CONSUMER_SECRET || '',
+      accessToken: process.env.VOZIT_X_ACCESS_TOKEN || '',
+      accessTokenSecret: process.env.VOZIT_X_ACCESS_TOKEN_SECRET || '',
     },
   }
 }
@@ -168,7 +174,10 @@ export async function autoDistributeToVozItChannels(params: {
       ? params.title.slice(0, 197) + '...'
       : params.title
     const r = await postToX({
+      consumerKey: accounts.x.consumerKey,
+      consumerSecret: accounts.x.consumerSecret,
       accessToken: accounts.x.accessToken,
+      accessTokenSecret: accounts.x.accessTokenSecret,
       text: `🔴 EYEWITNESS: ${tweetText}`,
       videoUrl,
       reportUrl,

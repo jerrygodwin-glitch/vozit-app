@@ -3,11 +3,19 @@
 // Cross-posts VozIt reports to social platforms via their APIs
 // Tracks views, engagement, and revenue attribution per platform
 
+import crypto from 'crypto'
+
 export type SocialPlatform = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x'
 
 export interface SocialAccount {
   platform: SocialPlatform
   accountId: string
+  // X-specific: its media-upload endpoint requires OAuth 1.0a signing
+  // (see buildOAuth1Header below), not the single bearer-token model the
+  // other platforms use — these are only populated/used for platform: 'x'.
+  consumerKey?: string
+  consumerSecret?: string
+  accessTokenSecret?: string
   accessToken: string
   refreshToken?: string
   tokenExpiresAt?: string
@@ -268,15 +276,74 @@ export async function postToFacebook(params: {
   }
 }
 
+// ── X (TWITTER) — OAuth 1.0a request signing ──────────────────────────
+// X's media-upload endpoint (still on the old v1.1 API) requires OAuth
+// 1.0a request signing — a plain bearer token, which works fine for
+// creating the tweet itself (v2 API), is rejected there. This builds the
+// `Authorization: OAuth ...` header curl/Postman would generate, using
+// only Node's built-in crypto (no OAuth library dependency).
+function oauthPercentEncode(str: string): string {
+  // OAuth 1.0a requires RFC 3986 percent-encoding, which reserves a few
+  // characters (!*'()) that encodeURIComponent leaves untouched — those
+  // need encoding by hand on top of it.
+  return encodeURIComponent(str).replace(/[!*'()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())
+}
+
+function buildOAuth1Header(
+  method: string,
+  url: string,
+  extraParams: Record<string, string>,
+  creds: { consumerKey: string; consumerSecret: string; accessToken: string; accessTokenSecret: string },
+): string {
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: creds.consumerKey,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: creds.accessToken,
+    oauth_version: '1.0',
+  }
+  // Only form-urlencoded / query-string params are part of an OAuth 1.0a
+  // signature — a JSON or multipart body never is. Callers below only
+  // pass extraParams that actually belong in the signature for that
+  // specific request (query-string params for multipart APPEND calls,
+  // form-body params for the INIT/FINALIZE/STATUS calls, nothing extra
+  // for the JSON tweet-creation call).
+  const allParams = { ...oauthParams, ...extraParams }
+  const baseString = [
+    method.toUpperCase(),
+    oauthPercentEncode(url),
+    oauthPercentEncode(
+      Object.keys(allParams).sort().map((k) => `${oauthPercentEncode(k)}=${oauthPercentEncode(allParams[k])}`).join('&')
+    ),
+  ].join('&')
+  const signingKey = `${oauthPercentEncode(creds.consumerSecret)}&${oauthPercentEncode(creds.accessTokenSecret)}`
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64')
+
+  const headerParams = { ...oauthParams, oauth_signature: signature }
+  return 'OAuth ' + Object.keys(headerParams).sort()
+    .map((k) => `${oauthPercentEncode(k)}="${oauthPercentEncode(headerParams[k])}"`).join(', ')
+}
+
 // ── X (TWITTER) ──────────────────────────────────────────────────────
-// Post via X API v2 (media upload + tweet)
+// Post via X API: chunked media upload (v1.1) + tweet creation (v2)
 export async function postToX(params: {
+  consumerKey: string
+  consumerSecret: string
   accessToken: string
+  accessTokenSecret: string
   text: string
   videoUrl: string
   reportUrl: string
 }): Promise<DistributionResult> {
   try {
+    const creds = {
+      consumerKey: params.consumerKey,
+      consumerSecret: params.consumerSecret,
+      accessToken: params.accessToken,
+      accessTokenSecret: params.accessTokenSecret,
+    }
+
     // X now bills per post ($0.20/post for anything containing a URL, vs
     // $0.015 without one, as of the 2026 pay-per-use pricing change) — this
     // tags the link so the actual traffic/value X sends back to the site
@@ -285,37 +352,107 @@ export async function postToX(params: {
     const separator = params.reportUrl.includes('?') ? '&' : '?'
     const trackedReportUrl = `${params.reportUrl}${separator}utm_source=x&utm_medium=social&utm_campaign=auto_distribution`
 
-    // 1. Upload media via X media upload endpoint
-    const mediaRes = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${params.accessToken}` },
-      body: new URLSearchParams({
-        command: 'INIT',
-        media_type: 'video/mp4',
-        media_category: 'tweet_video',
-      }),
-    })
-    const media = await mediaRes.json()
+    // 1. Download the video so it can actually be uploaded to X in
+    // chunks. The previous version of this function only ever called
+    // INIT and used whatever media id that returned straight in the
+    // tweet — it never sent the video's bytes (APPEND) or confirmed the
+    // upload was complete (FINALIZE), so no video was ever genuinely
+    // attached to a tweet by this code.
+    const videoRes = await fetch(params.videoUrl)
+    if (!videoRes.ok) throw new Error(`Failed to download video for X upload: ${videoRes.status}`)
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer())
+    const totalBytes = videoBuffer.length
+    const uploadUrl = 'https://upload.twitter.com/1.1/media/upload.json'
 
-    // 2. Create tweet with media
-    const tweetRes = await fetch('https://api.twitter.com/2/tweets', {
+    // 2. INIT — form-urlencoded body, so these params ARE part of the signature.
+    const initParams = { command: 'INIT', media_type: 'video/mp4', media_category: 'tweet_video', total_bytes: String(totalBytes) }
+    const initRes = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${params.accessToken}`,
+        'Authorization': buildOAuth1Header('POST', uploadUrl, initParams, creds),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(initParams),
+    })
+    const init = await initRes.json()
+    if (!init.media_id_string) throw new Error(`X media INIT failed: ${init.errors?.[0]?.message || JSON.stringify(init)}`)
+    const mediaId = init.media_id_string
+
+    // 3. APPEND — the binary chunk goes in a multipart body, which (like
+    // any non-form body) is never part of an OAuth 1.0a signature; command/
+    // media_id/segment_index go on the query string instead, both so X can
+    // read them and so they're still covered by the signature. 4MB is X's
+    // documented max per chunk.
+    const CHUNK_SIZE = 4 * 1024 * 1024
+    let segmentIndex = 0
+    for (let offset = 0; offset < totalBytes; offset += CHUNK_SIZE) {
+      const chunk = videoBuffer.subarray(offset, Math.min(offset + CHUNK_SIZE, totalBytes))
+      const appendParams = { command: 'APPEND', media_id: mediaId, segment_index: String(segmentIndex) }
+      const appendUrl = `${uploadUrl}?${new URLSearchParams(appendParams).toString()}`
+      const form = new FormData()
+      form.append('media', new Blob([chunk]))
+      const appendRes = await fetch(appendUrl, {
+        method: 'POST',
+        headers: { 'Authorization': buildOAuth1Header('POST', uploadUrl, appendParams, creds) },
+        body: form,
+      })
+      if (!appendRes.ok) throw new Error(`X media APPEND (segment ${segmentIndex}) failed: ${appendRes.status}`)
+      segmentIndex++
+    }
+
+    // 4. FINALIZE
+    const finalizeParams = { command: 'FINALIZE', media_id: mediaId }
+    const finalizeRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': buildOAuth1Header('POST', uploadUrl, finalizeParams, creds),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(finalizeParams),
+    })
+    const finalize = await finalizeRes.json()
+
+    // 5. Poll STATUS until X finishes processing the video server-side —
+    // expected for anything beyond a trivially short clip, not an error case.
+    let processingInfo = finalize.processing_info
+    while (processingInfo && (processingInfo.state === 'pending' || processingInfo.state === 'in_progress')) {
+      await new Promise((resolve) => setTimeout(resolve, (processingInfo.check_after_secs || 3) * 1000))
+      const statusParams = { command: 'STATUS', media_id: mediaId }
+      const statusUrl = `${uploadUrl}?${new URLSearchParams(statusParams).toString()}`
+      const statusRes = await fetch(statusUrl, {
+        method: 'GET',
+        headers: { 'Authorization': buildOAuth1Header('GET', uploadUrl, statusParams, creds) },
+      })
+      const status = await statusRes.json()
+      processingInfo = status.processing_info
+      if (processingInfo?.state === 'failed') {
+        throw new Error(`X video processing failed: ${processingInfo.error?.message || 'unknown error'}`)
+      }
+      if (!processingInfo || processingInfo.state === 'succeeded') break
+    }
+
+    // 6. Create the tweet (v2 API). A JSON body is never part of an OAuth
+    // 1.0a signature, so no extra params go into the signature here.
+    const tweetUrl = 'https://api.twitter.com/2/tweets'
+    const tweetRes = await fetch(tweetUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': buildOAuth1Header('POST', tweetUrl, {}, creds),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         text: `${params.text}\n\n📹 via @VozItApp ${trackedReportUrl}`,
-        media: media.media_id_string ? { media_ids: [media.media_id_string] } : undefined,
+        media: { media_ids: [mediaId] },
       }),
     })
     const tweet = await tweetRes.json()
+    if (!tweet.data?.id) throw new Error(`X tweet creation failed: ${tweet.errors?.[0]?.message || tweet.detail || JSON.stringify(tweet)}`)
 
     return {
       platform: 'x',
       success: true,
-      postId: tweet.data?.id,
-      postUrl: `https://x.com/i/status/${tweet.data?.id}`,
+      postId: tweet.data.id,
+      postUrl: `https://x.com/i/status/${tweet.data.id}`,
       distributedAt: new Date().toISOString(),
     }
   } catch (e: any) {
@@ -383,7 +520,10 @@ export async function distributeToAll(params: {
         break
       case 'x':
         result = await postToX({
+          consumerKey: account.consumerKey || '',
+          consumerSecret: account.consumerSecret || '',
           accessToken: account.accessToken,
+          accessTokenSecret: account.accessTokenSecret || '',
           text: params.title,
           videoUrl: params.videoUrl,
           reportUrl: params.reportUrl,
