@@ -6,12 +6,47 @@
 import { postToYouTube, postToTikTok, postToInstagram, postToFacebook, postToX } from './social-distribution'
 import type { DistributionResult } from './social-distribution'
 
+// YouTube access tokens expire in ~1 hour — unlike the other platforms'
+// effectively-permanent tokens, there's no single static value that keeps
+// working. Instead this holds a refresh token (which doesn't expire under
+// normal use) and exchanges it for a fresh access token right before each
+// upload, via Google's own token endpoint.
+async function getYouTubeAccessToken(): Promise<string> {
+  const refreshToken = process.env.VOZIT_YOUTUBE_REFRESH_TOKEN
+  const clientId = process.env.VOZIT_YOUTUBE_CLIENT_ID
+  const clientSecret = process.env.VOZIT_YOUTUBE_CLIENT_SECRET
+  if (!refreshToken || !clientId || !clientSecret) return ''
+
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+      }),
+    })
+    if (!res.ok) return ''
+    const data = await res.json()
+    return data.access_token || ''
+  } catch {
+    return ''
+  }
+}
+
 // VozIt's official platform accounts — tokens from env vars
 function getVozItAccounts() {
   return {
     youtube: {
-      enabled: !!process.env.VOZIT_YOUTUBE_TOKEN,
-      accessToken: process.env.VOZIT_YOUTUBE_TOKEN || '',
+      // Readiness is based on having the refresh-token credentials, not a
+      // (nonexistent, for YouTube) static access token — the real token is
+      // resolved just-in-time by getYouTubeAccessToken() right before
+      // posting, since any value fetched here would likely be stale by the
+      // time the upload actually runs.
+      enabled: !!(process.env.VOZIT_YOUTUBE_REFRESH_TOKEN && process.env.VOZIT_YOUTUBE_CLIENT_ID && process.env.VOZIT_YOUTUBE_CLIENT_SECRET),
+      accessToken: '',
     },
     tiktok: {
       enabled: !!process.env.VOZIT_TIKTOK_TOKEN,
@@ -72,15 +107,25 @@ export async function autoDistributeToVozItChannels(params: {
 
   // YouTube — full video upload
   if (accounts.youtube.enabled) {
-    const r = await postToYouTube({
-      accessToken: accounts.youtube.accessToken,
-      title: `[EYEWITNESS] ${params.title}`,
-      description,
-      videoUrl,
-      tags,
-      location: params.location,
-    })
-    results.push(r)
+    const youtubeToken = await getYouTubeAccessToken()
+    if (youtubeToken) {
+      const r = await postToYouTube({
+        accessToken: youtubeToken,
+        title: `[EYEWITNESS] ${params.title}`,
+        description,
+        videoUrl,
+        tags,
+        location: params.location,
+      })
+      results.push(r)
+    } else {
+      results.push({
+        platform: 'youtube',
+        success: false,
+        error: 'Could not refresh YouTube access token',
+        distributedAt: new Date().toISOString(),
+      })
+    }
   }
 
   // TikTok — post as TikTok video
