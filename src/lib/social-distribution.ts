@@ -277,6 +277,14 @@ export async function postToX(params: {
   reportUrl: string
 }): Promise<DistributionResult> {
   try {
+    // X now bills per post ($0.20/post for anything containing a URL, vs
+    // $0.015 without one, as of the 2026 pay-per-use pricing change) — this
+    // tags the link so the actual traffic/value X sends back to the site
+    // is measurable in analytics, rather than deciding whether X is worth
+    // the per-post cost from a guess.
+    const separator = params.reportUrl.includes('?') ? '&' : '?'
+    const trackedReportUrl = `${params.reportUrl}${separator}utm_source=x&utm_medium=social&utm_campaign=auto_distribution`
+
     // 1. Upload media via X media upload endpoint
     const mediaRes = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
       method: 'POST',
@@ -297,7 +305,7 @@ export async function postToX(params: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: `${params.text}\n\n📹 via @VozItApp ${params.reportUrl}`,
+        text: `${params.text}\n\n📹 via @VozItApp ${trackedReportUrl}`,
         media: media.media_id_string ? { media_ids: [media.media_id_string] } : undefined,
       }),
     })
