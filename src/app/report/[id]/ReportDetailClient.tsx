@@ -283,7 +283,7 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
         centered text, so cropping slightly to fill the box instead
         loses nothing — and removes the seam entirely rather than
         chasing an exact color match that can never fully hold up. */}
-    <video ref={playerRef} src={r.watermarked_url} controls playsInline preload="metadata" style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30',objectFit:showEndCard?'cover':'contain'}}/>
+    <video ref={playerRef} src={r.watermarked_url} controls playsInline autoPlay muted preload="auto" style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30',objectFit:showEndCard?'cover':'contain'}}/>
     {/* MuxPlayer (the other branch below) draws its own big center play
         button automatically; a plain <video> tag doesn't, which made
         the two players look inconsistent side by side. This matches
@@ -305,7 +305,7 @@ return(<div style={{background:'#fff',minHeight:'100vh'}}><div style={{backgroun
       fullscreen and the overlay layers below get left behind. Mitigates
       the gap on everything except iOS native fullscreen, until the
       watermarked file above takes over. */
-  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="metadata" poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} fullscreenElement={`vz-player-${r.id}`} style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>}
+  <MuxPlayer ref={playerRef} playbackId={r.playback_id} streamType="on-demand" preload="auto" autoPlay muted poster={r.thumbnail_url||undefined} metadata={{video_title:r.title,viewer_user_id:user?.id}} fullscreenElement={`vz-player-${r.id}`} style={{width:'100%',aspectRatio:videoAspect,maxHeight:'85vh',background:'#0a1e30'}}/>}
 
   {/* Mid-roll ad break — pauses the report at ~45s, plays a short ad,
       then resumes. Non-skippable by design at this length. */}

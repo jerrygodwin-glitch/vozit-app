@@ -101,9 +101,10 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
                 id="player"
                 controls
                 playsInline
-                preload="none"
+                autoPlay
+                muted
+                preload="auto"
                 poster={report.thumbnail_url || undefined}
-                style={{ display: 'none' }}
               >
                 <source src={videoUrl} type={videoMimeType} />
               </video>
@@ -148,10 +149,19 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
           </div>
         </div>
         <script dangerouslySetInnerHTML={{ __html: `
-          document.getElementById('playBtn').onclick = function() {
-            var v = document.getElementById('player');
-            var p = document.getElementById('poster');
-            if (v) { v.style.display = 'block'; v.play(); this.style.display = 'none'; if(p) p.style.display = 'none'; }
+          var v = document.getElementById('player');
+          var p = document.getElementById('poster');
+          var btn = document.getElementById('playBtn');
+          function hideStartUI() { if (btn) btn.style.display = 'none'; if (p) p.style.display = 'none'; }
+          // Autoplay (muted) usually starts immediately — this hides the
+          // poster/play button the moment it does. If a browser blocks
+          // even muted autoplay, they stay up as a manual fallback.
+          if (v) {
+            v.addEventListener('play', hideStartUI);
+            if (!v.paused) hideStartUI();
+          }
+          if (btn) btn.onclick = function() {
+            if (v) { v.muted = false; v.play(); hideStartUI(); }
           };
           document.getElementById('expandBtn').onclick = function() {
             document.querySelector('.video-wrap').classList.toggle('vz-fs');
