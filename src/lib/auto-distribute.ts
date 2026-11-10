@@ -36,6 +36,34 @@ async function getYouTubeAccessToken(): Promise<string> {
   }
 }
 
+// TikTok access tokens expire in 24 hours — same reasoning as YouTube's
+// getYouTubeAccessToken() above, just a longer-lived token and a
+// different refresh endpoint.
+async function getTikTokAccessToken(): Promise<string> {
+  const refreshToken = process.env.VOZIT_TIKTOK_REFRESH_TOKEN
+  const clientKey = process.env.VOZIT_TIKTOK_CLIENT_KEY
+  const clientSecret = process.env.VOZIT_TIKTOK_CLIENT_SECRET
+  if (!refreshToken || !clientKey || !clientSecret) return ''
+
+  try {
+    const res = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    })
+    if (!res.ok) return ''
+    const data = await res.json()
+    return data.access_token || ''
+  } catch {
+    return ''
+  }
+}
+
 // VozIt's official platform accounts — tokens from env vars
 function getVozItAccounts() {
   return {
@@ -49,8 +77,10 @@ function getVozItAccounts() {
       accessToken: '',
     },
     tiktok: {
-      enabled: !!process.env.VOZIT_TIKTOK_TOKEN,
-      accessToken: process.env.VOZIT_TIKTOK_TOKEN || '',
+      // Same just-in-time pattern as YouTube — TikTok access tokens expire
+      // in 24 hours, so a value fetched here would go stale.
+      enabled: !!(process.env.VOZIT_TIKTOK_REFRESH_TOKEN && process.env.VOZIT_TIKTOK_CLIENT_KEY && process.env.VOZIT_TIKTOK_CLIENT_SECRET),
+      accessToken: '',
     },
     instagram: {
       enabled: !!process.env.VOZIT_INSTAGRAM_TOKEN,
@@ -136,12 +166,23 @@ export async function autoDistributeToVozItChannels(params: {
 
   // TikTok — post as TikTok video
   if (accounts.tiktok.enabled) {
-    const r = await postToTikTok({
-      accessToken: accounts.tiktok.accessToken,
-      title: `${params.title} #VozIt #IWasThere`,
-      videoUrl,
-    })
-    results.push(r)
+    const tiktokToken = await getTikTokAccessToken()
+    if (tiktokToken) {
+      const r = await postToTikTok({
+        accessToken: tiktokToken,
+        title: `${params.title} #VozIt #IWasThere`,
+        videoUrl,
+        reportUrl,
+      })
+      results.push(r)
+    } else {
+      results.push({
+        platform: 'tiktok',
+        success: false,
+        error: 'Could not refresh TikTok access token',
+        distributedAt: new Date().toISOString(),
+      })
+    }
   }
 
   // Instagram — post as Reel

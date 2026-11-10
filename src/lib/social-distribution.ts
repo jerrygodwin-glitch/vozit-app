@@ -130,23 +130,50 @@ export async function postToTikTok(params: {
   reportUrl: string
 }): Promise<DistributionResult> {
   try {
-    // 1. Initialize upload
     // TikTok captions aren't clickable text (the real click-through paths
     // are the account's one bio link, or a link sticker placed on the
     // video — neither controlled from here), but including the URL still
     // gives viewers something to copy, and it's one more place the real
     // destination is visible.
     const caption = `${params.title}\n\n${params.reportUrl}`
+
+    // Unaudited apps are restricted to private (SELF_ONLY) posts regardless
+    // of what privacy_level is requested, and the exact set of allowed
+    // levels can vary by account — querying creator_info first avoids
+    // hardcoding a level TikTok will reject.
+    const creatorRes = await fetch('https://open.tiktokapis.com/v2/post/publish/creator_info/query/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${params.accessToken}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    })
+    const creatorData = await creatorRes.json()
+    if (creatorData.error?.code && creatorData.error.code !== 'ok') throw new Error(creatorData.error.message)
+    const availableLevels: string[] = creatorData.data?.privacy_level_options || []
+    const privacyLevel = availableLevels.includes('PUBLIC_TO_EVERYONE')
+      ? 'PUBLIC_TO_EVERYONE'
+      : (availableLevels[0] || 'SELF_ONLY')
+
+    // The finished watermarked video lives on Supabase's storage domain,
+    // not one VozIt has verified ownership of with TikTok, so "pull by
+    // URL" isn't usable — uploading the bytes directly sidesteps domain
+    // verification entirely (same approach as postToX below).
+    const videoRes = await fetch(params.videoUrl)
+    if (!videoRes.ok) throw new Error(`Could not download video: ${videoRes.status}`)
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer())
+    const videoSize = videoBuffer.length
+
     const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${params.accessToken}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8',
       },
       body: JSON.stringify({
         post_info: {
           title: caption.slice(0, 150),
-          privacy_level: 'PUBLIC_TO_EVERYONE',
+          privacy_level: privacyLevel,
           disable_duet: false,
           disable_stitch: false,
           disable_comment: false,
@@ -154,19 +181,34 @@ export async function postToTikTok(params: {
           brand_organic_toggle: false,
         },
         source_info: {
-          source: 'PULL_FROM_URL',
-          video_url: params.videoUrl,
+          source: 'FILE_UPLOAD',
+          video_size: videoSize,
+          chunk_size: videoSize,
+          total_chunk_count: 1,
         },
       }),
     })
+    const initData = await initRes.json()
+    if (initData.error?.code && initData.error.code !== 'ok') throw new Error(initData.error.message)
 
-    const data = await initRes.json()
-    if (data.error?.code) throw new Error(data.error.message)
+    const publishId = initData.data?.publish_id
+    const uploadUrl = initData.data?.upload_url
+    if (!uploadUrl) throw new Error('TikTok did not return an upload URL')
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Content-Range': `bytes 0-${videoSize - 1}/${videoSize}`,
+      },
+      body: videoBuffer,
+    })
+    if (!uploadRes.ok) throw new Error(`TikTok upload failed: ${uploadRes.status}`)
 
     return {
       platform: 'tiktok',
       success: true,
-      postId: data.data?.publish_id,
+      postId: publishId,
       distributedAt: new Date().toISOString(),
     }
   } catch (e: any) {
