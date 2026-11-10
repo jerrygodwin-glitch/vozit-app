@@ -155,7 +155,9 @@ export async function postToTikTok(params: {
         },
       })
       const creatorData = await creatorRes.json()
-      if (creatorData.error?.code && creatorData.error.code !== 'ok') throw new Error(creatorData.error.message)
+      if (creatorData.error?.code && creatorData.error.code !== 'ok') {
+        throw new Error(`TikTok creator_info rejected [${creatorData.error.code}] (log_id ${creatorData.error.log_id}): ${creatorData.error.message}`)
+      }
       const availableLevels: string[] = creatorData.data?.privacy_level_options || []
       privacyLevel = availableLevels.includes('PUBLIC_TO_EVERYONE')
         ? 'PUBLIC_TO_EVERYONE'
@@ -196,7 +198,9 @@ export async function postToTikTok(params: {
       }),
     })
     const initData = await initRes.json()
-    if (initData.error?.code && initData.error.code !== 'ok') throw new Error(initData.error.message)
+    if (initData.error?.code && initData.error.code !== 'ok') {
+      throw new Error(`TikTok init rejected [${initData.error.code}] (log_id ${initData.error.log_id}): ${initData.error.message}`)
+    }
 
     const publishId = initData.data?.publish_id
     const uploadUrl = initData.data?.upload_url
