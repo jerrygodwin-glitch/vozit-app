@@ -5,7 +5,7 @@
 
 import crypto from 'crypto'
 
-export type SocialPlatform = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x'
+export type SocialPlatform = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'telegram'
 
 export interface SocialAccount {
   platform: SocialPlatform
@@ -529,6 +529,52 @@ export async function postToX(params: {
     }
   } catch (e: any) {
     return { platform: 'x', success: false, error: e.message, distributedAt: new Date().toISOString() }
+  }
+}
+
+// ── TELEGRAM ─────────────────────────────────────────────────────────
+// Post via a bot the channel has made an admin. Telegram's sendVideo
+// accepts a plain URL and would fetch it server-side, but that relies on
+// Telegram being able to reach Supabase's storage domain and has its own
+// looser size/reliability behavior for URL-sourced media — downloading
+// and uploading the bytes directly (same approach as TikTok/X above) is
+// more predictable and keeps all four "real upload" platforms consistent.
+export async function postToTelegram(params: {
+  botToken: string
+  channelUsername: string // e.g. '@VozItNews'
+  caption: string
+  videoUrl: string
+}): Promise<DistributionResult> {
+  try {
+    const videoRes = await fetch(params.videoUrl)
+    if (!videoRes.ok) throw new Error(`Could not download video: ${videoRes.status}`)
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer())
+
+    const form = new FormData()
+    form.append('chat_id', params.channelUsername)
+    // Telegram's caption limit for media messages is 1024 characters.
+    form.append('caption', params.caption.slice(0, 1024))
+    form.append('supports_streaming', 'true')
+    form.append('video', new Blob([videoBuffer], { type: 'video/mp4' }), 'video.mp4')
+
+    const res = await fetch(`https://api.telegram.org/bot${params.botToken}/sendVideo`, {
+      method: 'POST',
+      body: form,
+    })
+    const data = await res.json()
+    if (!data.ok) throw new Error(`Telegram sendVideo failed: ${data.description || JSON.stringify(data)}`)
+
+    const messageId = data.result?.message_id
+    const channelName = params.channelUsername.replace(/^@/, '')
+    return {
+      platform: 'telegram',
+      success: true,
+      postId: messageId ? String(messageId) : undefined,
+      postUrl: messageId ? `https://t.me/${channelName}/${messageId}` : undefined,
+      distributedAt: new Date().toISOString(),
+    }
+  } catch (e: any) {
+    return { platform: 'telegram', success: false, error: e.message, distributedAt: new Date().toISOString() }
   }
 }
 

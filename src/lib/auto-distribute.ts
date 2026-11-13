@@ -3,7 +3,7 @@
 // Triggered after a report passes moderation in the Mux webhook pipeline
 // Uses VozIt's own platform tokens (stored as env vars)
 
-import { postToYouTube, postToTikTok, postToInstagram, postToFacebook, postToX } from './social-distribution'
+import { postToYouTube, postToTikTok, postToInstagram, postToFacebook, postToX, postToTelegram } from './social-distribution'
 import type { DistributionResult } from './social-distribution'
 
 // YouTube access tokens expire in ~1 hour — unlike the other platforms'
@@ -103,6 +103,11 @@ function getVozItAccounts() {
       consumerSecret: process.env.VOZIT_X_CONSUMER_SECRET || '',
       accessToken: process.env.VOZIT_X_ACCESS_TOKEN || '',
       accessTokenSecret: process.env.VOZIT_X_ACCESS_TOKEN_SECRET || '',
+    },
+    telegram: {
+      enabled: !!process.env.VOZIT_TELEGRAM_BOT_TOKEN,
+      botToken: process.env.VOZIT_TELEGRAM_BOT_TOKEN || '',
+      channelUsername: process.env.VOZIT_TELEGRAM_CHANNEL || '@VozItNews',
     },
   }
 }
@@ -225,6 +230,17 @@ export async function autoDistributeToVozItChannels(params: {
       text: `🔴 EYEWITNESS: ${tweetText}`,
       videoUrl,
       reportUrl,
+    })
+    results.push(r)
+  }
+
+  // Telegram — post as a video message in the channel
+  if (accounts.telegram.enabled) {
+    const r = await postToTelegram({
+      botToken: accounts.telegram.botToken,
+      channelUsername: accounts.telegram.channelUsername,
+      caption: description,
+      videoUrl,
     })
     results.push(r)
   }
