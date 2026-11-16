@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { sendPushNotification } from './push-notifications'
+
 // Applies the same 1/2/3/4 strike escalation the human admin queue uses
 // (src/app/api/admin/moderation/route.ts 'remove' action) — shared so an
 // automated Hive decision and a moderator's manual decision never drift
@@ -52,6 +54,12 @@ export async function applyStrike(admin: any, params: {
     notes: 'Automated: high-confidence Hive AI moderation match, no human review',
     result: actionLabel,
     strike_count_after: strikeCount,
+  })
+
+  await sendPushNotification(admin, params.userId, {
+    title: 'Content moderation notice',
+    body: actionLabel,
+    data: { type: 'moderation_strike', reportId: params.reportId ?? '' },
   })
 
   return { strikeCount, isSuspended, actionLabel }

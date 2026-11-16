@@ -35,7 +35,7 @@ export default function Settings() {
             ))}
           </div>
         </div>
-        {[{ i: '📊', t: 'Earnings', h: '/earnings' }, { i: '💰', t: 'Payouts', h: '/payouts' }, { i: '📱', t: 'Social', h: '/settings/social' }, { i: '📄', t: 'Licensing', h: '/licensing' }].map(s => (
+        {[{ i: '📊', t: 'Earnings', h: '/earnings' }, { i: '💰', t: 'Payouts', h: '/payouts' }, { i: '📱', t: 'Social', h: '/settings/social' }, { i: '📄', t: 'Licensing', h: '/licensing' }, { i: '🚫', t: 'Blocked Accounts', h: '/settings/blocked' }].map(s => (
           <a key={s.t} href={s.h} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#1a1a1a' }}>
             <span style={{ fontSize: 28 }}>{s.i}</span>
             <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>{s.t}</span>

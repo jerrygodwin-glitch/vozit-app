@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { captureError } from '@/lib/monitoring'
+import { sendPushNotification } from '@/lib/push-notifications'
 
 // POST /api/assignments/join — a reporter joins an assignment. The
 // assignment_contributors table has a "Self join" RLS policy (auth.uid() =
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const { data: assignment } = await supabase
       .from('assignments')
-      .select('id, status')
+      .select('id, status, created_by, title')
       .eq('id', assignment_id)
       .single()
     if (!assignment) return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
@@ -30,6 +31,17 @@ export async function POST(req: NextRequest) {
     // Unique (assignment_id, user_id) violation just means they already
     // joined — treat that as success rather than an error.
     if (error && error.code !== '23505') throw error
+
+    // Notify whoever created the assignment, not the joiner — reading
+    // another user's device tokens needs the admin client, same reasoning
+    // as the RLS-bypass note on getVozItAccounts()-style cross-user writes.
+    if (!error && assignment.created_by && assignment.created_by !== user.id) {
+      await sendPushNotification(createAdminClient(), assignment.created_by, {
+        title: 'New contributor on your assignment',
+        body: `Someone joined "${assignment.title}".`,
+        data: { type: 'assignment_joined', assignmentId: assignment_id },
+      })
+    }
 
     return NextResponse.json({ ok: true, alreadyJoined: error?.code === '23505' })
   } catch (e: any) {

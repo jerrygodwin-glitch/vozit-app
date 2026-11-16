@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { captureError } from '@/lib/monitoring'
+import { sendPushNotification } from '@/lib/push-notifications'
 
 // POST /api/tasks/claim — a reporter claims an open one-shot task.
 // The "Update own task" RLS policy only lets the task's CREATOR update it,
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!task_id) return NextResponse.json({ error: 'task_id required' }, { status: 400 })
 
     const admin = createAdminClient()
-    const { data: task } = await admin.from('tasks').select('id, deadline, status').eq('id', task_id).single()
+    const { data: task } = await admin.from('tasks').select('id, deadline, status, created_by, title').eq('id', task_id).single()
     if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     if (new Date(task.deadline) < new Date()) return NextResponse.json({ error: 'This task has passed its deadline' }, { status: 400 })
 
@@ -34,6 +35,14 @@ export async function POST(req: NextRequest) {
 
     if (error || !claimed) {
       return NextResponse.json({ error: 'This task was just claimed by someone else' }, { status: 409 })
+    }
+
+    if (task.created_by && task.created_by !== user.id) {
+      await sendPushNotification(admin, task.created_by, {
+        title: 'Your task was claimed',
+        body: `A reporter has claimed "${task.title}".`,
+        data: { type: 'task_claimed', taskId: task_id },
+      })
     }
 
     return NextResponse.json({ ok: true, task: claimed })

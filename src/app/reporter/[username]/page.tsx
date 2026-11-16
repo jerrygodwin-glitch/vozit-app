@@ -2,6 +2,7 @@
 import{createServerClient}from'@/lib/supabase-server'
 import{cookies}from'next/headers'
 import Link from'next/link'
+import BlockReporterButton from'./BlockReporterButton'
 
 export const dynamic='force-dynamic'
 
@@ -10,6 +11,14 @@ const supabase=createServerClient()
 const{data:reporter}=await supabase.from('users').select('id, username, display_name, bio, avatar_url, tier, report_count, credibility_score, created_at').eq('username',params.username).eq('is_banned',false).single()
 
 if(!reporter)return<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui'}}><p style={{color:'#888'}}>Reporter not found</p></div>
+
+const{data:{user:viewer}}=await supabase.auth.getUser()
+const isOwnProfile=viewer?.id===reporter.id
+let isBlocked=false
+if(viewer&&!isOwnProfile){
+  const{data:existingBlock}=await supabase.from('blocked_users').select('id').eq('blocker_id',viewer.id).eq('blocked_id',reporter.id).single()
+  isBlocked=!!existingBlock
+}
 
 const{data:reports}=await supabase.from('reports').select('id, title, thumbnail_url, playback_id, location_name, created_at, upvotes, downvotes, credibility_pct, duration').eq('user_id',reporter.id).eq('status','published').order('created_at',{ascending:false}).limit(20)
 
@@ -28,6 +37,7 @@ return(<div style={{minHeight:'100vh',background:'#f5f5f5',fontFamily:'-apple-sy
 <div style={{fontSize:13,color:'#888',marginBottom:8}}>@{reporter.username}</div>
 <span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:12,background:`${tc}18`,color:tc}}>★ {reporter.tier.charAt(0).toUpperCase()+reporter.tier.slice(1)} Reporter</span>
 {reporter.bio&&<p style={{fontSize:13,color:'#666',marginTop:12,lineHeight:1.5}}>{reporter.bio}</p>}
+{viewer&&!isOwnProfile&&!isBlocked&&<div style={{marginTop:12}}><BlockReporterButton reporterId={reporter.id} reporterName={reporter.display_name||reporter.username} initiallyBlocked={false}/></div>}
 
 <div style={{display:'flex',justifyContent:'center',gap:24,marginTop:16}}>
 <div><div style={{fontSize:20,fontWeight:700,color:'#1a1a1a'}}>{reporter.report_count}</div><div style={{fontSize:11,color:'#888'}}>Reports</div></div>
@@ -36,7 +46,15 @@ return(<div style={{minHeight:'100vh',background:'#f5f5f5',fontFamily:'-apple-sy
 </div>
 </div>
 
-{/* Reports grid */}
+{/* Reports grid — hidden behind a block notice if the viewer has
+    blocked this reporter, so blocking actually stops their content
+    from showing even via a direct profile link, not just in feeds. */}
+{isBlocked?
+<div style={{background:'#fff',borderRadius:12,padding:24,border:'1px solid #eee',textAlign:'center'}}>
+<p style={{color:'#666',fontSize:13,marginBottom:12}}>You've blocked this reporter. Their reports are hidden from your feed and profile.</p>
+<BlockReporterButton reporterId={reporter.id} reporterName={reporter.display_name||reporter.username} initiallyBlocked={true}/>
+</div>
+:<>
 <div style={{fontSize:14,fontWeight:600,color:'#1a1a1a',marginBottom:10}}>Reports ({reports?.length||0})</div>
 {(!reports||reports.length===0)?<div style={{background:'#fff',borderRadius:12,padding:20,border:'1px solid #eee',textAlign:'center',color:'#888',fontSize:13}}>No published reports yet</div>:
 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -56,6 +74,7 @@ return(<div style={{minHeight:'100vh',background:'#f5f5f5',fontFamily:'-apple-sy
 </Link>
 ))}
 </div>}
+</>}
 
 <div style={{textAlign:'center',marginTop:20}}><Link href="/feed" style={{color:'#0a8fe8',fontSize:13,fontWeight:500,textDecoration:'none'}}>← Back to feed</Link></div>
 </div>

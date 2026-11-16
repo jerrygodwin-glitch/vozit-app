@@ -381,3 +381,41 @@ ALTER TABLE reports ADD COLUMN IF NOT EXISTS ai_tags TEXT[] DEFAULT '{}';
 -- Voice-over support
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS voice_over_path TEXT;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS has_voice_over BOOLEAN DEFAULT false;
+
+-- Blocked users — required by Apple's App Store review guidelines for
+-- user-generated-content apps (report content + block abusive users, both
+-- required; VozIt already had report/flag, this adds the other half).
+CREATE TABLE IF NOT EXISTS blocked_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  blocker_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  blocked_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(blocker_id, blocked_id),
+  CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users(blocker_id);
+ALTER TABLE blocked_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Insert own block" ON blocked_users FOR INSERT WITH CHECK (auth.uid() = blocker_id);
+CREATE POLICY "Own blocks" ON blocked_users FOR SELECT USING (auth.uid() = blocker_id);
+CREATE POLICY "Self unblock" ON blocked_users FOR DELETE USING (auth.uid() = blocker_id);
+
+-- Device tokens — push-notification backend plumbing, ahead of the
+-- actual mobile apps existing. Inert until a real Apple Developer APNs
+-- key / Firebase service account are added as env vars (see
+-- src/lib/push-notifications.ts) — the table/routes are ready for the
+-- mobile client to register a token the moment it exists.
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  platform TEXT NOT NULL CHECK (platform IN ('ios','android')),
+  token TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(platform, token)
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+ALTER TABLE device_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Insert own device token" ON device_tokens FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Own device tokens" ON device_tokens FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Update own device token" ON device_tokens FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Delete own device token" ON device_tokens FOR DELETE USING (auth.uid() = user_id);

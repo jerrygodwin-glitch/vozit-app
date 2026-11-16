@@ -12,7 +12,11 @@ import { lookupWeather } from '@/lib/weather'
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerClient()
+    // getAuthedUser resolves to { user: null } for an anonymous visitor
+    // (no cookie session, no Bearer header) rather than throwing, so this
+    // is safe to call unconditionally — anonymous viewers just skip the
+    // blocked-users filter below.
+    const { user: viewer, supabase } = await getAuthedUser(req)
     const url = new URL(req.url)
     const region = url.searchParams.get('region')
     const category = url.searchParams.get('category')
@@ -40,6 +44,17 @@ export async function GET(req: NextRequest) {
 
     if (q) {
       query = query.or(`title.ilike.%${q}%,who.ilike.%${q}%,what.ilike.%${q}%,why.ilike.%${q}%,location_name.ilike.%${q}%`)
+    }
+
+    // Hide reports from anyone the viewer has blocked — required by
+    // Apple's UGC review guidelines (block must actually stop the
+    // blocked user's content from surfacing, not just sit in a list).
+    if (viewer) {
+      const { data: blocks } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', viewer.id)
+      const blockedIds = (blocks || []).map((b: any) => b.blocked_id)
+      if (blockedIds.length > 0) {
+        query = query.not('user_id', 'in', `(${blockedIds.join(',')})`)
+      }
     }
 
     // Sort by trending score, recency, votes, or credibility

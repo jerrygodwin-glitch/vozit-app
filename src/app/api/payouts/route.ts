@@ -6,6 +6,7 @@ import { PAYOUT_PROVIDERS, validatePayoutRequest, calculateAvailableBalance, exe
 import { fullPayoutScreening, logScreeningResult, type ScreeningResult } from '@/lib/ofac-screening'
 import { rateLimit, RATE_LIMITS } from '@/lib/security'
 import { captureError } from '@/lib/monitoring'
+import { sendPushNotification } from '@/lib/push-notifications'
 
 // GET — retrieve payout status, balance, and provider info
 export async function GET(req: NextRequest) {
@@ -276,6 +277,12 @@ export async function POST(req: NextRequest) {
           transaction_id: result.transactionId,
           completed_at: new Date().toISOString(),
         }).eq('id', payout.id)
+
+        await sendPushNotification(admin, user.id, {
+          title: 'Payout sent',
+          body: `$${amount.toFixed(2)} is on its way to your ${p} account.`,
+          data: { type: 'payout_completed', payoutId: payout.id },
+        })
 
         // Mark earnings as paid out (oldest first, up to amount) — this
         // previously computed `remaining` but never persisted which
