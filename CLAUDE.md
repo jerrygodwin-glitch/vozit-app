@@ -145,7 +145,7 @@ Note: `categories` does not exist in the live schema despite being listed here p
 | HIVE_API_KEY | Content moderation | Needs setup |
 | NEXT_PUBLIC_SENTRY_DSN | Error monitoring | Set by Claude Code |
 | SUPABASE_SERVICE_ROLE_KEY | Admin operations | Needs setup |
-| TELEGRAM_BOT_TOKEN | @VozItBot intake bot (src/app/api/telegram/route.ts) — from @BotFather. Separate from VOZIT_TELEGRAM_BOT_TOKEN (the outbound VozItNewsBot) | Needs setup |
+| TELEGRAM_BOT_TOKEN | @VozItReporterBot intake bot (src/app/api/telegram/route.ts) — from @BotFather. Separate from VOZIT_TELEGRAM_BOT_TOKEN (the outbound VozItNewsBot) | Needs setup |
 | TELEGRAM_WEBHOOK_SECRET | Optional — verifies incoming Telegram webhook calls, same pattern as MUX_WEBHOOK_SECRET | Optional |
 
 ## 6. KEY FEATURES
@@ -197,7 +197,7 @@ Note: `categories` does not exist in the live schema despite being listed here p
 ### Telegram Bot Intake (src/app/api/telegram/route.ts)
 Lets reporters in conflict zones, on low bandwidth, or who otherwise can't
 use the website/app submit a full report — video, description, location —
-entirely through a chat with @VozItBot. This is the INBOUND/submission
+entirely through a chat with @VozItReporterBot. This is the INBOUND/submission
 direction and is a completely separate bot/token from the OUTBOUND
 auto-distribution Telegram channel above (VozItNewsBot / `VOZIT_TELEGRAM_BOT_TOKEN`,
 which posts VozIt's own published reports TO a public channel) — don't

@@ -17,7 +17,7 @@ const LANGS = [
 
 const STEPS: Record<string, string[]> = {
   en: [
-    'Open Telegram and start a chat with @VozItBot.',
+    'Open Telegram and start a chat with @VozItReporterBot.',
     'Pick your language when the bot asks.',
     'First time? The bot sets up your account — name, username, email.',
     'Send your video as a FILE (tap the paperclip → File), not as a video message — this preserves quality and location data.',
@@ -41,7 +41,7 @@ export default function SubmitTelegramPage() {
           </span>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Submit via Telegram</h1>
-            <div style={{ fontSize: 13, color: '#666' }}>@VozItBot</div>
+            <div style={{ fontSize: 13, color: '#666' }}>@VozItReporterBot</div>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export default function SubmitTelegramPage() {
           </div>
         </div>
 
-        <a href="https://t.me/VozItBot" target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+        <a href="https://t.me/VozItReporterBot" target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
           <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 15 }}>
             Open Telegram
           </button>
