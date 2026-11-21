@@ -13,7 +13,7 @@ const S: Record<string, React.CSSProperties> = {
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   card: {
     display: 'block', textDecoration: 'none', border: '1px solid #e5e5e5', borderRadius: 10,
-    padding: '16px 18px', transition: 'border-color .15s',
+    padding: '16px 18px',
   },
   cardTitle: { fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 },
   cardDesc: { fontSize: 13, color: '#666', lineHeight: 1.5 },
@@ -41,6 +41,7 @@ const DOCS = [
 export default function PoliciesPage() {
   return (
     <div style={S.page}>
+      <style>{`.policy-card{transition:border-color .15s}.policy-card:hover{border-color:#ccc}`}</style>
       <Top />
       <div style={S.wrap}>
         <h1 style={S.h1}>Terms and Policies</h1>
@@ -52,10 +53,7 @@ export default function PoliciesPage() {
 
         <div style={S.list}>
           {DOCS.map(d => (
-            <a key={d.href} href={d.href} style={S.card}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = '#ccc')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#e5e5e5')}
-            >
+            <a key={d.href} href={d.href} className="policy-card" style={S.card}>
               <div style={S.cardTitle}>{d.title} →</div>
               <div style={S.cardDesc}>{d.desc}</div>
             </a>
