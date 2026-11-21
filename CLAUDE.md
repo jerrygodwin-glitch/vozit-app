@@ -145,6 +145,8 @@ Note: `categories` does not exist in the live schema despite being listed here p
 | HIVE_API_KEY | Content moderation | Needs setup |
 | NEXT_PUBLIC_SENTRY_DSN | Error monitoring | Set by Claude Code |
 | SUPABASE_SERVICE_ROLE_KEY | Admin operations | Needs setup |
+| TELEGRAM_BOT_TOKEN | @VozItBot intake bot (src/app/api/telegram/route.ts) — from @BotFather. Separate from VOZIT_TELEGRAM_BOT_TOKEN (the outbound VozItNewsBot) | Needs setup |
+| TELEGRAM_WEBHOOK_SECRET | Optional — verifies incoming Telegram webhook calls, same pattern as MUX_WEBHOOK_SECRET | Optional |
 
 ## 6. KEY FEATURES
 
@@ -186,9 +188,78 @@ Note: `categories` does not exist in the live schema despite being listed here p
 - "VozIt! — I was there..." floating stamp
 
 ### Social Distribution
-- Auto-post to 5 platforms: YouTube, TikTok, Instagram, Facebook, X (Twitter)
+- Auto-post to 6 platforms: YouTube, TikTok, Instagram, Facebook, X (Twitter), Telegram
 - Each platform has its own monetization tracking
-- Social accounts page with official logos via Google Favicon API
+- Social accounts page uses real inline SVG platform marks (simple-icons) —
+  the Google Favicon API is blocked by this site's own CSP and was never a
+  working icon source; don't reintroduce it
+
+### Telegram Bot Intake (src/app/api/telegram/route.ts)
+Lets reporters in conflict zones, on low bandwidth, or who otherwise can't
+use the website/app submit a full report — video, description, location —
+entirely through a chat with @VozItBot. This is the INBOUND/submission
+direction and is a completely separate bot/token from the OUTBOUND
+auto-distribution Telegram channel above (VozItNewsBot / `VOZIT_TELEGRAM_BOT_TOKEN`,
+which posts VozIt's own published reports TO a public channel) — don't
+confuse the two integrations.
+
+- `src/lib/bot-common.ts` — message templates in 7 languages (en/es/ar/fr/uk/pt/sw),
+  Claude-API language detection + translate-to-English, video duration
+  validation (61-90s, same window the website enforces), the submission-
+  channel credibility modifier, and `createReportFromBot()`/`createAccountFromBot()`.
+- `src/lib/telegram-bot.ts` — `sendMessage`, `getFile` (downloads bytes,
+  rejects >20MB — Telegram's own bot-download ceiling), `extractVideoMetadata`
+  (reads whatever Telegram's message object itself reports — NOT a general
+  EXIF/GPS parser, no binary tool for that is installed here), and
+  `parseMp4Duration` (reads the real duration straight out of the video's own
+  `moov`/`mvhd` box — needed because Telegram's API only reports duration for
+  compressed "video message" sends, never for files sent as a document).
+- `src/app/api/telegram/route.ts` — the webhook. Telegram gives one stateless
+  HTTP call per message, so all conversation progress (language → first-time
+  account setup → video → description → location → when) lives in the new
+  `telegram_sessions` table (chat_id, step, data jsonb), read/written on
+  every request, cleared once a report is created.
+- **No `pending_review` status exists or was added.** The original build
+  spec for this feature assumed one, but `reports.status`'s real CHECK
+  constraint only allows `processing`/`published`/`flagged`/`removed`, and
+  `hive-moderation.ts` already documents that VozIt deliberately has no
+  manual-review queue (a one-person operation can't keep one cleared). A
+  bot-submitted report goes through the exact same automated text/video
+  moderation every other channel does — `createReportFromBot()` duplicates
+  (deliberately, not shared via refactor, to avoid touching the already-
+  live `/api/reports` insert path) the real insert shape from that route.
+  Once a report has a valid `mux_upload_id`, the existing `/api/mux-webhook`
+  pipeline (AI 5W analysis, video moderation, watermarking, auto-distribution)
+  picks it up automatically — nothing bot-specific was built for that part.
+- **Real known limitation: Telegram's standard Bot API refuses to let a bot
+  download any file over 20MB**, regardless of how it was sent. This is in
+  direct tension with the bot's own "send as a FILE, not a video message"
+  instruction (files preserve quality/metadata but are also more likely to
+  exceed 20MB; video messages stay under it more easily but get re-compressed
+  and lose location data). No code-side fix exists short of a self-hosted
+  Bot API server (a real infrastructure decision, not done here) — the bot
+  just tells the reporter their file's too large and points them to the
+  website instead.
+- `submission_channel`/`metadata_quality` default to `'website'`/`'full'` on
+  `reports` (see migration below), so the existing, untouched `/api/reports`
+  insert path picks up correct values automatically with zero code change.
+- Reuses the existing `reports.location_lat`/`location_lng` columns for GPS
+  — NOT a separate `reporter_latitude`/`reporter_longitude` pair (the
+  original spec didn't know these columns already existed).
+- Migration: `supabase_migration_telegram_bot.sql` — `users.telegram_id`
+  (unique) + `users.telegram_language`; `reports.submission_channel`,
+  `metadata_quality`, `reported_timestamp`, `device_info`, `original_filename`,
+  `report_metadata` (jsonb), `metadata_credibility_modifier`; new
+  `telegram_sessions` table. Already applied directly to the live DB.
+- Public page: `/submit-telegram`. Linked from the Upload page (banner above
+  the camera recorder) and the homepage sidebar.
+- **Still needed before this does anything live:** `TELEGRAM_BOT_TOKEN` (from
+  @BotFather) in Vercel, and the webhook registered with Telegram
+  (`https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://www.vozit.net/api/telegram`
+  — optionally with `&secret_token=...` matching an also-set
+  `TELEGRAM_WEBHOOK_SECRET` env var, verified on every incoming call the same
+  way the Mux webhook's signature is). Until the token exists, this route is
+  inert — it 400s with no bot token configured.
 
 ### Assignment System
 - Ongoing assignments with fees for conflict zones and breaking news
