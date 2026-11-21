@@ -109,7 +109,9 @@ export default function TermsPage() {
           Questions about these terms? Email{' '}
           <a href="mailto:vozitnews@gmail.com" style={{ color: '#0a8fe8' }}>vozitnews@gmail.com</a>.
           For privacy-specific questions, see our{' '}
-          <a href="/privacy" style={{ color: '#0a8fe8' }}>Privacy Policy</a>.
+          <a href="/privacy" style={{ color: '#0a8fe8' }}>Privacy Policy</a>, or see
+          all of VozIt's governing documents on the{' '}
+          <a href="/policies" style={{ color: '#0a8fe8' }}>Terms and Policies</a> page.
         </p>
       </div>
       <Nav />
