@@ -44,6 +44,7 @@ export const T: Record<BotLanguage, Record<string, string>> = {
 📎 IMPORTANT: Send your video as a FILE, not as a video message.
 Tap the paperclip icon → File → select your video.
 This preserves the original quality and location data for verification.
+💡 Tip: if your camera lets you choose, record at 720p (HD) instead of 1080p or 4K — a 61–90 second clip at full resolution is usually too big to send as a File; 720p stays under the limit.
 
 📋 SUBMISSION GUIDELINES:
 • Video must be 61–90 seconds
@@ -66,7 +67,7 @@ What is your name?`,
     tooShort: (secs: number) => `Your video is ${secs} seconds. VozIt reports must be 61–90 seconds. Please resubmit.`,
     tooLong: (secs: number) => `Your video is ${secs} seconds. Please trim to 61–90 seconds and resubmit.`,
     sentAsVideoWarning: '⚠️ You sent this as a video message, which removes location data. Next time tap paperclip → File for better verification.',
-    fileTooLarge: "That file is too large for me to download directly (Telegram limits bots to 20MB files). Please compress it, or submit at vozit.net instead.",
+    fileTooLarge: "That file is too large for me to download directly (Telegram limits bots to 20MB files). A few fixes: record at a lower resolution next time (720p instead of 1080p/4K), compress this video using your phone's built-in share/compress option, or send it as a video message instead (smaller, but loses location data) — or submit at vozit.net instead.",
     askLocation: '📍 Share your location: tap the paperclip → Location → Send My Current Location.\nThis proves you were at the scene and strengthens your credibility score.',
     askWhen: '🕐 When did you record this video? (example: today 2pm, yesterday morning)',
     credibilityTip: '💡 Tip: sharing your location adds credibility and increases your earnings potential.',
@@ -87,6 +88,7 @@ What is your name?`,
 📎 IMPORTANTE: Envía tu video como ARCHIVO, no como mensaje de video.
 Toca el clip → Archivo → selecciona tu video.
 Esto conserva la calidad original y los datos de ubicación para la verificación.
+💡 Consejo: si tu cámara te lo permite, graba en 720p (HD) en vez de 1080p o 4K — un clip de 61–90 segundos a resolución completa suele ser demasiado grande para enviarlo como Archivo; 720p se mantiene dentro del límite.
 
 📋 REQUISITOS DE ENVÍO:
 • El video debe durar entre 61 y 90 segundos
@@ -109,7 +111,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
     tooShort: (secs: number) => `Tu video dura ${secs} segundos. Los reportes de VozIt deben durar entre 61 y 90 segundos. Por favor, vuelve a enviarlo.`,
     tooLong: (secs: number) => `Tu video dura ${secs} segundos. Recórtalo a 61–90 segundos y vuelve a enviarlo.`,
     sentAsVideoWarning: '⚠️ Enviaste esto como mensaje de video, lo que elimina los datos de ubicación. La próxima vez toca el clip → Archivo para una mejor verificación.',
-    fileTooLarge: 'Ese archivo es demasiado grande para descargarlo directamente (Telegram limita a los bots a 20MB). Comprímelo, o envíalo en vozit.net.',
+    fileTooLarge: 'Ese archivo es demasiado grande para descargarlo directamente (Telegram limita a los bots a 20MB). Algunas soluciones: graba en una resolución más baja la próxima vez (720p en vez de 1080p/4K), comprime este video con la opción de compartir/comprimir de tu teléfono, o envíalo como mensaje de video (más pequeño, pero pierde los datos de ubicación) — o envíalo en vozit.net.',
     askLocation: '📍 Comparte tu ubicación: toca el clip → Ubicación → Enviar mi ubicación actual.\nEsto demuestra que estuviste en el lugar y mejora tu puntaje de credibilidad.',
     askWhen: '🕐 ¿Cuándo grabaste este video? (ejemplo: hoy a las 2pm, ayer por la mañana)',
     credibilityTip: '💡 Consejo: compartir tu ubicación aumenta tu credibilidad y tu potencial de ganancias.',
@@ -130,6 +132,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
 📎 مهم: أرسل الفيديو كملف، وليس كرسالة فيديو.
 اضغط على أيقونة المشبك ← ملف ← اختر الفيديو.
 هذا يحافظ على الجودة الأصلية وبيانات الموقع اللازمة للتحقق.
+💡 نصيحة: إذا كانت كاميرتك تتيح لك الاختيار، سجّل بدقة 720p (HD) بدلاً من 1080p أو 4K — فالمقطع الذي يستمر 61–90 ثانية بدقة كاملة يكون عادةً كبيرًا جدًا لإرساله كملف؛ دقة 720p تبقى ضمن الحد المسموح.
 
 📋 شروط الإرسال:
 • يجب أن يكون الفيديو بين 61 و90 ثانية
@@ -152,7 +155,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
     tooShort: (secs: number) => `مدة الفيديو ${secs} ثانية. يجب أن تكون تقارير VozIt بين 61 و90 ثانية. الرجاء إعادة الإرسال.`,
     tooLong: (secs: number) => `مدة الفيديو ${secs} ثانية. يرجى تقليصه إلى 61–90 ثانية وإعادة الإرسال.`,
     sentAsVideoWarning: '⚠️ أرسلت هذا كرسالة فيديو، مما يزيل بيانات الموقع. في المرة القادمة اضغط المشبك ← ملف للتحقق بشكل أفضل.',
-    fileTooLarge: 'هذا الملف كبير جدًا بحيث لا يمكنني تنزيله مباشرة (تيليجرام يحد البوتات بـ 20 ميغابايت). يرجى ضغطه، أو الإرسال عبر vozit.net.',
+    fileTooLarge: 'هذا الملف كبير جدًا بحيث لا يمكنني تنزيله مباشرة (تيليجرام يحد البوتات بـ 20 ميغابايت). بعض الحلول: سجّل بدقة أقل في المرة القادمة (720p بدلاً من 1080p/4K)، أو اضغط هذا الفيديو باستخدام خيار المشاركة/الضغط المدمج في هاتفك، أو أرسله كرسالة فيديو بدلاً من ذلك (أصغر حجمًا لكنه يفقد بيانات الموقع) — أو أرسله عبر vozit.net.',
     askLocation: '📍 شارك موقعك: اضغط المشبك ← الموقع ← إرسال موقعي الحالي.\nهذا يثبت أنك كنت في مكان الحدث ويعزز درجة مصداقيتك.',
     askWhen: '🕐 متى سجّلت هذا الفيديو؟ (مثال: اليوم الساعة 2 ظهرًا، أمس صباحًا)',
     credibilityTip: '💡 نصيحة: مشاركة موقعك تزيد من مصداقيتك وإمكانية أرباحك.',
@@ -173,6 +176,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
 📎 IMPORTANT : Envoyez votre vidéo en tant que FICHIER, pas en tant que message vidéo.
 Appuyez sur le trombone → Fichier → sélectionnez votre vidéo.
 Cela préserve la qualité d'origine et les données de localisation nécessaires à la vérification.
+💡 Astuce : si votre caméra le permet, filmez en 720p (HD) plutôt qu'en 1080p ou 4K — un clip de 61 à 90 secondes en pleine résolution est souvent trop volumineux pour être envoyé en tant que Fichier ; le 720p reste sous la limite.
 
 📋 CONSIGNES DE SOUMISSION :
 • La vidéo doit durer entre 61 et 90 secondes
@@ -195,7 +199,7 @@ Quel est votre nom ?`,
     tooShort: (secs: number) => `Votre vidéo dure ${secs} secondes. Les rapports VozIt doivent durer entre 61 et 90 secondes. Veuillez la renvoyer.`,
     tooLong: (secs: number) => `Votre vidéo dure ${secs} secondes. Veuillez la raccourcir à 61–90 secondes et la renvoyer.`,
     sentAsVideoWarning: '⚠️ Vous avez envoyé ceci comme message vidéo, ce qui supprime les données de localisation. La prochaine fois, utilisez trombone → Fichier pour une meilleure vérification.',
-    fileTooLarge: "Ce fichier est trop volumineux pour être téléchargé directement (Telegram limite les bots à 20 Mo). Veuillez le compresser, ou l'envoyer sur vozit.net.",
+    fileTooLarge: "Ce fichier est trop volumineux pour être téléchargé directement (Telegram limite les bots à 20 Mo). Quelques solutions : filmez en résolution plus basse la prochaine fois (720p au lieu de 1080p/4K), compressez cette vidéo avec l'option partager/compresser de votre téléphone, ou envoyez-la comme message vidéo à la place (plus petit, mais perd les données de localisation) — ou envoyez-la sur vozit.net.",
     askLocation: '📍 Partagez votre position : trombone → Position → Envoyer ma position actuelle.\nCela prouve que vous étiez sur place et renforce votre score de crédibilité.',
     askWhen: '🕐 Quand avez-vous enregistré cette vidéo ? (exemple : aujourd\'hui 14h, hier matin)',
     credibilityTip: '💡 Astuce : partager votre position augmente votre crédibilité et votre potentiel de revenus.',
@@ -216,6 +220,7 @@ Quel est votre nom ?`,
 📎 ВАЖЛИВО: Надішліть відео як ФАЙЛ, а не як відеоповідомлення.
 Натисніть скріпку → Файл → виберіть відео.
 Це зберігає оригінальну якість і дані про місцезнаходження, потрібні для перевірки.
+💡 Порада: якщо камера дозволяє обрати, знімайте у 720p (HD) замість 1080p чи 4K — кліп на 61–90 секунд у повній роздільній здатності зазвичай завеликий, щоб надіслати як Файл; 720p залишається в межах ліміту.
 
 📋 ВИМОГИ ДО ПОДАННЯ:
 • Відео має тривати 61–90 секунд
@@ -238,7 +243,7 @@ Quel est votre nom ?`,
     tooShort: (secs: number) => `Ваше відео триває ${secs} секунд. Звіти VozIt мають тривати 61–90 секунд. Будь ласка, надішліть ще раз.`,
     tooLong: (secs: number) => `Ваше відео триває ${secs} секунд. Обріжте до 61–90 секунд і надішліть ще раз.`,
     sentAsVideoWarning: '⚠️ Ви надіслали це як відеоповідомлення, що видаляє дані про місцезнаходження. Наступного разу натисніть скріпку → Файл для кращої перевірки.',
-    fileTooLarge: 'Цей файл занадто великий, щоб завантажити його напряму (Telegram обмежує ботів до 20 МБ). Стисніть його або надішліть через vozit.net.',
+    fileTooLarge: 'Цей файл занадто великий, щоб завантажити його напряму (Telegram обмежує ботів до 20 МБ). Кілька варіантів: знімайте наступного разу в нижчій роздільній здатності (720p замість 1080p/4K), стисніть це відео за допомогою вбудованої опції «поділитися/стиснути» на телефоні, або надішліть його як відеоповідомлення (менший розмір, але без даних про місцезнаходження) — або надішліть через vozit.net.',
     askLocation: '📍 Поділіться місцезнаходженням: скріпка → Місцезнаходження → Надіслати поточне місцезнаходження.\nЦе підтверджує, що ви були на місці, і підвищує ваш рейтинг довіри.',
     askWhen: '🕐 Коли ви записали це відео? (наприклад: сьогодні о 14:00, вчора вранці)',
     credibilityTip: '💡 Порада: поширення місцезнаходження підвищує довіру та потенційний дохід.',
@@ -259,6 +264,7 @@ Quel est votre nom ?`,
 📎 IMPORTANTE: Envie seu vídeo como ARQUIVO, não como mensagem de vídeo.
 Toque no clipe → Arquivo → selecione seu vídeo.
 Isso preserva a qualidade original e os dados de localização para verificação.
+💡 Dica: se sua câmera permitir escolher, grave em 720p (HD) em vez de 1080p ou 4K — um vídeo de 61 a 90 segundos em resolução total costuma ser grande demais para enviar como Arquivo; o 720p fica dentro do limite.
 
 📋 DIRETRIZES DE ENVIO:
 • O vídeo deve ter entre 61 e 90 segundos
@@ -281,7 +287,7 @@ Qual é o seu nome?`,
     tooShort: (secs: number) => `Seu vídeo tem ${secs} segundos. Os relatos do VozIt devem ter entre 61 e 90 segundos. Por favor, reenvie.`,
     tooLong: (secs: number) => `Seu vídeo tem ${secs} segundos. Corte para 61–90 segundos e reenvie.`,
     sentAsVideoWarning: '⚠️ Você enviou isso como mensagem de vídeo, o que remove os dados de localização. Da próxima vez toque no clipe → Arquivo para melhor verificação.',
-    fileTooLarge: 'Esse arquivo é grande demais para eu baixar diretamente (o Telegram limita bots a 20MB). Comprima-o, ou envie pelo vozit.net.',
+    fileTooLarge: 'Esse arquivo é grande demais para eu baixar diretamente (o Telegram limita bots a 20MB). Algumas soluções: grave em uma resolução menor da próxima vez (720p em vez de 1080p/4K), comprima este vídeo usando a opção de compartilhar/comprimir do seu celular, ou envie-o como mensagem de vídeo (menor, mas perde os dados de localização) — ou envie pelo vozit.net.',
     askLocation: '📍 Compartilhe sua localização: clipe → Localização → Enviar minha localização atual.\nIsso comprova que você estava no local e fortalece sua pontuação de credibilidade.',
     askWhen: '🕐 Quando você gravou esse vídeo? (exemplo: hoje às 14h, ontem de manhã)',
     credibilityTip: '💡 Dica: compartilhar sua localização aumenta sua credibilidade e seu potencial de ganhos.',
@@ -302,6 +308,7 @@ Qual é o seu nome?`,
 📎 MUHIMU: Tuma video yako kama FAILI, si kama ujumbe wa video.
 Gusa klipu → Faili → chagua video yako.
 Hii inahifadhi ubora wa asili na data ya eneo kwa ajili ya uthibitisho.
+💡 Kidokezo: ikiwa kamera yako inakuruhusu kuchagua, rekodi kwa 720p (HD) badala ya 1080p au 4K — video ya sekunde 61–90 kwa ubora kamili mara nyingi ni kubwa mno kutuma kama Faili; 720p inabaki chini ya kikomo.
 
 📋 MASHARTI YA KUTUMA:
 • Video lazima iwe sekunde 61–90
@@ -324,7 +331,7 @@ Jina lako ni nani?`,
     tooShort: (secs: number) => `Video yako ina sekunde ${secs}. Ripoti za VozIt lazima ziwe sekunde 61–90. Tafadhali tuma tena.`,
     tooLong: (secs: number) => `Video yako ina sekunde ${secs}. Tafadhali ipunguze hadi sekunde 61–90 na utume tena.`,
     sentAsVideoWarning: '⚠️ Umetuma hii kama ujumbe wa video, jambo linaloondoa data ya eneo. Mara ijayo gusa klipu → Faili kwa uthibitisho bora.',
-    fileTooLarge: 'Faili hiyo ni kubwa mno kwa mimi kuipakua moja kwa moja (Telegram inawekea roboti kikomo cha MB 20). Tafadhali ipunguze ukubwa, au itume kupitia vozit.net.',
+    fileTooLarge: 'Faili hiyo ni kubwa mno kwa mimi kuipakua moja kwa moja (Telegram inawekea roboti kikomo cha MB 20). Suluhisho chache: rekodi kwa ubora wa chini mara nyingine (720p badala ya 1080p/4K), punguza ukubwa wa video hii kwa kutumia chaguo la kushiriki/kupunguza la simu yako, au itume kama ujumbe wa video badala yake (ndogo zaidi, lakini inapoteza data ya eneo) — au itume kupitia vozit.net.',
     askLocation: '📍 Shiriki eneo lako: gusa klipu → Eneo → Tuma eneo langu la sasa.\nHii inathibitisha ulikuwepo eneo la tukio na kuongeza alama yako ya uaminifu.',
     askWhen: '🕐 Ulirekodi video hii lini? (mfano: leo saa 8 mchana, jana asubuhi)',
     credibilityTip: '💡 Kidokezo: kushiriki eneo lako huongeza uaminifu wako na uwezekano wa mapato.',
@@ -345,6 +352,7 @@ Jina lako ni nani?`,
 📎 ВАЖНО: Отправьте видео как ФАЙЛ, а не как видеосообщение.
 Нажмите на скрепку → Файл → выберите видео.
 Это сохраняет исходное качество и данные о местоположении, необходимые для проверки.
+💡 Совет: если камера позволяет выбрать, снимайте в 720p (HD) вместо 1080p или 4K — ролик длиной 61–90 секунд в полном разрешении обычно слишком большой, чтобы отправить как Файл; 720p остаётся в пределах лимита.
 
 📋 ТРЕБОВАНИЯ К ОТПРАВКЕ:
 • Видео должно длиться от 61 до 90 секунд
@@ -367,7 +375,7 @@ Jina lako ni nani?`,
     tooShort: (secs: number) => `Ваше видео длится ${secs} секунд. Репортажи VozIt должны длиться от 61 до 90 секунд. Пожалуйста, отправьте заново.`,
     tooLong: (secs: number) => `Ваше видео длится ${secs} секунд. Пожалуйста, обрежьте до 61–90 секунд и отправьте заново.`,
     sentAsVideoWarning: '⚠️ Вы отправили это как видеосообщение, что удаляет данные о местоположении. В следующий раз нажмите скрепку → Файл для лучшей проверки.',
-    fileTooLarge: 'Этот файл слишком большой, чтобы я мог скачать его напрямую (Telegram ограничивает ботов 20 МБ). Пожалуйста, сожмите его, или отправьте через vozit.net.',
+    fileTooLarge: 'Этот файл слишком большой, чтобы я мог скачать его напрямую (Telegram ограничивает ботов 20 МБ). Несколько решений: снимайте в более низком разрешении в следующий раз (720p вместо 1080p/4K), сожмите это видео через встроенную функцию «поделиться/сжать» на телефоне, или отправьте его как видеосообщение (меньше размер, но теряются данные о местоположении) — или отправьте через vozit.net.',
     askLocation: '📍 Поделитесь своим местоположением: нажмите скрепку → Местоположение → Отправить текущее местоположение.\nЭто подтверждает, что вы были на месте, и повышает ваш рейтинг доверия.',
     askWhen: '🕐 Когда вы записали это видео? (например: сегодня в 14:00, вчера утром)',
     credibilityTip: '💡 Совет: указание местоположения повышает доверие и ваш потенциальный доход.',
@@ -388,6 +396,7 @@ Jina lako ni nani?`,
 📎 PENTING: Kirim video Anda sebagai FILE, bukan sebagai pesan video.
 Ketuk ikon klip kertas → File → pilih video Anda.
 Ini menjaga kualitas asli dan data lokasi yang diperlukan untuk verifikasi.
+💡 Tips: jika kamera Anda memungkinkan memilih, rekam dalam 720p (HD), bukan 1080p atau 4K — video berdurasi 61–90 detik dalam resolusi penuh biasanya terlalu besar untuk dikirim sebagai File; 720p tetap berada di bawah batas.
 
 📋 PANDUAN PENGIRIMAN:
 • Video harus berdurasi 61–90 detik
@@ -410,7 +419,7 @@ Siapa nama Anda?`,
     tooShort: (secs: number) => `Video Anda berdurasi ${secs} detik. Laporan VozIt harus berdurasi 61–90 detik. Silakan kirim ulang.`,
     tooLong: (secs: number) => `Video Anda berdurasi ${secs} detik. Silakan potong menjadi 61–90 detik dan kirim ulang.`,
     sentAsVideoWarning: '⚠️ Anda mengirim ini sebagai pesan video, yang menghapus data lokasi. Lain kali ketuk klip kertas → File untuk verifikasi yang lebih baik.',
-    fileTooLarge: 'File itu terlalu besar untuk saya unduh secara langsung (Telegram membatasi bot hingga 20MB). Silakan kompres, atau kirim melalui vozit.net.',
+    fileTooLarge: 'File itu terlalu besar untuk saya unduh secara langsung (Telegram membatasi bot hingga 20MB). Beberapa solusi: rekam dengan resolusi lebih rendah lain kali (720p alih-alih 1080p/4K), kompres video ini menggunakan opsi bagikan/kompres bawaan ponsel Anda, atau kirim sebagai pesan video (lebih kecil, tetapi kehilangan data lokasi) — atau kirim melalui vozit.net.',
     askLocation: '📍 Bagikan lokasi Anda: ketuk klip kertas → Lokasi → Kirim Lokasi Saya Saat Ini.\nIni membuktikan Anda berada di lokasi kejadian dan meningkatkan skor kredibilitas Anda.',
     askWhen: '🕐 Kapan Anda merekam video ini? (contoh: hari ini jam 2 siang, kemarin pagi)',
     credibilityTip: '💡 Tips: membagikan lokasi Anda menambah kredibilitas dan potensi penghasilan Anda.',
@@ -431,6 +440,7 @@ Siapa nama Anda?`,
 📎 مهم: ویدیوی خود را به‌صورت فایل ارسال کنید، نه به‌صورت پیام ویدیویی.
 روی آیکون گیره کاغذ ← فایل ← انتخاب ویدیو ضربه بزنید.
 این کار کیفیت اصلی و داده‌های مکانی لازم برای تأیید را حفظ می‌کند.
+💡 نکته: اگر دوربین شما اجازه انتخاب می‌دهد، با کیفیت ۷۲۰p (HD) ضبط کنید نه ۱۰۸۰p یا ۴K — یک کلیپ ۶۱ تا ۹۰ ثانیه‌ای با کیفیت کامل معمولاً برای ارسال به‌صورت فایل خیلی بزرگ است؛ ۷۲۰p در محدوده مجاز باقی می‌ماند.
 
 📋 راهنمای ارسال:
 • ویدیو باید بین ۶۱ تا ۹۰ ثانیه باشد
@@ -453,7 +463,7 @@ Siapa nama Anda?`,
     tooShort: (secs: number) => `ویدیوی شما ${secs} ثانیه است. گزارش‌های VozIt باید بین ۶۱ تا ۹۰ ثانیه باشند. لطفاً دوباره ارسال کنید.`,
     tooLong: (secs: number) => `ویدیوی شما ${secs} ثانیه است. لطفاً آن را به ۶۱ تا ۹۰ ثانیه کوتاه کنید و دوباره ارسال کنید.`,
     sentAsVideoWarning: '⚠️ شما این را به‌صورت پیام ویدیویی ارسال کردید که داده‌های مکانی را حذف می‌کند. دفعه بعد روی گیره کاغذ ← فایل بزنید تا تأیید بهتری انجام شود.',
-    fileTooLarge: 'این فایل برای دانلود مستقیم توسط من بیش از حد بزرگ است (تلگرام ربات‌ها را به ۲۰ مگابایت محدود می‌کند). لطفاً آن را فشرده کنید، یا از طریق vozit.net ارسال کنید.',
+    fileTooLarge: 'این فایل برای دانلود مستقیم توسط من بیش از حد بزرگ است (تلگرام ربات‌ها را به ۲۰ مگابایت محدود می‌کند). چند راه‌حل: دفعه بعد با کیفیت پایین‌تر ضبط کنید (۷۲۰p به‌جای ۱۰۸۰p یا ۴K)، این ویدیو را با گزینه اشتراک‌گذاری/فشرده‌سازی داخلی گوشی خود فشرده کنید، یا آن را به‌صورت پیام ویدیویی ارسال کنید (حجم کمتر، اما بدون داده‌های مکانی) — یا از طریق vozit.net ارسال کنید.',
     askLocation: '📍 موقعیت مکانی خود را به اشتراک بگذارید: روی گیره کاغذ ← موقعیت مکانی ← ارسال موقعیت مکانی فعلی من بزنید.\nاین ثابت می‌کند که شما در محل حادثه بوده‌اید و امتیاز اعتبار شما را افزایش می‌دهد.',
     askWhen: '🕐 چه زمانی این ویدیو را ضبط کردید؟ (مثال: امروز ساعت ۲ بعدازظهر، دیروز صبح)',
     credibilityTip: '💡 نکته: به اشتراک گذاشتن موقعیت مکانی اعتبار و پتانسیل درآمد شما را افزایش می‌دهد.',
