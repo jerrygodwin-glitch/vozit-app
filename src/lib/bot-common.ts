@@ -43,7 +43,7 @@ export const T: Record<BotLanguage, Record<string, string>> = {
 
 📎 IMPORTANT: Send your video as a FILE, not as a video message.
 Tap the paperclip icon → File → select your video.
-This preserves the original quality and location data for verification.
+This preserves the original quality for verification.
 💡 Tip: if your camera lets you choose, record at 720p (HD) instead of 1080p or 4K — a 61–90 second clip at full resolution is usually too big to send as a File; 720p stays under the limit.
 
 📋 SUBMISSION GUIDELINES:
@@ -87,7 +87,7 @@ What is your name?`,
 
 📎 IMPORTANTE: Envía tu video como ARCHIVO, no como mensaje de video.
 Toca el clip → Archivo → selecciona tu video.
-Esto conserva la calidad original y los datos de ubicación para la verificación.
+Esto conserva la calidad original para la verificación.
 💡 Consejo: si tu cámara te lo permite, graba en 720p (HD) en vez de 1080p o 4K — un clip de 61–90 segundos a resolución completa suele ser demasiado grande para enviarlo como Archivo; 720p se mantiene dentro del límite.
 
 📋 REQUISITOS DE ENVÍO:
@@ -131,7 +131,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
 
 📎 مهم: أرسل الفيديو كملف، وليس كرسالة فيديو.
 اضغط على أيقونة المشبك ← ملف ← اختر الفيديو.
-هذا يحافظ على الجودة الأصلية وبيانات الموقع اللازمة للتحقق.
+هذا يحافظ على الجودة الأصلية اللازمة للتحقق.
 💡 نصيحة: إذا كانت كاميرتك تتيح لك الاختيار، سجّل بدقة 720p (HD) بدلاً من 1080p أو 4K — فالمقطع الذي يستمر 61–90 ثانية بدقة كاملة يكون عادةً كبيرًا جدًا لإرساله كملف؛ دقة 720p تبقى ضمن الحد المسموح.
 
 📋 شروط الإرسال:
@@ -175,7 +175,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
 
 📎 IMPORTANT : Envoyez votre vidéo en tant que FICHIER, pas en tant que message vidéo.
 Appuyez sur le trombone → Fichier → sélectionnez votre vidéo.
-Cela préserve la qualité d'origine et les données de localisation nécessaires à la vérification.
+Cela préserve la qualité d'origine nécessaire à la vérification.
 💡 Astuce : si votre caméra le permet, filmez en 720p (HD) plutôt qu'en 1080p ou 4K — un clip de 61 à 90 secondes en pleine résolution est souvent trop volumineux pour être envoyé en tant que Fichier ; le 720p reste sous la limite.
 
 📋 CONSIGNES DE SOUMISSION :
@@ -219,7 +219,7 @@ Quel est votre nom ?`,
 
 📎 ВАЖЛИВО: Надішліть відео як ФАЙЛ, а не як відеоповідомлення.
 Натисніть скріпку → Файл → виберіть відео.
-Це зберігає оригінальну якість і дані про місцезнаходження, потрібні для перевірки.
+Це зберігає оригінальну якість, потрібну для перевірки.
 💡 Порада: якщо камера дозволяє обрати, знімайте у 720p (HD) замість 1080p чи 4K — кліп на 61–90 секунд у повній роздільній здатності зазвичай завеликий, щоб надіслати як Файл; 720p залишається в межах ліміту.
 
 📋 ВИМОГИ ДО ПОДАННЯ:
@@ -263,7 +263,7 @@ Quel est votre nom ?`,
 
 📎 IMPORTANTE: Envie seu vídeo como ARQUIVO, não como mensagem de vídeo.
 Toque no clipe → Arquivo → selecione seu vídeo.
-Isso preserva a qualidade original e os dados de localização para verificação.
+Isso preserva a qualidade original para verificação.
 💡 Dica: se sua câmera permitir escolher, grave em 720p (HD) em vez de 1080p ou 4K — um vídeo de 61 a 90 segundos em resolução total costuma ser grande demais para enviar como Arquivo; o 720p fica dentro do limite.
 
 📋 DIRETRIZES DE ENVIO:
@@ -307,7 +307,7 @@ Qual é o seu nome?`,
 
 📎 MUHIMU: Tuma video yako kama FAILI, si kama ujumbe wa video.
 Gusa klipu → Faili → chagua video yako.
-Hii inahifadhi ubora wa asili na data ya eneo kwa ajili ya uthibitisho.
+Hii inahifadhi ubora wa asili kwa ajili ya uthibitisho.
 💡 Kidokezo: ikiwa kamera yako inakuruhusu kuchagua, rekodi kwa 720p (HD) badala ya 1080p au 4K — video ya sekunde 61–90 kwa ubora kamili mara nyingi ni kubwa mno kutuma kama Faili; 720p inabaki chini ya kikomo.
 
 📋 MASHARTI YA KUTUMA:
@@ -351,7 +351,7 @@ Jina lako ni nani?`,
 
 📎 ВАЖНО: Отправьте видео как ФАЙЛ, а не как видеосообщение.
 Нажмите на скрепку → Файл → выберите видео.
-Это сохраняет исходное качество и данные о местоположении, необходимые для проверки.
+Это сохраняет исходное качество, необходимое для проверки.
 💡 Совет: если камера позволяет выбрать, снимайте в 720p (HD) вместо 1080p или 4K — ролик длиной 61–90 секунд в полном разрешении обычно слишком большой, чтобы отправить как Файл; 720p остаётся в пределах лимита.
 
 📋 ТРЕБОВАНИЯ К ОТПРАВКЕ:
@@ -395,7 +395,7 @@ Jina lako ni nani?`,
 
 📎 PENTING: Kirim video Anda sebagai FILE, bukan sebagai pesan video.
 Ketuk ikon klip kertas → File → pilih video Anda.
-Ini menjaga kualitas asli dan data lokasi yang diperlukan untuk verifikasi.
+Ini menjaga kualitas asli yang diperlukan untuk verifikasi.
 💡 Tips: jika kamera Anda memungkinkan memilih, rekam dalam 720p (HD), bukan 1080p atau 4K — video berdurasi 61–90 detik dalam resolusi penuh biasanya terlalu besar untuk dikirim sebagai File; 720p tetap berada di bawah batas.
 
 📋 PANDUAN PENGIRIMAN:
@@ -439,7 +439,7 @@ Siapa nama Anda?`,
 
 📎 مهم: ویدیوی خود را به‌صورت فایل ارسال کنید، نه به‌صورت پیام ویدیویی.
 روی آیکون گیره کاغذ ← فایل ← انتخاب ویدیو ضربه بزنید.
-این کار کیفیت اصلی و داده‌های مکانی لازم برای تأیید را حفظ می‌کند.
+این کار کیفیت اصلی لازم برای تأیید را حفظ می‌کند.
 💡 نکته: اگر دوربین شما اجازه انتخاب می‌دهد، با کیفیت ۷۲۰p (HD) ضبط کنید نه ۱۰۸۰p یا ۴K — یک کلیپ ۶۱ تا ۹۰ ثانیه‌ای با کیفیت کامل معمولاً برای ارسال به‌صورت فایل خیلی بزرگ است؛ ۷۲۰p در محدوده مجاز باقی می‌ماند.
 
 📋 راهنمای ارسال:
