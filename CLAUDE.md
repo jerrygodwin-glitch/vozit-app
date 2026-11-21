@@ -203,7 +203,7 @@ auto-distribution Telegram channel above (VozItNewsBot / `VOZIT_TELEGRAM_BOT_TOK
 which posts VozIt's own published reports TO a public channel) — don't
 confuse the two integrations.
 
-- `src/lib/bot-common.ts` — message templates in 7 languages (en/es/ar/fr/uk/pt/sw),
+- `src/lib/bot-common.ts` — message templates in 10 languages (en/es/ar/fr/uk/pt/sw/ru/id/fa — Russian, Indonesian, and Persian/Farsi added for their own large Telegram user bases, Farsi specifically for Iran's crisis-journalism relevance),
   Claude-API language detection + translate-to-English, video duration
   validation (61-90s, same window the website enforces), the submission-
   channel credibility modifier, and `createReportFromBot()`/`createAccountFromBot()`.

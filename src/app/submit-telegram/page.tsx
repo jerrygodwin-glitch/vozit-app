@@ -10,6 +10,9 @@ const LANGS = [
   { code: 'uk', label: 'Українська' },
   { code: 'pt', label: 'Português' },
   { code: 'sw', label: 'Kiswahili' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'fa', label: 'فارسی' },
 ]
 
 const STEPS: Record<string, string[]> = {

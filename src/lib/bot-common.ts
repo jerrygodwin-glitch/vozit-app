@@ -22,11 +22,12 @@ import { moderateContent, logModerationResult } from './hive-moderation'
 import { createMuxUpload } from './mux'
 import { captureError } from './monitoring'
 
-export type BotLanguage = 'en' | 'es' | 'ar' | 'fr' | 'uk' | 'pt' | 'sw'
+export type BotLanguage = 'en' | 'es' | 'ar' | 'fr' | 'uk' | 'pt' | 'sw' | 'ru' | 'id' | 'fa'
 
 export const LANGUAGE_NAMES: Record<BotLanguage, string> = {
   en: 'English', es: 'Español', ar: 'العربية', fr: 'Français',
   uk: 'Українська', pt: 'Português', sw: 'Kiswahili',
+  ru: 'Русский', id: 'Bahasa Indonesia', fa: 'فارسی',
 }
 
 // ── MESSAGE TEMPLATES ────────────────────────────────────────────
@@ -36,7 +37,7 @@ export const LANGUAGE_NAMES: Record<BotLanguage, string> = {
 
 export const T: Record<BotLanguage, Record<string, string>> = {
   en: {
-    chooseLanguage: '🌐 Language? Reply with a number:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 Language? Reply with a number:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `Welcome to VozIt! — "I was there..."
 
@@ -79,7 +80,7 @@ What is your name?`,
     linkGenFailed: "I couldn't generate your link just now — please try again in a moment.",
   },
   es: {
-    chooseLanguage: '🌐 ¿Idioma? Responde con un número:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 ¿Idioma? Responde con un número:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `Bienvenido a VozIt! — "Yo estuve allí..."
 
@@ -122,7 +123,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
     linkGenFailed: 'No pude generar tu enlace en este momento — intenta de nuevo en un momento.',
   },
   ar: {
-    chooseLanguage: '🌐 اللغة؟ الرجاء الرد برقم:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 اللغة؟ الرجاء الرد برقم:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `مرحبًا بك في VozIt! — "كنت هناك..."
 
@@ -165,7 +166,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
     linkGenFailed: 'تعذر إنشاء رابطك الآن — حاول مرة أخرى بعد قليل.',
   },
   fr: {
-    chooseLanguage: '🌐 Langue ? Répondez avec un numéro :\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 Langue ? Répondez avec un numéro :\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `Bienvenue sur VozIt! — « J'y étais... »
 
@@ -208,7 +209,7 @@ Quel est votre nom ?`,
     linkGenFailed: "Je n'ai pas pu générer votre lien pour le moment — réessayez dans un instant.",
   },
   uk: {
-    chooseLanguage: '🌐 Мова? Дайте відповідь номером:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 Мова? Дайте відповідь номером:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `Ласкаво просимо до VozIt! — «Я був там...»
 
@@ -251,7 +252,7 @@ Quel est votre nom ?`,
     linkGenFailed: 'Не вдалося створити ваше посилання зараз — спробуйте ще раз за хвилину.',
   },
   pt: {
-    chooseLanguage: '🌐 Idioma? Responda com um número:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 Idioma? Responda com um número:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `Bem-vindo ao VozIt! — "Eu estava lá..."
 
@@ -294,7 +295,7 @@ Qual é o seu nome?`,
     linkGenFailed: 'Não consegui gerar seu link agora — tente novamente em instantes.',
   },
   sw: {
-    chooseLanguage: '🌐 Lugha? Jibu kwa nambari:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
+    chooseLanguage: '🌐 Lugha? Jibu kwa nambari:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
     welcome:
 `Karibu VozIt! — "Nilikuwepo..."
 
@@ -336,10 +337,142 @@ Jina lako ni nani?`,
     settingsLinkMsg: (link: string) => `⚙️ Hiki ndicho kiungo chako binafsi cha mipangilio: ${link}\n\nKiungo hiki ni chako pekee na kinafanya kazi kwa muda mfupi — kikiacha kufanya kazi, andika /profile tena kupata kipya.`,
     linkGenFailed: 'Sikuweza kutengeneza kiungo chako sasa hivi — jaribu tena baada ya muda.',
   },
+  ru: {
+    chooseLanguage: '🌐 Язык? Ответьте цифрой:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
+    welcome:
+`Добро пожаловать в VozIt! — «Я был там...»
+
+📎 ВАЖНО: Отправьте видео как ФАЙЛ, а не как видеосообщение.
+Нажмите на скрепку → Файл → выберите видео.
+Это сохраняет исходное качество и данные о местоположении, необходимые для проверки.
+
+📋 ТРЕБОВАНИЯ К ОТПРАВКЕ:
+• Видео должно длиться от 61 до 90 секунд
+• Следуйте формату 5W:
+  КТО — Кто участвует?
+  ЧТО — Что происходит?
+  ГДЕ — Где вы находитесь?
+  КОГДА — Когда это началось?
+  ПОЧЕМУ — Почему это происходит?
+• Завершите фразой: «Я был там» — ваше имя, ваш город
+
+Чтобы опубликовать материал и получать доход, мне нужно создать ваш аккаунт.
+Как вас зовут?`,
+    askUsername: 'Принято. Какое имя пользователя вы хотите на VozIt? (буквы, цифры, нижние подчёркивания — это публично)',
+    askEmail: 'И адрес электронной почты, для аккаунта и выплат?',
+    accountCreated: (username: string, link: string) => `✅ Аккаунт создан! Имя пользователя: @${username}.\n\n💳 Настройте выплаты здесь (ваша личная ссылка): ${link}\n\nВы всегда можете получить новую ссылку на выплаты, написав /payouts, или ссылку на настройки, написав /profile.`,
+    accountCreateFailed: 'Не удалось создать ваш аккаунт сейчас — попробуйте ещё раз через момент, или зарегистрируйтесь на vozit.net.',
+    returningGreeting: (username: string) => `Принято, @${username}! 🎥 Обрабатываю ваш репортаж.`,
+    askDescription: 'Что происходит? (краткое описание)',
+    tooShort: (secs: number) => `Ваше видео длится ${secs} секунд. Репортажи VozIt должны длиться от 61 до 90 секунд. Пожалуйста, отправьте заново.`,
+    tooLong: (secs: number) => `Ваше видео длится ${secs} секунд. Пожалуйста, обрежьте до 61–90 секунд и отправьте заново.`,
+    sentAsVideoWarning: '⚠️ Вы отправили это как видеосообщение, что удаляет данные о местоположении. В следующий раз нажмите скрепку → Файл для лучшей проверки.',
+    fileTooLarge: 'Этот файл слишком большой, чтобы я мог скачать его напрямую (Telegram ограничивает ботов 20 МБ). Пожалуйста, сожмите его, или отправьте через vozit.net.',
+    askLocation: '📍 Поделитесь своим местоположением: нажмите скрепку → Местоположение → Отправить текущее местоположение.\nЭто подтверждает, что вы были на месте, и повышает ваш рейтинг доверия.',
+    askWhen: '🕐 Когда вы записали это видео? (например: сегодня в 14:00, вчера утром)',
+    credibilityTip: '💡 Совет: указание местоположения повышает доверие и ваш потенциальный доход.',
+    processing: 'Спасибо — ваш репортаж обрабатывается. Вы увидите его в своём профиле VozIt, как только он будет опубликован.',
+    reportFlagged: 'Ваш репортаж отправлен, но отмечен для проверки нашей автоматической модерацией — пока он не будет публичным. Вы можете проверить его статус на vozit.net.',
+    reportRemoved: 'Ваш репортаж не удалось опубликовать — он был отмечен нашей модерацией контента. Если вы считаете это ошибкой, посетите vozit.net за помощью.',
+    genericError: 'Что-то пошло не так с моей стороны — попробуйте ещё раз, или отправьте через vozit.net.',
+    noVideoYet: 'Отправьте мне видео, когда будете готовы — как ФАЙЛ (скрепка → Файл), а не видеосообщение.',
+    payoutsLinkMsg: (link: string) => `💳 Вот ваша личная ссылка на выплаты: ${link}\n\nЭта ссылка только для вас и работает некоторое время — если она перестанет работать, просто напишите /payouts снова, чтобы получить новую.`,
+    settingsLinkMsg: (link: string) => `⚙️ Вот ваша личная ссылка на настройки: ${link}\n\nЭта ссылка только для вас и работает некоторое время — если она перестанет работать, просто напишите /profile снова, чтобы получить новую.`,
+    linkGenFailed: 'Не удалось создать вашу ссылку сейчас — попробуйте ещё раз через момент.',
+  },
+  id: {
+    chooseLanguage: '🌐 Bahasa? Balas dengan angka:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
+    welcome:
+`Selamat datang di VozIt! — "Saya ada di sana..."
+
+📎 PENTING: Kirim video Anda sebagai FILE, bukan sebagai pesan video.
+Ketuk ikon klip kertas → File → pilih video Anda.
+Ini menjaga kualitas asli dan data lokasi yang diperlukan untuk verifikasi.
+
+📋 PANDUAN PENGIRIMAN:
+• Video harus berdurasi 61–90 detik
+• Ikuti format 5W:
+  SIAPA — Siapa yang terlibat?
+  APA — Apa yang terjadi?
+  DI MANA — Di mana Anda berada?
+  KAPAN — Kapan ini dimulai?
+  MENGAPA — Mengapa ini terjadi?
+• Akhiri dengan: "Saya ada di sana" — nama Anda, kota Anda
+
+Untuk mempublikasikan dan mendapatkan penghasilan, saya perlu membuat akun Anda.
+Siapa nama Anda?`,
+    askUsername: 'Baik. Nama pengguna apa yang Anda inginkan di VozIt? (huruf, angka, garis bawah — ini bersifat publik)',
+    askEmail: 'Dan alamat email, untuk akun dan pembayaran Anda?',
+    accountCreated: (username: string, link: string) => `✅ Akun berhasil dibuat! Nama pengguna: @${username}.\n\n💳 Atur pembayaran Anda di sini (tautan pribadi Anda): ${link}\n\nAnda selalu bisa mendapatkan tautan pembayaran baru dengan mengetik /payouts, atau tautan pengaturan dengan mengetik /profile.`,
+    accountCreateFailed: 'Saya tidak bisa membuat akun Anda saat ini — coba lagi sebentar, atau daftar di vozit.net.',
+    returningGreeting: (username: string) => `Baik, @${username}! 🎥 Memproses laporan Anda.`,
+    askDescription: 'Apa yang sedang terjadi? (deskripsi singkat)',
+    tooShort: (secs: number) => `Video Anda berdurasi ${secs} detik. Laporan VozIt harus berdurasi 61–90 detik. Silakan kirim ulang.`,
+    tooLong: (secs: number) => `Video Anda berdurasi ${secs} detik. Silakan potong menjadi 61–90 detik dan kirim ulang.`,
+    sentAsVideoWarning: '⚠️ Anda mengirim ini sebagai pesan video, yang menghapus data lokasi. Lain kali ketuk klip kertas → File untuk verifikasi yang lebih baik.',
+    fileTooLarge: 'File itu terlalu besar untuk saya unduh secara langsung (Telegram membatasi bot hingga 20MB). Silakan kompres, atau kirim melalui vozit.net.',
+    askLocation: '📍 Bagikan lokasi Anda: ketuk klip kertas → Lokasi → Kirim Lokasi Saya Saat Ini.\nIni membuktikan Anda berada di lokasi kejadian dan meningkatkan skor kredibilitas Anda.',
+    askWhen: '🕐 Kapan Anda merekam video ini? (contoh: hari ini jam 2 siang, kemarin pagi)',
+    credibilityTip: '💡 Tips: membagikan lokasi Anda menambah kredibilitas dan potensi penghasilan Anda.',
+    processing: 'Terima kasih — laporan Anda sedang diproses. Anda akan melihatnya di profil VozIt Anda setelah dipublikasikan.',
+    reportFlagged: 'Laporan Anda telah dikirim tetapi ditandai untuk ditinjau oleh moderasi otomatis kami — belum akan tampil publik. Anda bisa memeriksa statusnya di vozit.net.',
+    reportRemoved: 'Laporan Anda tidak dapat dipublikasikan — ditandai oleh moderasi konten kami. Jika menurut Anda ini salah, kunjungi vozit.net untuk bantuan.',
+    genericError: 'Terjadi kesalahan di pihak saya — coba lagi, atau kirim melalui vozit.net.',
+    noVideoYet: 'Kirim video Anda kapan pun Anda siap — sebagai FILE (klip kertas → File), bukan pesan video.',
+    payoutsLinkMsg: (link: string) => `💳 Ini tautan pembayaran pribadi Anda: ${link}\n\nTautan ini hanya untuk Anda dan berfungsi untuk sementara waktu — jika berhenti berfungsi, cukup ketik /payouts lagi untuk mendapatkan yang baru.`,
+    settingsLinkMsg: (link: string) => `⚙️ Ini tautan pengaturan pribadi Anda: ${link}\n\nTautan ini hanya untuk Anda dan berfungsi untuk sementara waktu — jika berhenti berfungsi, cukup ketik /profile lagi untuk mendapatkan yang baru.`,
+    linkGenFailed: 'Saya tidak bisa membuat tautan Anda saat ini — coba lagi sebentar.',
+  },
+  fa: {
+    chooseLanguage: '🌐 زبان؟ لطفاً با یک عدد پاسخ دهید:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili\n8. Русский\n9. Bahasa Indonesia\n10. فارسی',
+    welcome:
+`به VozIt خوش آمدید! — «من آنجا بودم...»
+
+📎 مهم: ویدیوی خود را به‌صورت فایل ارسال کنید، نه به‌صورت پیام ویدیویی.
+روی آیکون گیره کاغذ ← فایل ← انتخاب ویدیو ضربه بزنید.
+این کار کیفیت اصلی و داده‌های مکانی لازم برای تأیید را حفظ می‌کند.
+
+📋 راهنمای ارسال:
+• ویدیو باید بین ۶۱ تا ۹۰ ثانیه باشد
+• از قالب ۵W پیروی کنید:
+  چه کسی — چه کسی درگیر است؟
+  چه چیزی — چه اتفاقی در حال رخ دادن است؟
+  کجا — شما کجا هستید؟
+  چه زمانی — این کی شروع شد؟
+  چرا — چرا این اتفاق می‌افتد؟
+• با این جمله پایان دهید: «من آنجا بودم» — نام شما، شهر شما
+
+برای انتشار و کسب درآمد، باید حساب شما را بسازم.
+نام شما چیست؟`,
+    askUsername: 'بسیار خب. چه نام کاربری‌ای می‌خواهید در VozIt داشته باشید؟ (حروف، اعداد، زیرخط — این عمومی است)',
+    askEmail: 'و یک آدرس ایمیل، برای حساب و پرداخت‌های شما؟',
+    accountCreated: (username: string, link: string) => `✅ حساب ساخته شد! نام کاربری: @${username}.\n\n💳 پرداخت‌های خود را از اینجا تنظیم کنید (لینک شخصی شما): ${link}\n\nهمیشه می‌توانید با نوشتن /payouts لینک جدیدی برای پرداخت‌ها، یا با نوشتن /profile لینک تنظیمات دریافت کنید.`,
+    accountCreateFailed: 'در حال حاضر نتوانستم حساب شما را بسازم — کمی بعد دوباره امتحان کنید، یا در vozit.net ثبت‌نام کنید.',
+    returningGreeting: (username: string) => `متوجه شدم، @${username}! 🎥 در حال پردازش گزارش شما هستم.`,
+    askDescription: 'چه اتفاقی در حال رخ دادن است؟ (توضیح مختصر)',
+    tooShort: (secs: number) => `ویدیوی شما ${secs} ثانیه است. گزارش‌های VozIt باید بین ۶۱ تا ۹۰ ثانیه باشند. لطفاً دوباره ارسال کنید.`,
+    tooLong: (secs: number) => `ویدیوی شما ${secs} ثانیه است. لطفاً آن را به ۶۱ تا ۹۰ ثانیه کوتاه کنید و دوباره ارسال کنید.`,
+    sentAsVideoWarning: '⚠️ شما این را به‌صورت پیام ویدیویی ارسال کردید که داده‌های مکانی را حذف می‌کند. دفعه بعد روی گیره کاغذ ← فایل بزنید تا تأیید بهتری انجام شود.',
+    fileTooLarge: 'این فایل برای دانلود مستقیم توسط من بیش از حد بزرگ است (تلگرام ربات‌ها را به ۲۰ مگابایت محدود می‌کند). لطفاً آن را فشرده کنید، یا از طریق vozit.net ارسال کنید.',
+    askLocation: '📍 موقعیت مکانی خود را به اشتراک بگذارید: روی گیره کاغذ ← موقعیت مکانی ← ارسال موقعیت مکانی فعلی من بزنید.\nاین ثابت می‌کند که شما در محل حادثه بوده‌اید و امتیاز اعتبار شما را افزایش می‌دهد.',
+    askWhen: '🕐 چه زمانی این ویدیو را ضبط کردید؟ (مثال: امروز ساعت ۲ بعدازظهر، دیروز صبح)',
+    credibilityTip: '💡 نکته: به اشتراک گذاشتن موقعیت مکانی اعتبار و پتانسیل درآمد شما را افزایش می‌دهد.',
+    processing: 'متشکرم — گزارش شما در حال پردازش است. به‌محض انتشار، آن را در پروفایل VozIt خود خواهید دید.',
+    reportFlagged: 'گزارش شما ارسال شد اما توسط سیستم نظارت خودکار ما برای بررسی علامت‌گذاری شد — هنوز عمومی نخواهد بود. می‌توانید وضعیت آن را در vozit.net بررسی کنید.',
+    reportRemoved: 'گزارش شما منتشر نشد — توسط سیستم نظارت بر محتوای ما علامت‌گذاری شد. اگر فکر می‌کنید این اشتباه است، برای کمک به vozit.net مراجعه کنید.',
+    genericError: 'مشکلی از طرف من پیش آمد — دوباره امتحان کنید، یا از طریق vozit.net ارسال کنید.',
+    noVideoYet: 'هر زمان آماده بودید ویدیوی خود را برایم بفرستید — به‌صورت فایل (گیره کاغذ ← فایل)، نه پیام ویدیویی.',
+    payoutsLinkMsg: (link: string) => `💳 این لینک خصوصی پرداخت‌های شماست: ${link}\n\nاین لینک فقط برای شماست و برای مدت کوتاهی کار می‌کند — اگر کار نکرد، کافی است دوباره /payouts را بنویسید تا لینک جدیدی دریافت کنید.`,
+    settingsLinkMsg: (link: string) => `⚙️ این لینک خصوصی تنظیمات شماست: ${link}\n\nاین لینک فقط برای شماست و برای مدت کوتاهی کار می‌کند — اگر کار نکرد، کافی است دوباره /profile را بنویسید تا لینک جدیدی دریافت کنید.`,
+    linkGenFailed: 'در حال حاضر نتوانستم لینک شما را بسازم — کمی بعد دوباره امتحان کنید.',
+  },
 }
 
 export function languageFromChoice(choice: string): BotLanguage | null {
-  const map: Record<string, BotLanguage> = { '1': 'en', '2': 'es', '3': 'ar', '4': 'fr', '5': 'uk', '6': 'pt', '7': 'sw' }
+  const map: Record<string, BotLanguage> = {
+    '1': 'en', '2': 'es', '3': 'ar', '4': 'fr', '5': 'uk', '6': 'pt', '7': 'sw',
+    '8': 'ru', '9': 'id', '10': 'fa',
+  }
   return map[choice.trim()] || null
 }
 
