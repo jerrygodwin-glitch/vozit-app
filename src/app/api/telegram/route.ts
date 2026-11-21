@@ -6,6 +6,7 @@ import { sendMessage, getFile, extractVideoMetadata, parseMp4Duration, TELEGRAM_
 import {
   T, BotLanguage, languageFromChoice, detectLanguage, translateToEnglish,
   validateVideoDuration, createReportFromBot, createAccountFromBot, uploadVideoToMux,
+  generateBotLoginLink,
 } from '@/lib/bot-common'
 
 // Telegram webhook endpoint — lets reporters in conflict zones or on low
@@ -58,7 +59,7 @@ async function clearSession(admin: any, chatId: string) {
 }
 
 async function findUserByTelegramId(admin: any, telegramId: string) {
-  const { data } = await admin.from('users').select('id, username, telegram_language').eq('telegram_id', telegramId).single()
+  const { data } = await admin.from('users').select('id, username, telegram_language, email').eq('telegram_id', telegramId).single()
   return data || null
 }
 
@@ -252,6 +253,31 @@ export async function POST(req: NextRequest) {
 
     const text: string = message.text || ''
 
+    // ── /payouts and /profile — always available, regardless of step ──
+    // These hand an existing reporter a fresh one-time sign-in link to the
+    // website (see generateBotLoginLink in bot-common.ts), so "visit the
+    // payouts page" never means "log in with a password you don't have."
+    // Always available rather than only right after signup, since an
+    // expired link's whole recovery path is just asking again.
+    const commandMatch = text.trim().match(/^\/(payouts|profile)\b/i)
+    if (commandMatch && existingUser) {
+      const isPayouts = commandMatch[1].toLowerCase() === 'payouts'
+      if (!existingUser.email) {
+        await sendMessage(chatId, t(lang, 'linkGenFailed'))
+        return NextResponse.json({ ok: true })
+      }
+      const linkResult = await generateBotLoginLink({
+        email: existingUser.email,
+        redirectPath: isPayouts ? '/payouts' : '/settings',
+      })
+      if ('error' in linkResult) {
+        await sendMessage(chatId, t(lang, 'linkGenFailed'))
+      } else {
+        await sendMessage(chatId, isPayouts ? t(lang, 'payoutsLinkMsg', linkResult.url) : t(lang, 'settingsLinkMsg', linkResult.url))
+      }
+      return NextResponse.json({ ok: true })
+    }
+
     switch (step) {
       case 'awaiting_language': {
         const chosen = languageFromChoice(text)
@@ -292,7 +318,11 @@ export async function POST(req: NextRequest) {
           await sendMessage(chatId, t(lang, 'accountCreateFailed'))
           return NextResponse.json({ ok: true })
         }
-        await sendMessage(chatId, t(lang, 'accountCreated', data.username))
+        // Degrades to a plain-text mention (no live link) only if link
+        // generation itself fails — never blocks account creation on it.
+        const linkResult = await generateBotLoginLink({ email, redirectPath: '/payouts' })
+        const payoutsLink = 'url' in linkResult ? linkResult.url : 'https://www.vozit.net/payouts'
+        await sendMessage(chatId, t(lang, 'accountCreated', data.username, payoutsLink))
 
         if (data.pendingVideo) {
           if (data.pendingVideo.caption) {

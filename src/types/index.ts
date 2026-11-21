@@ -15,6 +15,8 @@ export interface User {
   reporter_type?: 'eyewitness' | 'journalist' | 'activist' | 'hobbyist'
   topics?: string[]
   country?: string
+  telegram_id?: string
+  telegram_language?: string
   tier: ReporterTier
   report_count: number
   credibility_score: number

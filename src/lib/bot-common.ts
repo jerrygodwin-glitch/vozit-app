@@ -58,7 +58,7 @@ To publish and earn revenue, I need to set up your account.
 What is your name?`,
     askUsername: 'Got it. What username would you like on VozIt? (letters, numbers, underscores — this is public)',
     askEmail: 'And an email address, for your account and payouts?',
-    accountCreated: (username: string) => `✅ Account created! Username: @${username}. To set up payouts, visit vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ Account created! Username: @${username}.\n\n💳 Set up payouts here (your personal link): ${link}\n\nYou can always get a fresh payouts link by typing /payouts, or your settings link by typing /profile.`,
     accountCreateFailed: "I couldn't create your account just now — please try again in a moment, or sign up at vozit.net instead.",
     returningGreeting: (username: string) => `Got it, @${username}! 🎥 Processing your report.`,
     askDescription: "What's happening? (brief description)",
@@ -74,6 +74,9 @@ What is your name?`,
     reportRemoved: "Your report couldn't be published — it was flagged by our content moderation. If you think this is wrong, visit vozit.net for help.",
     genericError: "Something went wrong on my end — please try again, or submit at vozit.net instead.",
     noVideoYet: "Send me your video whenever you're ready — as a FILE (paperclip → File), not a video message.",
+    payoutsLinkMsg: (link: string) => `💳 Here's your private payouts link: ${link}\n\nThis link is just for you and works for a little while — if it stops working, just type /payouts again for a new one.`,
+    settingsLinkMsg: (link: string) => `⚙️ Here's your private settings link: ${link}\n\nThis link is just for you and works for a little while — if it stops working, just type /profile again for a new one.`,
+    linkGenFailed: "I couldn't generate your link just now — please try again in a moment.",
   },
   es: {
     chooseLanguage: '🌐 ¿Idioma? Responde con un número:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
@@ -98,7 +101,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
 ¿Cuál es tu nombre?`,
     askUsername: 'Gracias. ¿Qué nombre de usuario quieres en VozIt? (letras, números, guiones bajos — esto es público)',
     askEmail: '¿Y un correo electrónico, para tu cuenta y tus pagos?',
-    accountCreated: (username: string) => `✅ ¡Cuenta creada! Usuario: @${username}. Para configurar tus pagos, visita vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ ¡Cuenta creada! Usuario: @${username}.\n\n💳 Configura tus pagos aquí (tu enlace personal): ${link}\n\nSiempre puedes obtener un nuevo enlace de pagos escribiendo /payouts, o tu enlace de ajustes escribiendo /profile.`,
     accountCreateFailed: 'No pude crear tu cuenta en este momento — intenta de nuevo en un momento, o regístrate en vozit.net.',
     returningGreeting: (username: string) => `¡Entendido, @${username}! 🎥 Procesando tu reporte.`,
     askDescription: '¿Qué está pasando? (descripción breve)',
@@ -114,6 +117,9 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
     reportRemoved: 'Tu reporte no pudo publicarse — fue marcado por nuestra moderación de contenido. Si crees que esto es un error, visita vozit.net para obtener ayuda.',
     genericError: 'Algo salió mal de mi lado — intenta de nuevo, o envíalo en vozit.net.',
     noVideoYet: 'Envíame tu video cuando estés listo — como ARCHIVO (clip → Archivo), no como mensaje de video.',
+    payoutsLinkMsg: (link: string) => `💳 Aquí tienes tu enlace privado de pagos: ${link}\n\nEste enlace es solo para ti y funciona por un tiempo limitado — si deja de funcionar, escribe /payouts de nuevo para obtener uno nuevo.`,
+    settingsLinkMsg: (link: string) => `⚙️ Aquí tienes tu enlace privado de ajustes: ${link}\n\nEste enlace es solo para ti y funciona por un tiempo limitado — si deja de funcionar, escribe /profile de nuevo para obtener uno nuevo.`,
+    linkGenFailed: 'No pude generar tu enlace en este momento — intenta de nuevo en un momento.',
   },
   ar: {
     chooseLanguage: '🌐 اللغة؟ الرجاء الرد برقم:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
@@ -138,7 +144,7 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
 ما اسمك؟`,
     askUsername: 'تمام. ما اسم المستخدم الذي تريده في VozIt؟ (أحرف وأرقام وشرطات سفلية — هذا عام)',
     askEmail: 'وبريد إلكتروني، لحسابك ومدفوعاتك؟',
-    accountCreated: (username: string) => `✅ تم إنشاء الحساب! اسم المستخدم: @${username}. لإعداد المدفوعات، تفضل بزيارة vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ تم إنشاء الحساب! اسم المستخدم: @${username}.\n\n💳 أعدّ مدفوعاتك من هنا (رابطك الخاص): ${link}\n\nيمكنك دائمًا الحصول على رابط مدفوعات جديد بكتابة /payouts، أو رابط الإعدادات بكتابة /profile.`,
     accountCreateFailed: 'تعذر إنشاء حسابك الآن — حاول مرة أخرى بعد قليل، أو سجّل عبر vozit.net.',
     returningGreeting: (username: string) => `تمام يا @${username}! 🎥 جارٍ معالجة تقريرك.`,
     askDescription: 'ماذا يحدث؟ (وصف موجز)',
@@ -154,6 +160,9 @@ Para publicar y ganar dinero, necesito crear tu cuenta.
     reportRemoved: 'تعذر نشر تقريرك — تم وضع علامة عليه من قبل نظام الإشراف على المحتوى لدينا. إذا كنت تعتقد أن هذا خطأ، تفضل بزيارة vozit.net للمساعدة.',
     genericError: 'حدث خطأ ما من جانبي — حاول مرة أخرى، أو أرسل عبر vozit.net.',
     noVideoYet: 'أرسل لي الفيديو عندما تكون جاهزًا — كملف (مشبك ← ملف)، وليس كرسالة فيديو.',
+    payoutsLinkMsg: (link: string) => `💳 إليك رابط المدفوعات الخاص بك: ${link}\n\nهذا الرابط لك فقط ويعمل لفترة محدودة — إذا توقف عن العمل، اكتب /payouts مرة أخرى للحصول على رابط جديد.`,
+    settingsLinkMsg: (link: string) => `⚙️ إليك رابط الإعدادات الخاص بك: ${link}\n\nهذا الرابط لك فقط ويعمل لفترة محدودة — إذا توقف عن العمل، اكتب /profile مرة أخرى للحصول على رابط جديد.`,
+    linkGenFailed: 'تعذر إنشاء رابطك الآن — حاول مرة أخرى بعد قليل.',
   },
   fr: {
     chooseLanguage: '🌐 Langue ? Répondez avec un numéro :\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
@@ -178,7 +187,7 @@ Pour publier et gagner de l'argent, je dois créer votre compte.
 Quel est votre nom ?`,
     askUsername: "Merci. Quel nom d'utilisateur voulez-vous sur VozIt ? (lettres, chiffres, tirets bas — c'est public)",
     askEmail: 'Et une adresse e-mail, pour votre compte et vos paiements ?',
-    accountCreated: (username: string) => `✅ Compte créé ! Nom d'utilisateur : @${username}. Pour configurer vos paiements, visitez vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ Compte créé ! Nom d'utilisateur : @${username}.\n\n💳 Configurez vos paiements ici (votre lien personnel) : ${link}\n\nVous pouvez toujours obtenir un nouveau lien de paiements en tapant /payouts, ou votre lien de paramètres en tapant /profile.`,
     accountCreateFailed: "Je n'ai pas pu créer votre compte pour le moment — réessayez dans un instant, ou inscrivez-vous sur vozit.net.",
     returningGreeting: (username: string) => `Bien reçu, @${username} ! 🎥 Traitement de votre rapport en cours.`,
     askDescription: 'Que se passe-t-il ? (brève description)',
@@ -194,6 +203,9 @@ Quel est votre nom ?`,
     reportRemoved: "Votre rapport n'a pas pu être publié — il a été signalé par notre modération de contenu. Si vous pensez que c'est une erreur, consultez vozit.net.",
     genericError: "Une erreur s'est produite de mon côté — réessayez, ou envoyez sur vozit.net.",
     noVideoYet: "Envoyez-moi votre vidéo quand vous serez prêt — en tant que FICHIER (trombone → Fichier), pas en message vidéo.",
+    payoutsLinkMsg: (link: string) => `💳 Voici votre lien privé de paiements : ${link}\n\nCe lien est juste pour vous et fonctionne pendant un temps limité — s'il ne fonctionne plus, tapez à nouveau /payouts pour en obtenir un nouveau.`,
+    settingsLinkMsg: (link: string) => `⚙️ Voici votre lien privé de paramètres : ${link}\n\nCe lien est juste pour vous et fonctionne pendant un temps limité — s'il ne fonctionne plus, tapez à nouveau /profile pour en obtenir un nouveau.`,
+    linkGenFailed: "Je n'ai pas pu générer votre lien pour le moment — réessayez dans un instant.",
   },
   uk: {
     chooseLanguage: '🌐 Мова? Дайте відповідь номером:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
@@ -218,7 +230,7 @@ Quel est votre nom ?`,
 Як вас звати?`,
     askUsername: "Дякую. Яке ім'я користувача ви хочете на VozIt? (літери, цифри, підкреслення — це публічно)",
     askEmail: 'І електронну адресу, для акаунта та виплат?',
-    accountCreated: (username: string) => `✅ Акаунт створено! Ім'я користувача: @${username}. Щоб налаштувати виплати, відвідайте vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ Акаунт створено! Ім'я користувача: @${username}.\n\n💳 Налаштуйте виплати тут (ваше особисте посилання): ${link}\n\nВи завжди можете отримати нове посилання на виплати, написавши /payouts, або посилання на налаштування, написавши /profile.`,
     accountCreateFailed: 'Не вдалося створити акаунт зараз — спробуйте ще раз за хвилину, або зареєструйтеся на vozit.net.',
     returningGreeting: (username: string) => `Зрозуміло, @${username}! 🎥 Обробляю ваш звіт.`,
     askDescription: 'Що відбувається? (короткий опис)',
@@ -234,6 +246,9 @@ Quel est votre nom ?`,
     reportRemoved: 'Ваш звіт не вдалося опублікувати — його позначила наша модерація контенту. Якщо вважаєте це помилкою, зверніться на vozit.net.',
     genericError: 'Щось пішло не так з мого боку — спробуйте ще раз, або надішліть через vozit.net.',
     noVideoYet: 'Надішліть відео, коли будете готові — як ФАЙЛ (скріпка → Файл), а не відеоповідомлення.',
+    payoutsLinkMsg: (link: string) => `💳 Ось ваше приватне посилання для виплат: ${link}\n\nЦе посилання лише для вас і діє протягом обмеженого часу — якщо воно перестане працювати, просто напишіть /payouts ще раз, щоб отримати нове.`,
+    settingsLinkMsg: (link: string) => `⚙️ Ось ваше приватне посилання на налаштування: ${link}\n\nЦе посилання лише для вас і діє протягом обмеженого часу — якщо воно перестане працювати, просто напишіть /profile ще раз, щоб отримати нове.`,
+    linkGenFailed: 'Не вдалося створити ваше посилання зараз — спробуйте ще раз за хвилину.',
   },
   pt: {
     chooseLanguage: '🌐 Idioma? Responda com um número:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
@@ -258,7 +273,7 @@ Para publicar e ganhar receita, preciso configurar sua conta.
 Qual é o seu nome?`,
     askUsername: 'Certo. Qual nome de usuário você quer no VozIt? (letras, números, sublinhados — isso é público)',
     askEmail: 'E um e-mail, para sua conta e pagamentos?',
-    accountCreated: (username: string) => `✅ Conta criada! Usuário: @${username}. Para configurar seus pagamentos, acesse vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ Conta criada! Usuário: @${username}.\n\n💳 Configure seus pagamentos aqui (seu link pessoal): ${link}\n\nVocê sempre pode obter um novo link de pagamentos digitando /payouts, ou seu link de configurações digitando /profile.`,
     accountCreateFailed: 'Não consegui criar sua conta agora — tente novamente em instantes, ou cadastre-se em vozit.net.',
     returningGreeting: (username: string) => `Certo, @${username}! 🎥 Processando seu relato.`,
     askDescription: 'O que está acontecendo? (descrição breve)',
@@ -274,6 +289,9 @@ Qual é o seu nome?`,
     reportRemoved: 'Seu relato não pôde ser publicado — foi sinalizado pela nossa moderação de conteúdo. Se achar que isso é um erro, acesse vozit.net para ajuda.',
     genericError: 'Algo deu errado do meu lado — tente novamente, ou envie pelo vozit.net.',
     noVideoYet: 'Me envie seu vídeo quando estiver pronto — como ARQUIVO (clipe → Arquivo), não como mensagem de vídeo.',
+    payoutsLinkMsg: (link: string) => `💳 Aqui está seu link privado de pagamentos: ${link}\n\nEsse link é só seu e funciona por um tempo limitado — se parar de funcionar, digite /payouts novamente para obter um novo.`,
+    settingsLinkMsg: (link: string) => `⚙️ Aqui está seu link privado de configurações: ${link}\n\nEsse link é só seu e funciona por um tempo limitado — se parar de funcionar, digite /profile novamente para obter um novo.`,
+    linkGenFailed: 'Não consegui gerar seu link agora — tente novamente em instantes.',
   },
   sw: {
     chooseLanguage: '🌐 Lugha? Jibu kwa nambari:\n1. English\n2. Español\n3. العربية\n4. Français\n5. Українська\n6. Português\n7. Kiswahili',
@@ -298,7 +316,7 @@ Ili kuchapisha na kupata mapato, ninahitaji kusanidi akaunti yako.
 Jina lako ni nani?`,
     askUsername: 'Sawa. Unataka jina gani la mtumiaji kwenye VozIt? (herufi, nambari, mistari ya chini — hii ni ya umma)',
     askEmail: 'Na barua pepe, kwa ajili ya akaunti yako na malipo?',
-    accountCreated: (username: string) => `✅ Akaunti imeundwa! Mtumiaji: @${username}. Kusanidi malipo, tembelea vozit.net/payouts`,
+    accountCreated: (username: string, link: string) => `✅ Akaunti imeundwa! Mtumiaji: @${username}.\n\n💳 Sanidi malipo yako hapa (kiungo chako binafsi): ${link}\n\nUnaweza kupata kiungo kipya cha malipo wakati wowote kwa kuandika /payouts, au kiungo cha mipangilio kwa kuandika /profile.`,
     accountCreateFailed: 'Sikuweza kuunda akaunti yako sasa hivi — jaribu tena baada ya muda, au jisajili kwenye vozit.net.',
     returningGreeting: (username: string) => `Sawa, @${username}! 🎥 Ninachakata ripoti yako.`,
     askDescription: 'Nini kinaendelea? (maelezo mafupi)',
@@ -314,6 +332,9 @@ Jina lako ni nani?`,
     reportRemoved: 'Ripoti yako haikuweza kuchapishwa — ilitiwa alama na mfumo wetu wa ukaguzi wa maudhui. Ukidhani hii ni kosa, tembelea vozit.net kwa msaada.',
     genericError: 'Kuna hitilafu upande wangu — jaribu tena, au tuma kupitia vozit.net.',
     noVideoYet: 'Nitumie video yako ukiwa tayari — kama FAILI (klipu → Faili), si ujumbe wa video.',
+    payoutsLinkMsg: (link: string) => `💳 Hiki ndicho kiungo chako binafsi cha malipo: ${link}\n\nKiungo hiki ni chako pekee na kinafanya kazi kwa muda mfupi — kikiacha kufanya kazi, andika /payouts tena kupata kipya.`,
+    settingsLinkMsg: (link: string) => `⚙️ Hiki ndicho kiungo chako binafsi cha mipangilio: ${link}\n\nKiungo hiki ni chako pekee na kinafanya kazi kwa muda mfupi — kikiacha kufanya kazi, andika /profile tena kupata kipya.`,
+    linkGenFailed: 'Sikuweza kutengeneza kiungo chako sasa hivi — jaribu tena baada ya muda.',
   },
 }
 
@@ -539,6 +560,32 @@ export async function createAccountFromBot(params: {
   }
 
   return { userId: authData.user.id }
+}
+
+// Generates a one-time Supabase sign-in link for an already-created bot
+// account, landing the reporter straight on a given website page — used so
+// "set up payouts" never means "create a password and log in," since
+// bot-created accounts don't have a password the reporter actually knows
+// (see createAccountFromBot above; its only password was randomly
+// generated and thrown away). Supabase owns this link's expiry and
+// single-use behavior, not a custom token this app would have to secure
+// itself — if one expires, the reporter just asks the bot again
+// (/payouts or /profile) for a fresh one.
+export async function generateBotLoginLink(params: {
+  email: string
+  redirectPath: string
+}): Promise<{ url: string } | { error: string }> {
+  const admin = createAdminClient()
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: params.email,
+    options: { redirectTo: `https://www.vozit.net/auth/callback?next=${encodeURIComponent(params.redirectPath)}` },
+  })
+  if (error || !data?.properties?.action_link) {
+    captureError(error, { fn: 'generateBotLoginLink' })
+    return { error: error?.message || 'link generation failed' }
+  }
+  return { url: data.properties.action_link }
 }
 
 // Pushes already-downloaded video bytes straight to Mux, the same

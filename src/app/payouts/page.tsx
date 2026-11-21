@@ -2,6 +2,47 @@
 import { useState, useEffect } from 'react'
 import { Top } from '@/lib/ui'
 import { createBrowserClient } from '@/lib/supabase'
+import { useUITranslation } from '@/hooks/useUITranslation'
+
+// Static UI copy translated (via Claude, cached per language) for reporters
+// whose account language — set once, in the Telegram bot — isn't English.
+// Country names and provider brand names are left as-is: they're proper
+// nouns, and COUNTRIES' `code` values (not the labels) drive the actual
+// logic below, so translating the labels is cosmetic only and out of scope
+// for this pass.
+const PAYOUTS_STRINGS = {
+  backToSettings: '← Settings',
+  pageTitle: 'Payouts',
+  pageSubtitle: 'Withdraw earnings. 7-day hold.',
+  balAvailable: 'Available',
+  balPending: 'Pending',
+  balTotal: 'Total',
+  requestWithdrawal: 'Request a withdrawal',
+  amountPlaceholder: 'Amount (USD)',
+  withdrawVia: 'Withdraw via',
+  sending: 'Sending...',
+  whereLocated: 'Where are you located?',
+  whereLocatedHelp: 'So we can show the payout methods that actually work where you are.',
+  selectCountry: 'Select your country...',
+  cancel: 'Cancel',
+  recommendedForYou: 'Recommended for you',
+  payoutProviders: 'Payout providers',
+  change: 'Change',
+  showRecommendedOnly: 'Show recommended only',
+  showAllMethods: 'Show all methods',
+  acctPlaceholder: 'Account email / ID / wallet address',
+  save: 'Save',
+  connect: 'Connect',
+  connected: '✓ Connected',
+  recentPayouts: 'Recent payouts',
+  ofacNote: 'OFAC sanctions screening on every withdrawal',
+  notSignedIn: 'Not signed in — please refresh and try again.',
+  couldNotSaveCountry: 'Could not save your country:',
+  couldNotConnect: 'Could not connect provider',
+  payoutRequestFailed: 'Payout request failed',
+  sentTo: 'sent to',
+  loading: 'Loading...',
+}
 
 // Compact country list grouped by which providers actually serve them —
 // enough to smart-default without building a full 195-country picker.
@@ -150,6 +191,7 @@ function suggestProviderIds(country: string): string[] {
 }
 
 export default function Payouts() {
+  const tr = useUITranslation('payouts', PAYOUTS_STRINGS)
   const sb = createBrowserClient()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -183,12 +225,12 @@ export default function Payouts() {
     setData((prev: any) => ({ ...prev, country }))
     try {
       const { data: { user } } = await sb.auth.getUser()
-      if (!user) { setConnectMsg('Not signed in — please refresh and try again.'); return }
+      if (!user) { setConnectMsg(tr.notSignedIn); return }
       const { error } = await sb.from('users').update({ country }).eq('id', user.id)
-      if (error) setConnectMsg(`Could not save your country: ${error.message}`)
+      if (error) setConnectMsg(`${tr.couldNotSaveCountry} ${error.message}`)
       else setEditingCountry(false)
     } catch (e: any) {
-      setConnectMsg(`Could not save your country: ${e.message}`)
+      setConnectMsg(`${tr.couldNotSaveCountry} ${e.message}`)
     } finally { setSettingCountry(false) }
   }
 
@@ -220,7 +262,7 @@ export default function Payouts() {
         }),
       })
       const d = await res.json()
-      if (!res.ok) { setConnectMsg(d.error || 'Could not connect provider'); return }
+      if (!res.ok) { setConnectMsg(d.error || tr.couldNotConnect); return }
       setConnecting(null)
       await load()
     } catch (e: any) { setConnectMsg(e.message) }
@@ -234,14 +276,14 @@ export default function Payouts() {
         body: JSON.stringify({ action: 'payout', amount: Number(amount) }),
       })
       const d = await res.json()
-      if (!res.ok) setPayoutMsg(d.error || 'Payout request failed')
+      if (!res.ok) setPayoutMsg(d.error || tr.payoutRequestFailed)
       else if (d.status === 'pending_review') setPayoutMsg(d.message)
-      else { setPayoutMsg(`✓ $${d.amount} sent to ${d.provider}`); setAmount(''); await load() }
+      else { setPayoutMsg(`✓ $${d.amount} ${tr.sentTo} ${d.provider}`); setAmount(''); await load() }
     } catch (e: any) { setPayoutMsg(e.message) }
     setPayoutLoading(false)
   }
 
-  if (loading) return (<div className="page"><Top /><div className="container"><p style={{ color: '#999', textAlign: 'center', padding: 40 }}>Loading...</p></div></div>)
+  if (loading) return (<div className="page"><Top /><div className="container"><p style={{ color: '#999', textAlign: 'center', padding: 40 }}>{tr.loading}</p></div></div>)
 
   const providers = data?.availableProviders || []
   const connectedProvider = data?.provider
@@ -257,15 +299,15 @@ export default function Payouts() {
   return (
     <div className="page"><Top />
       <div className="container">
-        <a href="/settings" style={{ fontSize: 13, color: '#0a8fe8', marginBottom: 16, display: 'block' }}>← Settings</a>
-        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Payouts</h1>
-        <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Withdraw earnings. 7-day hold.</p>
+        <a href="/settings" style={{ fontSize: 13, color: '#0a8fe8', marginBottom: 16, display: 'block' }}>{tr.backToSettings}</a>
+        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{tr.pageTitle}</h1>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>{tr.pageSubtitle}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           {[
-            { l: 'Available', v: data?.balance?.available ?? 0, c: '#22C55E' },
-            { l: 'Pending', v: data?.balance?.pending ?? 0, c: '#CA8A04' },
-            { l: 'Total', v: data?.balance?.total ?? 0, c: '#1a1a1a' },
+            { l: tr.balAvailable, v: data?.balance?.available ?? 0, c: '#22C55E' },
+            { l: tr.balPending, v: data?.balance?.pending ?? 0, c: '#CA8A04' },
+            { l: tr.balTotal, v: data?.balance?.total ?? 0, c: '#1a1a1a' },
           ].map(b => (
             <div key={b.l} className="card"><div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>{b.l}</div><div style={{ fontSize: 24, fontWeight: 700, color: b.c }}>${Number(b.v).toFixed(2)}</div></div>
           ))}
@@ -273,12 +315,12 @@ export default function Payouts() {
 
         {connectedProvider && (
           <div className="card" style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Request a withdrawal</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{tr.requestWithdrawal}</div>
             {payoutMsg && <div style={{ fontSize: 12, marginBottom: 10, color: payoutMsg.startsWith('✓') ? '#065F46' : '#DC2626' }}>{payoutMsg}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount (USD)" type="number" style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }} />
+              <input value={amount} onChange={e => setAmount(e.target.value)} placeholder={tr.amountPlaceholder} type="number" style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }} />
               <button onClick={requestPayout} disabled={payoutLoading || !amount || Number(amount) <= 0} className="btn btn-primary" style={{ opacity: (payoutLoading || !amount) ? 0.5 : 1 }}>
-                {payoutLoading ? 'Sending...' : `Withdraw via ${connectedProvider}`}
+                {payoutLoading ? tr.sending : `${tr.withdrawVia} ${connectedProvider}`}
               </button>
             </div>
           </div>
@@ -286,28 +328,28 @@ export default function Payouts() {
 
         {(!country || editingCountry) && (
           <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Where are you located?</div>
-            <div style={{ fontSize: 11, color: '#666', marginBottom: 10 }}>So we can show the payout methods that actually work where you are.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{tr.whereLocated}</div>
+            <div style={{ fontSize: 11, color: '#666', marginBottom: 10 }}>{tr.whereLocatedHelp}</div>
             <select onChange={e => e.target.value && setCountry(e.target.value)} disabled={settingCountry} defaultValue={country || ''} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit' }}>
-              <option value="" disabled>Select your country...</option>
+              <option value="" disabled>{tr.selectCountry}</option>
               {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
             {editingCountry && (
-              <span onClick={() => setEditingCountry(false)} style={{ fontSize: 12, color: '#666', cursor: 'pointer', display: 'inline-block', marginTop: 8 }}>Cancel</span>
+              <span onClick={() => setEditingCountry(false)} style={{ fontSize: 12, color: '#666', cursor: 'pointer', display: 'inline-block', marginTop: 8 }}>{tr.cancel}</span>
             )}
           </div>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>{country && !showAllProviders ? 'Recommended for you' : 'Payout providers'}</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{country && !showAllProviders ? tr.recommendedForYou : tr.payoutProviders}</div>
           <div style={{ display: 'flex', gap: 12 }}>
             {country && !editingCountry && (
               <span onClick={() => setEditingCountry(true)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>
-                {COUNTRIES.find(c => c.code === country)?.label || country} · Change
+                {COUNTRIES.find(c => c.code === country)?.label || country} · {tr.change}
               </span>
             )}
             {country && suggested.length > 0 && others.length > 0 && (
-              <span onClick={() => setShowAllProviders(s => !s)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>{showAllProviders ? 'Show recommended only' : 'Show all methods'}</span>
+              <span onClick={() => setShowAllProviders(s => !s)} style={{ fontSize: 12, color: '#0a8fe8', cursor: 'pointer' }}>{showAllProviders ? tr.showRecommendedOnly : tr.showAllMethods}</span>
             )}
           </div>
         </div>
@@ -321,13 +363,13 @@ export default function Payouts() {
                 <div style={{ fontSize: 11, color: '#666' }}>{p.description}</div>
               </div>
               {connectedProvider === p.id
-                ? <span style={{ fontSize: 12, fontWeight: 600, color: '#22C55E' }}>✓ Connected</span>
-                : <button onClick={() => connect(p.id)} className="btn btn-outline">Connect</button>}
+                ? <span style={{ fontSize: 12, fontWeight: 600, color: '#22C55E' }}>{tr.connected}</span>
+                : <button onClick={() => connect(p.id)} className="btn btn-outline">{tr.connect}</button>}
             </div>
             {connecting === p.id && (
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <input value={acctInput} onChange={e => setAcctInput(e.target.value)} placeholder="Account email / ID / wallet address" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12, fontFamily: 'inherit' }} />
-                <button onClick={() => saveConnect(p.id)} className="btn btn-primary btn-sm">Save</button>
+                <input value={acctInput} onChange={e => setAcctInput(e.target.value)} placeholder={tr.acctPlaceholder} style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12, fontFamily: 'inherit' }} />
+                <button onClick={() => saveConnect(p.id)} className="btn btn-primary btn-sm">{tr.save}</button>
               </div>
             )}
           </div>
@@ -335,7 +377,7 @@ export default function Payouts() {
 
         {data?.payouts?.length > 0 && (
           <>
-            <div style={{ fontSize: 15, fontWeight: 600, margin: '20px 0 10px' }}>Recent payouts</div>
+            <div style={{ fontSize: 15, fontWeight: 600, margin: '20px 0 10px' }}>{tr.recentPayouts}</div>
             {data.payouts.map((p: any) => (
               <div key={p.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -348,7 +390,7 @@ export default function Payouts() {
           </>
         )}
 
-        <div style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 12 }}>OFAC sanctions screening on every withdrawal</div>
+        <div style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 12 }}>{tr.ofacNote}</div>
       </div>
     </div>
   )

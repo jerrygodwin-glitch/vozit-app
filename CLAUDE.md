@@ -261,6 +261,66 @@ confuse the two integrations.
   way the Mux webhook's signature is). Until the token exists, this route is
   inert — it 400s with no bot token configured.
 
+#### Bot → website handoff: `/payouts` and `/profile` commands
+A bot-created account's password is a random, thrown-away value (see
+`createAccountFromBot`) — the reporter never knows it, so the website's
+normal email+password login doesn't work for them. Rather than a custom
+token this app would have to secure itself, `generateBotLoginLink()` in
+`bot-common.ts` calls Supabase's own `admin.auth.admin.generateLink({ type:
+'magiclink' })`, which Supabase owns the expiry/single-use semantics for,
+with `redirectTo` pointed at `/auth/callback?next=<path>` (that route's
+`explicitNext` param already existed and bypasses the onboarding-redirect
+check entirely, so a bot-created account's `onboarding_completed: false`
+never gets in the way).
+
+- Sent automatically, inline, right after account creation (`accountCreated`
+  message — now takes `(username, link)` instead of a plain-text URL
+  mention).
+- Also available on demand, any time, regardless of session step: typing
+  `/payouts` or `/profile` (handled near the top of the webhook POST
+  handler, before the step state machine) mints a **fresh** link each time.
+  This is the deliberate answer to "what if the link expires" — there's no
+  password-reset fallback path for these accounts, so expiry is handled by
+  making regeneration trivial and always available instead of making the
+  link long-lived.
+- `/profile` redirects to `/settings` (the actual hub page with Payouts/
+  Earnings/Social/Licensing links) — named `/profile` in the bot for a more
+  natural word, not because it points at `src/app/profile/page.tsx`.
+- If Supabase's redirect-URL allow-list doesn't already include
+  `https://www.vozit.net/auth/callback` (other login paths already use it,
+  so it likely does), `generateLink` returns an error and the bot falls
+  back to a plain-text `vozit.net/payouts` mention rather than failing the
+  whole message — check the Supabase Auth dashboard's URL Configuration if
+  reporters report the link not working.
+
+#### Translating the website pages a bot reporter gets sent to
+A reporter may have done their entire account setup in Telegram in a
+language other than English and never otherwise see an English screen —
+but `/payouts` and `/settings` are real website pages with no multi-
+language UI of their own. `useUITranslation(pageKey, defaultStrings)`
+(`src/hooks/useUITranslation.ts`) renders the English defaults immediately,
+then swaps in a Claude translation (keyed off the account's
+`telegram_language`) once `/api/translate-ui` resolves — falls back to
+English permanently if that call fails. `translateUIStrings()` in
+`translate.ts` does the actual Claude call (same JSON-in/JSON-out pattern
+as `translateReportContent`); results are cached in `ui_translation_cache`
+(`page_key, lang` → `translated jsonb`, keyed by a hash of the English
+source so an edit to the English copy automatically invalidates the cache
+with no manual step) so repeat visits don't re-call Claude.
+
+- Only the static instructional copy (headings, labels, buttons, help text)
+  is translated — not dynamic data. Country names (`/payouts`' `COUNTRIES`
+  list), provider brand names/descriptions, and tier names (Starter/Silver/
+  Gold/Platinum) are deliberately left untranslated: they're proper nouns,
+  or in the tier names' case, the same branded labels shown everywhere else
+  in the app.
+- Currently wired up on `/payouts` and `/settings` only (the two pages the
+  bot's magic links point at). `/profile` (the separate read-only stats
+  screen under the bottom nav's "More" tab) is not yet translated — same
+  hook would apply if that's wanted later.
+- Migration: `supabase_migration_ui_translation_cache.sql`. Already applied
+  directly to the live DB.
+
 ### Assignment System
 - Ongoing assignments with fees for conflict zones and breaking news
 - Example assignments: Ukraine ($2,400), Sudan ($3,000), Venezuela ($1,200), Pacific ($800), Myanmar ($1,800)
