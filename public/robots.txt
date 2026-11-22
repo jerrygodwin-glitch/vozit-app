@@ -5,3 +5,5 @@ Disallow: /payouts
 Disallow: /earnings
 Disallow: /api/
 Disallow: /auth/
+
+Sitemap: https://www.vozit.net/sitemap.xml

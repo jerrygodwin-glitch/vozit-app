@@ -2,6 +2,11 @@
 import { createServerClient } from '@/lib/supabase-server'
 import { LandingClient } from './LandingClient'
 
+export const metadata = {
+  title: 'VozIt! — I was there...',
+  description: 'Citizen journalism platform — eyewitnesses report breaking news, document human rights, and earn revenue from their footage.',
+}
+
 // Was a client component fetching reports/assignments in a useEffect —
 // confirmed directly: that meant the server-rendered HTML always showed
 // empty-state placeholders regardless of real data, since useEffect never

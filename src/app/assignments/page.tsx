@@ -2,6 +2,11 @@
 import { createServerClient } from '@/lib/supabase-server'
 import { AssignmentsClient } from './AssignmentsClient'
 
+export const metadata = {
+  title: 'Assignments — VozIt!',
+  description: 'Funded assignments for conflict zones and breaking news — fulfill a request and earn the reward.',
+}
+
 // Was entirely client-fetched — confirmed directly (same issue found on
 // the homepage): the raw server-rendered HTML always showed "No active
 // assignments right now" regardless of real data, since the fetch never

@@ -6,6 +6,17 @@ import BlockReporterButton from'./BlockReporterButton'
 
 export const dynamic='force-dynamic'
 
+export async function generateMetadata({params}:{params:{username:string}}){
+  const supabase=createServerClient()
+  const{data:reporter}=await supabase.from('users').select('username, display_name, bio, report_count').eq('username',params.username).eq('is_banned',false).single()
+  if(!reporter)return{title:'Reporter not found — VozIt!'}
+  const name=reporter.display_name||reporter.username
+  return{
+    title:`${name} (@${reporter.username}) — VozIt!`,
+    description:reporter.bio||`${reporter.report_count||0} verified eyewitness reports on VozIt! — citizen journalism, I was there...`,
+  }
+}
+
 export default async function ReporterProfile({params}:{params:{username:string}}){
 const supabase=createServerClient()
 const{data:reporter}=await supabase.from('users').select('id, username, display_name, bio, avatar_url, tier, report_count, credibility_score, created_at').eq('username',params.username).eq('is_banned',false).single()

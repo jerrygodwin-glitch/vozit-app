@@ -6,7 +6,16 @@ import { getCorsHeaders, getEmbedCorsHeaders, getSecurityHeaders } from '@/lib/s
 const SUPABASE_URL = 'https://mfanqkbhegxppyitxtye.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mYW5xa2JoZWd4cHB5aXR4dHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDc2NDYsImV4cCI6MjEwMzcyMzY0Nn0.83-3UqR1BH2uaVoTO7Gta0l3lxVlkh7qSZ0b20aszdw'
 
-const PUBLIC = ['/auth', '/feed', '/api/mux-webhook', '/api/stripe', '/api/og', '/api/licensing', '/embed', '/search', '/assignments', '/licensing', '/privacy', '/terms', '/contact']
+// '/policies', '/report', and '/reporter' were missing from this list
+// despite all being genuinely public content (legal pages, published
+// reports, reporter profiles) — confirmed directly: an anonymous visitor
+// (including Googlebot/AdSense's review crawler) hitting any of those URLs
+// got redirected to /auth/login instead of the real page. That's a much
+// more direct explanation for a "Site down or unavailable" AdSense
+// rejection than any SSR concern — a crawler following a link from the
+// homepage footer or a shared report URL would see a login redirect, not
+// content, regardless of how well that destination page itself renders.
+const PUBLIC = ['/auth', '/feed', '/api/mux-webhook', '/api/stripe', '/api/og', '/api/licensing', '/embed', '/search', '/assignments', '/licensing', '/privacy', '/terms', '/contact', '/policies', '/report', '/reporter', '/submit-telegram', '/api/health']
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname

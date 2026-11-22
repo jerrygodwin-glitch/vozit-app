@@ -572,6 +572,82 @@ are now each available in 6 languages (English, Español, العربية, Franç
   email and the top-of-page "back to Terms and Policies" link still work
   normally; only mid-paragraph inline links were affected.
 
+### SEO / Crawlability / AdSense Review (2026-11-21)
+A pasted spec, prompted by a recurring Google AdSense "Site down or
+unavailable" rejection, assumed the root cause was client-only rendering
+("'use client' pages render an empty shell"). That diagnosis was already
+largely wrong by the time this arrived — checked directly before building
+anything:
+
+- **Homepage, feed, assignments, and licensing's search-param bailout had
+  already been fixed for this exact reason in an earlier session** (their
+  own code comments say so explicitly, and were re-verified directly this
+  pass). Rewriting them again per the spec would have been redundant, not
+  a fix.
+- **The real, confirmed cause: `middleware.ts`'s `PUBLIC` allowlist never
+  included `/policies`, `/report`, `/reporter`, or `/submit-telegram`.**
+  Verified live against production before fixing anything —
+  `curl https://www.vozit.net/policies` as an anonymous request returned
+  `307 → /auth/login`, same for `/submit-telegram`, while an already-listed
+  path like `/feed` returned a clean `200`. That means every one of the 12
+  legal pages built in the previous two passes, every published report
+  page, every reporter profile, and the Telegram-bot info page were
+  invisible to Googlebot/AdSense's crawler (and any logged-out visitor) —
+  a far more direct explanation for "Site down or unavailable" than any
+  SSR concern, since a redirect-to-login instead of real content is
+  exactly what that rejection reason describes. Fixed by adding those four
+  path prefixes to `PUBLIC`.
+- **robots.txt and ads.txt already existed correctly** (confirmed by
+  reading them, not assumed from the spec's claim they needed creating) —
+  only added the `Sitemap:` line to the existing file rather than
+  overwriting it with the spec's version, which would have silently
+  dropped the existing `/settings`/`/payouts`/`/earnings` disallow rules.
+- **New `src/app/sitemap.ts`** (didn't exist before) — static pages
+  (including all 12 real `/policies/*` pages, not a partial list) plus
+  every published report and non-banned reporter profile, queried
+  directly rather than hardcoded. Capped at Google/Next.js's 50,000-URL
+  single-sitemap limit for now; flagged in-file for whenever that needs
+  splitting via `generateSitemaps()`.
+- **New `/api/health`** — trivial `{status:'ok', timestamp}` endpoint, as
+  asked.
+- **AdSense script converted to `next/script` with `strategy=
+  "afterInteractive"`**, client ID moved to `NEXT_PUBLIC_ADSENSE_ID` (falls
+  back to the known-good hardcoded value if unset, so nothing breaks if
+  Jerry hasn't set it in Vercel yet) — also added the
+  `<meta name="google-adsense-account">` tag, Google's own documented
+  site-ownership-verification method, as a second, more crawler-reliable
+  signal alongside the script. The verification script itself stays
+  unconsented/unconditional, same reasoning as the Cookie Policy pass:
+  Google's verification crawler never clicks a consent banner.
+- **`licensing/page.tsx` split into a thin server wrapper + new
+  `LicensingClient.tsx`** (mechanical move, no logic changes) so the page
+  could finally export real `metadata` — a `'use client'` file can't
+  export metadata at all, which is why it was inheriting the generic root
+  layout title before. Homepage, feed, and assignments got their own
+  `metadata` exports the same way (they were already server components,
+  so this was a straight addition); `reporter/[username]/page.tsx` got a
+  new `generateMetadata`. `report/[id]/page.tsx` already had real dynamic
+  OG metadata — confirmed, not touched.
+- **Two spec items deliberately NOT done:**
+  1. *"Use plain `<a href>` instead of `next/link` wherever ads show, to
+     force full page reloads."* Skipped — this would degrade the entire
+     app's navigation to full reloads for a problem VozIt doesn't actually
+     have yet (no real AdSense ad units exist anywhere in the codebase,
+     only the verification script; the standard, correct fix for ad
+     refresh on client-side nav is re-triggering
+     `(adsbygoogle=window.adsbygoogle||[]).push({})` on route change via
+     `usePathname()`, not abandoning `next/link`).
+  2. *A permanent `/api/debug/ssr-test` route that fetches vozit.net's own
+     homepage and returns the raw HTML.* Skipped in favor of verifying
+     directly via `curl` from this session instead (see above) — same
+     result, without leaving a throwaway debug endpoint in the deployed
+     app ("remove before production" per the spec's own words, so better
+     not added at all).
+- **`/submit-whatsapp`**, named in the spec's sitemap list, does not exist
+  (WhatsApp intake isn't built — see the WhatsApp item in memory) and was
+  not added to the sitemap; including a URL that 404s for every crawl
+  would hurt more than help.
+
 ## 7. DESIGN SYSTEM
 
 ### CSS Custom Properties (src/app/globals.css)

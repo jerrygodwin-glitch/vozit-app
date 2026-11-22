@@ -9,6 +9,11 @@ import { supabase } from '@/lib/supabase'
 import { Top, Nav } from '@/lib/ui'
 import { FeedClient } from '@/components/feed/FeedClient'
 
+export const metadata = {
+  title: 'Feed — VozIt!',
+  description: 'Verified eyewitness video reports from citizen journalists around the world.',
+}
+
 const FEED_PAGE_SIZE = 30
 
 export default async function Feed() {
