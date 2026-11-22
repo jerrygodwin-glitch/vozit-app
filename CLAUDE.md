@@ -332,6 +332,58 @@ with no manual step) so repeat visits don't re-call Claude.
 - "Most popular" badge on Digital tier
 - Media organization CTA for wire service accounts
 
+### Legal / Compliance Pages (`/policies` hub)
+Terms of Service (`/terms`), Privacy Policy (`/privacy`), Correction & Moderation
+Policy (`/policies/moderation`), and Cookie Policy (`/policies/cookies`) are all
+linked from the `/policies` index page (footer link: "Terms and Policies"). More
+get added to that same index as they're written, rather than each one needing
+its own separate footer link.
+- **Privacy Policy explicitly names every processor** that touches user data —
+  Supabase, Mux, Stripe, Hive, **Anthropic/Claude** (5W analysis + translation;
+  states it isn't used to train models, per Anthropic's own API terms),
+  Resend, Google/AdSense, and Telegram (for bot-submitted reports). Don't add
+  a new third-party service to the codebase without adding it here too.
+- **Cookie Policy accurately reflects that the AdSense script in
+  `layout.tsx` loads site-wide today** (for site-ownership verification)
+  even though no ad has actually shown yet — Google may set cookies from
+  that script regardless. Update this page the moment real ads go live, not
+  after.
+- **`CookieNotice` component** (`src/components/CookieNotice.tsx`, mounted
+  globally in `layout.tsx`) is a disclosure banner, not a consent gate —
+  VozIt's login cookie is required for the site to function, so there's
+  nothing to actually let someone opt out of yet. Dismissal state is a
+  `localStorage` flag, nothing server-side.
+- **Signup now requires clickwrap consent, enforced server-side, not just
+  the checkbox on the page.** `/auth/register`'s email/password path sends
+  `terms_accepted: true`; `/api/auth/register` rejects the request with a
+  400 if that's not literally `true`, and records `users.terms_accepted_at`
+  (migration: `supabase_migration_terms_accepted_at.sql`) — a browsewrap
+  footer link alone is weaker evidence of agreement than an explicit,
+  timestamped checkbox click. **Known gap**: the OAuth (Google/Facebook)
+  signup buttons on that same page only check the checkbox client-side
+  before firing `signInWithOAuth()` — there's no equivalent server-side
+  timestamp recorded for that path yet, since OAuth redirects away before
+  any VozIt API call happens. Closing that gap would mean recording consent
+  during `/auth/profile-setup` (the first-run flow OAuth users land on)
+  instead — not done yet.
+- **No generic "Refund Policy" page** — VozIt has no end-user subscription
+  to refund. Payments are one-time: licensing fees (paid by buyers) and
+  assignment funding. Terms of Service has a short "Payments and fees"
+  section instead. **Real known gap, not a documentation problem**: there is
+  no refund/cancellation code path at all for unfulfilled assignment
+  funding (checked directly — `src/app/api/assignments/` has no
+  refund/expire/cancel logic). The ToS section says "contact us" for this
+  deliberately, rather than describing an automated process that doesn't
+  exist yet.
+- **Not done, and explicitly blocked**: a "real business details" disclosure
+  (registered legal entity name/address) can't be truthfully published
+  since VozIt isn't incorporated yet — see the incorporation item in
+  memory. Can't be worked around with a web page.
+- **Not done, needs a real audit pass, not a document**: color contrast and
+  keyboard navigation across the site weren't verified as part of this
+  pass — spot-checked image alt text looked fine but wasn't exhaustively
+  verified per-tag.
+
 ## 7. DESIGN SYSTEM
 
 ### CSS Custom Properties (src/app/globals.css)

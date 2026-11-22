@@ -36,6 +36,11 @@ const DOCS = [
     title: 'Privacy Policy',
     desc: 'What information VozIt collects, how it’s used, and your choices about it.',
   },
+  {
+    href: '/policies/cookies',
+    title: 'Cookie Policy',
+    desc: 'What cookies and similar browser storage VozIt uses, and why.',
+  },
 ]
 
 export default function PoliciesPage() {

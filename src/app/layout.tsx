@@ -1,5 +1,6 @@
 import './globals.css'
 import { Analytics } from '@vercel/analytics/next'
+import CookieNotice from '@/components/CookieNotice'
 
 export const metadata = {
   title: 'VozIt! — I was there...',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
+        <CookieNotice />
         <Analytics />
       </body>
     </html>

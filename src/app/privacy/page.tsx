@@ -96,8 +96,10 @@ export default function PrivacyPage() {
           <li style={S.li}>Mux — video hosting, streaming, and processing</li>
           <li style={S.li}>Stripe and our payout providers — payments and reporter payouts</li>
           <li style={S.li}>Hive — automated content moderation</li>
+          <li style={S.li}>Anthropic (Claude) — analyzing report text for the 5W summary shown with each report, and translating report content and chat-based submissions between languages. Anthropic processes this text to perform these functions and does not use it to train its models.</li>
           <li style={S.li}>Resend — transactional email (account verification, password resets)</li>
           <li style={S.li}>Google (AdSense) — advertising, as described above</li>
+          <li style={S.li}>Telegram — if you submit a report by chatting with VozIt's Telegram bot instead of the website, Telegram carries that conversation (including your video and any location you share) to our servers the same way it carries any other message you send on its platform</li>
         </ul>
         <p style={S.p}>
           Published reports — including their title, description, video, and
@@ -117,14 +119,24 @@ export default function PrivacyPage() {
 
         <h2 style={S.h2}>Children's privacy</h2>
         <p style={S.p}>
-          VozIt is not directed to children under 13, and we do not knowingly
-          collect personal information from children under 13.
+          VozIt is not directed to children under 13, and you must be at least 13 to
+          create an account — consistent with the U.S. Children's Online Privacy
+          Protection Act (COPPA) and similar laws elsewhere. We do not knowingly
+          collect personal information from anyone under 13. If we learn that we've
+          collected information from a child under 13 without a parent or guardian's
+          consent, we'll delete that account and its data. If you believe a child has
+          created an account or appears in a report, contact us at the email below
+          and we'll look into it promptly.
         </p>
 
         <h2 style={S.h2}>Changes to this policy</h2>
         <p style={S.p}>
           We may update this policy as VozIt evolves. We'll update the "Last
-          updated" date above when we do.
+          updated" date above when we do. See the{' '}
+          <a href="/policies/cookies" style={{ color: '#0a8fe8' }}>Cookie Policy</a>{' '}
+          for details on cookies specifically, or the full{' '}
+          <a href="/policies" style={{ color: '#0a8fe8' }}>Terms and Policies</a> page
+          for everything else.
         </p>
 
         <h2 style={S.h2}>Contact us</h2>

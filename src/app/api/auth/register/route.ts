@@ -12,7 +12,15 @@ export async function POST(req: NextRequest) {
   if (!limit.allowed) return NextResponse.json({ error: 'Too many registration attempts. Try again later.' }, { status: 429 })
 
   try {
-    const { email, password, username, display_name, turnstile_token } = await req.json()
+    const { email, password, username, display_name, turnstile_token, terms_accepted } = await req.json()
+
+    // Server-side enforcement, not just the signup page's checkbox — that
+    // UI gate alone wouldn't stop a direct call to this endpoint, and a
+    // clickwrap agreement needs a real recorded moment of acceptance to
+    // mean anything if it's ever actually relied on.
+    if (terms_accepted !== true) {
+      return NextResponse.json({ error: 'You must agree to the Terms, Privacy Policy, and Cookie Policy to create an account.' }, { status: 400 })
+    }
 
     const emailClean = sanitizeInput(email, 254).toLowerCase().trim()
     if (!emailClean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean))
@@ -81,6 +89,7 @@ export async function POST(req: NextRequest) {
           email: emailClean, username: usernameCheck.cleaned,
           display_name: sanitizeInput(display_name || username, 50),
           tier: 'starter', credibility_score: 0, total_earned: 0, is_admin: false, is_banned: false,
+          terms_accepted_at: new Date().toISOString(),
         })
         .eq('id', authData.user.id)
         .select()

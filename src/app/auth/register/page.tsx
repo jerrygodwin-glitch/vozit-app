@@ -22,6 +22,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState('')
   const [showPw, setShowPw] = useState(false)
+  const [agreed, setAgreed] = useState(false)
 
   // Live username availability
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
@@ -66,6 +67,7 @@ export default function Register() {
           username: f.username,
           display_name: f.username,
           turnstile_token: turnstileToken || undefined,
+          terms_accepted: agreed,
         }),
       })
       const data = await res.json()
@@ -79,9 +81,10 @@ export default function Register() {
     setLoading(false)
   }
 
-  const canSubmit = !loading && !!f.email && pwValid && usernameStatus === 'available' && (!TURNSTILE_SITE_KEY || !!turnstileToken)
+  const canSubmit = !loading && !!f.email && pwValid && usernameStatus === 'available' && (!TURNSTILE_SITE_KEY || !!turnstileToken) && agreed
 
   function oauth(provider: 'google' | 'facebook') {
+    if (!agreed) { setMsg('Please agree to the Terms, Privacy Policy, and Cookie Policy first.'); return }
     const sb = createBrowserClient()
     sb.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback` } })
   }
@@ -131,6 +134,15 @@ export default function Register() {
         {TURNSTILE_SITE_KEY && (
           <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-callback="onTurnstileVerify" style={{ marginTop: 8, marginBottom: 16 }} />
         )}
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#666', marginTop: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
+          <span>
+            I agree to VozIt's{' '}
+            <a href="/terms" target="_blank" style={{ color: '#0a8fe8' }}>Terms of Service</a>,{' '}
+            <a href="/privacy" target="_blank" style={{ color: '#0a8fe8' }}>Privacy Policy</a>, and{' '}
+            <a href="/policies/cookies" target="_blank" style={{ color: '#0a8fe8' }}>Cookie Policy</a>.
+          </span>
+        </label>
         <button onClick={go} disabled={!canSubmit} className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
           {loading ? 'Creating...' : 'Create account'}
         </button>

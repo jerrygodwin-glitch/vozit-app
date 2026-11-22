@@ -72,6 +72,17 @@ export default function TermsPage() {
           involved fraud, manipulated engagement, or violated these terms.
         </p>
 
+        <h2 style={S.h2}>Payments and fees</h2>
+        <p style={S.p}>
+          VozIt does not charge reporters or viewers a subscription or membership fee.
+          Two kinds of payments flow through the platform instead: licensing fees paid
+          by a third party who wants to license a report for their own use, and
+          assignment funding paid to have a specific report fulfilled. Licensing fees
+          are generally non-refundable once a license has been granted and the
+          licensed content delivered. If an assignment you've funded isn't fulfilled,
+          contact us at the email below and we'll help sort it out.
+        </p>
+
         <h2 style={S.h2}>Prohibited conduct</h2>
         <ul style={S.ul}>
           <li style={S.li}>Submitting fabricated, staged, or recycled footage presented as original and current</li>
