@@ -519,6 +519,59 @@ the deviations aren't mistaken for oversights.
   would be a real layout change, not a quick link addition — not done
   without that being scoped deliberately first.
 
+### Multi-Language Policy Pages (2026-11-21)
+Terms of Service, Privacy Policy, and the Reporter & Contributor Agreement
+are now each available in 6 languages (English, Español, العربية, Français,
+Українська, Português), driven by a shared data/renderer pair rather than
+6 separate hand-written pages per document:
+
+- **`src/lib/translations/policies/types.ts`** defines the shared
+  `PolicyContent` shape (title, intro, sections with paragraphs/list/
+  table). **`src/lib/translations/policies/{terms,privacy,contributor}/
+  {en,es,ar,fr,uk,pt}.ts`** hold the actual content — 18 files. The `en.ts`
+  file in each folder is the authoritative source, reformatted from (not
+  rewritten from) the already-live English pages, so it matches exactly
+  what was already reviewed. The other 5 are real, complete translations
+  (done directly, not machine-generated placeholders) of that same content,
+  each tagged with an `aiTranslatedLabel` ("AI-translated — last reviewed:
+  November 2026") and a `viewInEnglishLabel`/`viewInEnglishLinkText` pair
+  for the disclaimer banner.
+- **`src/components/PolicyPage.tsx`** is the shared client-side renderer —
+  reads/writes the selected language via `src/components/
+  LanguageSelector.tsx` (localStorage key `vozit_policy_lang`), shows the
+  "this is a translation, the English version controls" disclaimer banner
+  whenever a non-English language is active, sets `dir="rtl"` for Arabic,
+  and renders sections generically (including the Contributor Agreement's
+  tier-percentage table). `src/app/terms/page.tsx`, `src/app/privacy/
+  page.tsx`, and `src/app/policies/contributor-agreement/page.tsx` are now
+  thin server components that just import their 6 language files and pass
+  them to `<PolicyPage>` — this is also where the new "Governing language"
+  clause (English controls over any translation) lives in the Terms of
+  Service.
+- **Scope deliberately limited to 6 languages / these 3 documents, not
+  all 10 or all 12 policy pages.** The bot supports 10 languages
+  (the original 6 here plus Kiswahili, Русский, Bahasa Indonesia, فارسی,
+  added in an earlier pass) — this system doesn't cover those 4 yet, so a
+  Swahili/Russian/Indonesian/Farsi-speaking visitor still sees English
+  legal pages. Flagged to Jerry as a natural follow-up, not silently
+  expanded to 10 without being asked, and not silently narrowed either —
+  it matches exactly what this spec scoped. The other 9 policy pages
+  (moderation, cookies, DMCA, licensing-agreement, refunds, accessibility,
+  law-enforcement, safety, ofac) were NOT retrofitted with language
+  selectors or given empty placeholder translation files — creating dozens
+  of empty stub files added for a "structure" no content exists for yet
+  would be clutter, not infrastructure. The same `PolicyContent`/
+  `PolicyPage` pattern applies cleanly to any of them whenever real
+  translations are wanted.
+- **Some fidelity was deliberately traded for simplicity**: the original
+  English pages had inline links and bold emphasis mid-paragraph (e.g.
+  linking to the Privacy Policy from inside a Terms paragraph); the
+  structured translation data model represents paragraphs as plain text
+  (or a bold label + plain text for definition-style paragraphs), so those
+  inline cross-links don't carry over into the generic renderer. Contact
+  email and the top-of-page "back to Terms and Policies" link still work
+  normally; only mid-paragraph inline links were affected.
+
 ## 7. DESIGN SYSTEM
 
 ### CSS Custom Properties (src/app/globals.css)
