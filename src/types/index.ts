@@ -17,6 +17,11 @@ export interface User {
   country?: string
   telegram_id?: string
   telegram_language?: string
+  terms_accepted_at?: string
+  contributor_agreement_accepted_at?: string
+  is_deleted?: boolean
+  deleted_at?: string
+  deletion_scheduled_at?: string
   tier: ReporterTier
   report_count: number
   credibility_score: number

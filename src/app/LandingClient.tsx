@@ -297,7 +297,7 @@ export function LandingClient({ reports, assignments }: { reports: any[]; assign
             <span style={{ color: '#fff', fontWeight: 700 }}>VozIt!</span>
           </div>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {[{ l: 'Feed', h: '/feed' }, { l: 'Assignments', h: '/assignments' }, { l: 'Licensing', h: '/licensing' }, { l: 'About', h: '#about' }, { l: 'Contact', h: '/contact' }, { l: 'Privacy', h: '/privacy' }, { l: 'Terms and Policies', h: '/policies' }].map(t => (
+            {[{ l: 'Feed', h: '/feed' }, { l: 'Assignments', h: '/assignments' }, { l: 'Licensing', h: '/licensing' }, { l: 'About', h: '#about' }, { l: 'Contact', h: '/contact' }, { l: 'Terms', h: '/terms' }, { l: 'Privacy', h: '/privacy' }, { l: 'Cookies', h: '/policies/cookies' }, { l: 'DMCA', h: '/policies/dmca' }, { l: 'Safety', h: '/policies/safety' }, { l: 'All Policies', h: '/policies' }].map(t => (
               <a key={t.l} href={t.h} style={{ color: '#999', fontSize: 12 }}>{t.l}</a>
             ))}
           </div>

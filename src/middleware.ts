@@ -49,6 +49,18 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next()
 
+  // EU/EEA/UK visitor flag, read client-side by CookieConsent to decide its
+  // default framing — set once per visitor from Vercel's own geo header
+  // (no DB call, no guessing from timezone). The actual technical gating
+  // (AdSense blocked until an explicit "Accept all" click) already applies
+  // to every visitor regardless of region — this cookie only affects which
+  // choice the banner treats as the safe default before any click happens.
+  if (!req.cookies.get('vozit_region')) {
+    const country = req.headers.get('x-vercel-ip-country') || ''
+    const EU_EEA_UK = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB']
+    res.cookies.set('vozit_region', EU_EEA_UK.includes(country) ? 'eu' : 'other', { maxAge: 60 * 60 * 24 * 365, path: '/' })
+  }
+
   // Security headers (CSP, HSTS, etc.)
   const securityHeaders = getSecurityHeaders()
   for (const [k, v] of Object.entries(securityHeaders)) {

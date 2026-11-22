@@ -8,6 +8,7 @@ import{CameraRecorder}from'@/components/camera/CameraRecorder'
 import{VoiceOverRecorder}from'@/components/camera/VoiceOverRecorder'
 import{BRAND}from'@/lib/logo'
 import{saveDraftVideo,getDraftVideo,clearDraftVideo,saveDraftFields,getDraftFields,clearDraftFields}from'@/lib/draft-storage'
+import{useAuth}from'@/hooks/useAuth'
 
 type Step='record'|'voiceover'|'mode'|'quick'|'detailed'|'review'|'submitting'|'done'
 type FiveWs={who:string;what:string;where_text:string;when_happened:string;why:string}
@@ -37,6 +38,9 @@ function uploadWithProgress(url:string,blob:Blob,onProgress:(pct:number)=>void):
 
 export default function UploadPage(){
 const sb=createBrowserClient()
+const{user:authedUser}=useAuth()
+const[showContributorModal,setShowContributorModal]=useState(false)
+const[acceptingAgreement,setAcceptingAgreement]=useState(false)
 const[step,setStep]=useState<Step>('record')
 const[title,setTitle]=useState('')
 const[notes,setNotes]=useState('')
@@ -291,6 +295,27 @@ async function submitReport(){
     setSubmitError(e.message||'Something went wrong. Please try again.')
     setStep('review')
   }
+}
+
+// Gates the first-ever report a reporter submits — every submission after
+// their first skips straight to submitReport() once
+// contributor_agreement_accepted_at is set. Checked from the authed
+// profile (useAuth already selects the full users row), not re-fetched
+// separately.
+function handlePublishClick(){
+  if(!authedUser?.contributor_agreement_accepted_at){setShowContributorModal(true);return}
+  submitReport()
+}
+
+async function acceptContributorAgreement(){
+  setAcceptingAgreement(true)
+  try{
+    const{data:{user}}=await sb.auth.getUser()
+    if(user)await sb.from('users').update({contributor_agreement_accepted_at:new Date().toISOString()}).eq('id',user.id)
+  }catch{}
+  setAcceptingAgreement(false)
+  setShowContributorModal(false)
+  submitReport()
 }
 
 function toggleAccept(field:keyof FiveWs){
@@ -555,9 +580,30 @@ if(step==='review')return(<div style={{minHeight:'100vh',background:'#f5f5f5'}}>
 
 {submitError&&<div style={{background:'#FEF2F2',color:'#DC2626',padding:12,borderRadius:10,fontSize:12,marginBottom:10}}>⚠️ {submitError}</div>}
 {!isOnline&&<div style={{background:'#FEF3E6',color:'#92400E',padding:10,borderRadius:10,fontSize:12,marginBottom:10}}>You're offline — reconnect to publish</div>}
-<button onClick={submitReport} disabled={!title.trim()||!isOnline} style={{width:'100%',padding:14,borderRadius:10,border:'none',background:'#22C55E',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',marginTop:4,opacity:(!title.trim()||!isOnline)?0.5:1}}>
+<button onClick={handlePublishClick} disabled={!title.trim()||!isOnline} style={{width:'100%',padding:14,borderRadius:10,border:'none',background:'#22C55E',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',marginTop:4,opacity:(!title.trim()||!isOnline)?0.5:1}}>
 {submitError?'↻ Retry publish':'✓ Publish report'}
 </button>
+
+{showContributorModal&&(
+<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,padding:20}}>
+<div style={{background:'#fff',borderRadius:16,padding:24,maxWidth:420,width:'100%'}}>
+<h2 style={{fontSize:16,fontWeight:700,marginBottom:12}}>Before you submit your first report, please confirm:</h2>
+<ul style={{paddingLeft:18,marginBottom:14,fontSize:13,color:'#333',lineHeight:1.8}}>
+<li>I personally captured this footage at the time and place indicated</li>
+<li>This footage is genuine, unaltered, and not AI-generated</li>
+<li>I grant VozIt a license to host, distribute, watermark, and sublicense this content</li>
+<li>I understand I will earn revenue at my current tier rate</li>
+</ul>
+<p style={{fontSize:12,marginBottom:16}}><a href="/policies/contributor-agreement" target="_blank" style={{color:'#0a8fe8'}}>Read the full Contributor Agreement</a></p>
+<div style={{display:'flex',gap:10}}>
+<button onClick={()=>setShowContributorModal(false)} style={{flex:1,padding:11,borderRadius:8,border:'1px solid #ddd',background:'#fff',color:'#333',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+<button onClick={acceptContributorAgreement} disabled={acceptingAgreement} style={{flex:2,padding:11,borderRadius:8,border:'none',background:'#22C55E',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:acceptingAgreement?0.6:1}}>
+{acceptingAgreement?'...':'I agree — submit my report'}
+</button>
+</div>
+</div>
+</div>
+)}
 
 <button onClick={()=>setStep(aiSuggestion?'quick':'detailed')} style={{width:'100%',padding:10,borderRadius:10,border:'1px solid #eee',background:'#fff',color:'#888',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginTop:6}}>
 ← Go back and edit

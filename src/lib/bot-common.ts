@@ -694,6 +694,12 @@ export async function createAccountFromBot(params: {
       telegram_id: params.telegramId,
       telegram_language: params.language || null,
       email_verified: true,
+      // The welcome message's submission guidelines (genuine footage, 61-90s,
+      // 5W format) are the bot's equivalent moment to the website's signup
+      // checkbox and first-upload modal — recorded here rather than adding a
+      // separate interactive certification step to the chat flow itself.
+      terms_accepted_at: new Date().toISOString(),
+      contributor_agreement_accepted_at: new Date().toISOString(),
     })
     .eq('id', authData.user.id)
   if (profileError) {

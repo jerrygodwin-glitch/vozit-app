@@ -140,9 +140,12 @@ export default function Register() {
             I agree to VozIt's{' '}
             <a href="/terms" target="_blank" style={{ color: '#0a8fe8' }}>Terms of Service</a>,{' '}
             <a href="/privacy" target="_blank" style={{ color: '#0a8fe8' }}>Privacy Policy</a>, and{' '}
-            <a href="/policies/cookies" target="_blank" style={{ color: '#0a8fe8' }}>Cookie Policy</a>.
+            <a href="/policies/contributor-agreement" target="_blank" style={{ color: '#0a8fe8' }}>Contributor Agreement</a>.
           </span>
         </label>
+        <p style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
+          By creating an account, you confirm you are at least 13 years old.
+        </p>
         <button onClick={go} disabled={!canSubmit} className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
           {loading ? 'Creating...' : 'Create account'}
         </button>
