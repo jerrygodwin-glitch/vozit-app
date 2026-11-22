@@ -334,10 +334,64 @@ with no manual step) so repeat visits don't re-call Claude.
 
 ### Legal / Compliance Pages (`/policies` hub)
 Terms of Service (`/terms`), Privacy Policy (`/privacy`), Correction & Moderation
-Policy (`/policies/moderation`), and Cookie Policy (`/policies/cookies`) are all
-linked from the `/policies` index page (footer link: "Terms and Policies"). More
-get added to that same index as they're written, rather than each one needing
-its own separate footer link.
+Policy (`/policies/moderation`), Cookie Policy (`/policies/cookies`), DMCA &
+Copyright Takedown Policy (`/policies/dmca`), Media Licensing Agreement
+(`/policies/licensing-agreement`), Reporter & Contributor Agreement
+(`/policies/contributor-agreement`), Refund Policy (`/policies/refunds`),
+Accessibility (`/policies/accessibility`), Law Enforcement Guidelines
+(`/policies/law-enforcement`), Reporter Safety (`/policies/safety`), and
+Sanctions & Compliance (`/policies/ofac`) are all linked from the `/policies`
+index page (footer link: "Terms and Policies"). More get added to that same
+index as they're written, rather than each one needing its own separate
+footer link.
+
+- **The 8 pages added 2026-11-21 came from a pasted build spec, and two of
+  its numbers were wrong — checked against the live code before writing
+  anything, not trusted as-is.** The spec claimed reporter revenue-share
+  tiers of Starter 50%/Silver 55%/Gold 65%/Platinum 70% — the real, live
+  numbers (`REVENUE_SHARE` in `src/lib/payouts.ts`, matching the existing
+  Terms of Service and Settings page) are **40%/45%/50%/55%**. Used the real
+  numbers throughout. The spec's licensing-tier *prices* did check out
+  exactly against `LICENSE_TIERS` in `src/app/api/licensing/route.ts` — those
+  were trusted since they were verified, not just copied.
+- **Real mechanic worth knowing, not obvious from either the spec or the
+  Terms of Service**: for licensing fees specifically, VozIt takes 30% off
+  the top as a flat platform fee *before* the reporter's tier percentage
+  applies to the remaining 70% (`calculateReporterShare(price * 0.70,
+  tier)`) — so a Starter reporter's real share of a licensing sale is 28% of
+  the gross price, not 40%. The Reporter & Contributor Agreement states this
+  mechanic plainly. This 30%-off-top rule is confirmed specific to
+  *licensing* revenue — ad revenue and assignment fees have no equivalent
+  split logic in the code, so those are described more generally ("a share
+  … at the rate tied to your tier"), matching the existing Terms of
+  Service's own wording, rather than asserting an unverified formula.
+- **Refund Policy and the Reporter & Contributor Agreement's indemnification/
+  removal sections describe real behavior, not spec-invented promises.**
+  Checked directly: there is no refund/cancellation code path at all for
+  unfulfilled assignment funding (`src/app/api/assignments/` has none), so
+  the Refund Policy says that's handled case-by-case for now rather than
+  inventing an automatic process or a specific percentage (the spec
+  suggested "full refund minus a 5% processing fee" — not implemented
+  anywhere, not stated as policy).
+- **Submission channels named only include what's actually live**: website
+  and the Telegram bot. The spec's contributor-agreement draft asked to
+  cover "mobile app and WhatsApp" too — neither exists yet (see the mobile
+  app and WhatsApp items in memory), so the page is worded to cover
+  "any other submission channel VozIt adds in the future" instead of
+  asserting channels that don't exist.
+- **Media Licensing Agreement's "Governing law" section is intentionally
+  left as an unresolved placeholder**, not a guessed state — VozIt isn't
+  incorporated yet, so there's no real jurisdiction to name truthfully. Fill
+  this in once incorporation happens, not before.
+- **DMCA takedown notices currently go to `vozitnews@gmail.com`**, same as
+  every other policy page — the page itself notes Jerry should still
+  register an official DMCA agent at copyright.gov ($6 fee) for full Section
+  512 safe-harbor protection; that's a real action only he can take, not
+  something this build could do for him.
+- All contact points across every policy page use the one real working
+  inbox (`vozitnews@gmail.com`) rather than inventing addresses like
+  `legal@vozit.com` or `licensing@vozit.com` that don't exist and would
+  bounce.
 - **Privacy Policy explicitly names every processor** that touches user data —
   Supabase, Mux, Stripe, Hive, **Anthropic/Claude** (5W analysis + translation;
   states it isn't used to train models, per Anthropic's own API terms),

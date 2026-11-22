@@ -41,6 +41,46 @@ const DOCS = [
     title: 'Cookie Policy',
     desc: 'What cookies and similar browser storage VozIt uses, and why.',
   },
+  {
+    href: '/policies/dmca',
+    title: 'DMCA & Copyright Takedown Policy',
+    desc: 'How to report copyright infringement, and how a reporter can dispute a takedown.',
+  },
+  {
+    href: '/policies/licensing-agreement',
+    title: 'Media Licensing Agreement',
+    desc: 'The rights and obligations that come with each license tier, for media organizations licensing footage.',
+  },
+  {
+    href: '/policies/contributor-agreement',
+    title: 'Reporter & Contributor Agreement',
+    desc: 'What you certify when you submit a report, the content license you grant, and how revenue-sharing works.',
+  },
+  {
+    href: '/policies/refunds',
+    title: 'Refund Policy',
+    desc: 'How refunds work for media licensing purchases and assignment funding.',
+  },
+  {
+    href: '/policies/accessibility',
+    title: 'Accessibility',
+    desc: 'VozIt’s commitment to accessibility, and how to report a barrier.',
+  },
+  {
+    href: '/policies/law-enforcement',
+    title: 'Law Enforcement Guidelines',
+    desc: 'How VozIt handles legal requests for user information.',
+  },
+  {
+    href: '/policies/safety',
+    title: 'Reporter Safety',
+    desc: 'VozIt does not ask reporters to put themselves at risk — safety guidance for dangerous situations.',
+  },
+  {
+    href: '/policies/ofac',
+    title: 'Sanctions & Compliance',
+    desc: 'How VozIt screens payouts against U.S. sanctions requirements.',
+  },
 ]
 
 export default function PoliciesPage() {
