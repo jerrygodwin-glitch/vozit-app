@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { sanitizeInput, checkAccountLockout, recordFailedLogin, clearLoginAttempts, rateLimit, RATE_LIMITS } from '@/lib/security'
 import { captureError } from '@/lib/monitoring'
@@ -8,6 +8,11 @@ import { captureError } from '@/lib/monitoring'
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   const supabase = createServerClient()
+  // login_attempts is written/read with the admin client, not the request's
+  // anon-role client — it has to work for people who aren't authenticated
+  // yet, and locking the table down (no public RLS policy) means the anon
+  // role can no longer read or insert into it at all, by design.
+  const admin = createAdminClient()
   const limit = await rateLimit(`auth:${ip}`, RATE_LIMITS.auth.max, RATE_LIMITS.auth.window, supabase)
   if (!limit.allowed) return NextResponse.json({ error: 'Too many login attempts. Try again in a few minutes.' }, { status: 429 })
 
@@ -15,17 +20,17 @@ export async function POST(req: NextRequest) {
     const { email, password } = await req.json()
     const emailClean = sanitizeInput(email, 254).toLowerCase().trim()
 
-    const lockout = await checkAccountLockout(emailClean, supabase)
+    const lockout = await checkAccountLockout(emailClean, admin)
     if (lockout.locked) return NextResponse.json({ error: `Account temporarily locked. Try again in ${lockout.minutesRemaining} minutes.` }, { status: 423 })
 
     const { data, error } = await supabase.auth.signInWithPassword({ email: emailClean, password })
 
     if (error) {
-      const result = await recordFailedLogin(emailClean, supabase, ip)
+      const result = await recordFailedLogin(emailClean, admin, ip)
       return NextResponse.json({ error: result.locked ? 'Account locked due to too many failed attempts.' : `Invalid credentials. ${result.attemptsRemaining} attempts remaining.` }, { status: 401 })
     }
 
-    await clearLoginAttempts(emailClean, supabase)
+    await clearLoginAttempts(emailClean, admin)
 
     // Previously this flag was computed and returned, but the login page
     // ignored it and let unverified accounts straight into the app —

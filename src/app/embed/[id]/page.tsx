@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createServerClient } from '@/lib/supabase-server'
+import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { headers } from 'next/headers'
 
@@ -7,6 +7,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function EmbedPage({ params }: { params: { id: string } }) {
   const supabase = createServerClient()
+  // embed_views is written with the admin client — it's an anonymous-visitor
+  // write (no login on an embedded report), and the table now has no public
+  // RLS policy, so the anon-role client can no longer touch it. This also
+  // stops anyone from reading other sites' referrer/view-count rows over
+  // the public API, which the anon role previously could.
+  const admin = createAdminClient()
   const headersList = headers()
   const referer = headersList.get('referer') || ''
   const refererDomain = referer ? new URL(referer).hostname : 'direct'
@@ -24,7 +30,7 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
   }
 
   // Track embed view (non-blocking)
-  supabase.from('embed_views').upsert({
+  admin.from('embed_views').upsert({
     report_id: report.id,
     referrer_domain: refererDomain,
     referrer_url: referer || null,
@@ -34,7 +40,7 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
     onConflict: 'report_id,referrer_domain',
   }).then(() => {
     // Increment view count for existing entries
-    supabase.rpc('increment_embed_views', {
+    admin.rpc('increment_embed_views', {
       rid: report.id, domain: refererDomain,
     })
   })
