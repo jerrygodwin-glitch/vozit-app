@@ -5,6 +5,7 @@
 
 import { postToYouTube, postToTikTok, postToInstagram, postToFacebook, postToX, postToTelegram } from './social-distribution'
 import type { DistributionResult } from './social-distribution'
+import { rateLimit } from './security'
 
 // YouTube access tokens expire in ~1 hour — unlike the other platforms'
 // effectively-permanent tokens, there's no single static value that keeps
@@ -123,6 +124,7 @@ export async function autoDistributeToVozItChannels(params: {
   location?: { lat: number; lng: number }
   reporterUsername: string
   reporterTier: string
+  supabase?: any // admin client — only used for Instagram's daily-post rate limit below
 }): Promise<{
   results: DistributionResult[]
   platformsPosted: string[]
@@ -192,17 +194,24 @@ export async function autoDistributeToVozItChannels(params: {
     }
   }
 
-  // Instagram — post as Reel
+  // Instagram — post as Reel. Instagram caps API-published posts at 25 per
+  // 24 hours per account; this reuses the same persistent rate limiter
+  // every auth route already relies on rather than a bespoke counter.
   if (accounts.instagram.enabled) {
-    const r = await postToInstagram({
-      accessToken: accounts.instagram.accessToken,
-      igUserId: accounts.instagram.igUserId,
-      caption: `${params.title}\n\n📹 @${params.reporterUsername} via VozIt\n\n#VozIt #IWasThere #CitizenJournalism`,
-      videoUrl,
-      reportUrl,
-      location: params.location,
-    })
-    results.push(r)
+    const limit = await rateLimit('instagram_vozit_channel_post', 25, 86400, params.supabase)
+    if (!limit.allowed) {
+      results.push({ platform: 'instagram', success: false, error: 'Instagram daily post limit (25/24h) reached', distributedAt: new Date().toISOString() })
+    } else {
+      const r = await postToInstagram({
+        accessToken: accounts.instagram.accessToken,
+        igUserId: accounts.instagram.igUserId,
+        caption: `${params.title}\n\n📹 @${params.reporterUsername} via VozIt${params.locationName ? `\n📍 ${params.locationName}` : ''}\n\n#VozIt #IWasThere #CitizenJournalism`,
+        videoUrl,
+        reportUrl,
+        location: params.location,
+      })
+      results.push(r)
+    }
   }
 
   // Facebook — post to VozIt page

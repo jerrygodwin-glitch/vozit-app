@@ -387,6 +387,7 @@ export async function POST(req: NextRequest) {
           location: report.location_lat ? { lat: report.location_lat, lng: report.location_lng } : undefined,
           reporterUsername: (report.user as any)?.username || 'reporter',
           reporterTier: (report.user as any)?.tier || 'starter',
+          supabase,
         }).then(dist => logVozItDistribution(supabase, report.id, dist.results))
       }).catch(e => captureError(e, { route: 'POST /api/mux-webhook', step: 'watermark/distribute background job', reportId: report.id })))
 

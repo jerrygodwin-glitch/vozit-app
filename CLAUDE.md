@@ -194,6 +194,77 @@ Note: `categories` does not exist in the live schema despite being listed here p
   the Google Favicon API is blocked by this site's own CSP and was never a
   working icon source; don't reintroduce it
 
+### Instagram posting — direct Graph API, bypassing the broken Page link (2026-11-23)
+A pasted spec asked to "build Instagram Graph API integration that bypasses
+the broken Page linking," framed as new work. Checked the live code first:
+**most of this was already built and live**, from an earlier session —
+`postToInstagram()` in `src/lib/social-distribution.ts` already creates a
+Reels container and publishes it via direct Graph API calls against a known
+Instagram Business Account ID (`VOZIT_INSTAGRAM_USER_ID` /
+`17841469846896307`) and access token (`VOZIT_INSTAGRAM_TOKEN`) — it never
+depended on Meta's "Link Instagram to Page" UI feature at all (that feature
+only affects Business Suite's own account-picker screen, not direct Graph
+API calls). It's already wired into `autoDistributeToVozItChannels()`
+(fires automatically on every published report), and analytics
+(`fetchInstagramAnalytics` — views/likes/comments/revenue) already exists
+in `src/lib/social-monetization.ts`. None of that was rebuilt.
+
+**What was genuinely missing, and got built:**
+- **Real container-status polling** (`src/lib/instagram-api.ts`'s
+  `pollContainerStatus()`) replaces a blind 10-second sleep in
+  `postToInstagram` — the old code had an explicit comment flagging the
+  sleep as a placeholder ("in production, poll status endpoint").
+- **`/api/instagram/extend-token`** and **`/api/instagram/refresh-token`**
+  (both admin-role-gated, same `isAdminIpAllowed` + `role==='admin'` pattern
+  as `/api/admin/moderation`) — exchange a short-lived Graph API Explorer
+  token (first-time setup) or the current long-lived token (renewal, every
+  ~60 days) for a fresh 60-day one via `exchangeForLongLivedToken()` in
+  `instagram-api.ts`. Both just return the new token in the response for
+  Jerry to copy into `VOZIT_INSTAGRAM_TOKEN` in Vercel himself — neither
+  route writes to Vercel's env vars directly. **New env vars needed:
+  `VOZIT_META_APP_ID` (1899963848097738, the existing "VozIt App") and
+  `VOZIT_META_APP_SECRET`** — the exchange call needs both.
+- **Instagram's 25-posts/24h API limit** — reuses the same persistent
+  `rateLimit()` (Supabase-backed, same mechanism every auth route already
+  uses) rather than a bespoke counter; checked inside
+  `autoDistributeToVozItChannels()`'s Instagram branch, which now takes an
+  optional `supabase` admin-client param for this (wired from
+  `/api/mux-webhook`, which already had one in scope).
+- **Small caption improvement**: added a `📍 location` line to the
+  auto-posted Reel caption, matching what the other platforms' captions
+  already include.
+
+**Spec items deliberately NOT done, because they don't apply or don't exist
+as described:**
+- *A standalone `/api/instagram/insights` route.* Not built — would
+  duplicate the existing analytics pipeline (`fetchInstagramAnalytics`,
+  already called internally by `/api/social` GET for a reporter's own
+  dashboard). No second route needed for the same data.
+- *"Add Instagram to the auto-distribution pipeline alongside YouTube,
+  TikTok, Facebook, X, **Reddit**, and Telegram."* VozIt has never
+  integrated with Reddit — the real list is YouTube/TikTok/Instagram/
+  Facebook/X/Telegram (6 platforms, confirmed in code). Not added; the
+  spec's platform list was simply wrong.
+- *Updating `src/app/settings/social/page.tsx` to show Instagram
+  "Connected via API."* That page is for individual reporters connecting
+  their own personal accounts (a separate OAuth-based system,
+  `/api/social` + the `social_accounts` table) — not VozIt's own official
+  channel, which has no settings-page UI at all (admin-configured via env
+  vars only). The page doesn't currently say anything about "connecting
+  through Facebook Page settings" either, so there was nothing matching
+  the spec's description to remove.
+- *A token-expiry-warning notification system.* Not built — no
+  scheduled-task runner exists in this project at all yet (no
+  `vercel.json`/cron config), so there's no automatic trigger point for a
+  warning check. `/api/instagram/refresh-token` is a manually-triggered
+  admin action for now; Jerry should call it periodically (every ~50 days)
+  rather than wait for an expiry warning that doesn't exist yet.
+- **Known precondition, not yet resolved**: Meta's "Link Instagram to Page"
+  bug (see the social-media-setup item in memory) is still broken as of
+  this entry — Jerry is working around it with a Graph API Explorer-issued
+  token exchanged via the new endpoints above, not by the Page link itself
+  getting fixed.
+
 ### Telegram Bot Intake (src/app/api/telegram/route.ts)
 Lets reporters in conflict zones, on low bandwidth, or who otherwise can't
 use the website/app submit a full report — video, description, location —

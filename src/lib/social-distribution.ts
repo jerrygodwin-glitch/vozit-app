@@ -4,6 +4,7 @@
 // Tracks views, engagement, and revenue attribution per platform
 
 import crypto from 'crypto'
+import { pollContainerStatus } from './instagram-api'
 
 export type SocialPlatform = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'telegram'
 
@@ -260,9 +261,11 @@ export async function postToInstagram(params: {
     const container = await containerRes.json()
     if (container.error) throw new Error(container.error.message)
 
-    // 2. Wait for processing then publish
-    // In production, poll status endpoint until FINISHED
-    await new Promise(resolve => setTimeout(resolve, 10000))
+    // 2. Wait for processing to actually finish before publishing — a
+    // fixed sleep either wastes time on a short clip or isn't long enough
+    // for a longer one; this polls the container's own reported status.
+    const status = await pollContainerStatus(container.id, params.accessToken)
+    if (!status.ready) throw new Error(status.error || 'Instagram container never finished processing')
 
     const publishRes = await fetch(
       `https://graph.facebook.com/v19.0/${params.igUserId}/media_publish`, {
