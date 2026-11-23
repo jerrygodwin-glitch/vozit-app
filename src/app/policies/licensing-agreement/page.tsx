@@ -58,15 +58,34 @@ export default function LicensingAgreementPage() {
         <p style={S.p}>
           The right to air footage on TV, streaming, or in a documentary, and to
           archive it. $500 for local/regional use, $2,500 for national network use,
-          $3,500 for documentary/long-form use, $7,500 for 24-hour breaking
-          exclusive, $10,000 for a full 24-hour exclusive. Lasts 90 days.
+          $3,500 for documentary/long-form use, $7,500 for a 24-hour exclusive,
+          $10,000 for a 48-hour breaking exclusive. Lasts 90 days.
         </p>
 
         <h3 style={S.h3}>Wire Service License</h3>
         <p style={S.p}>
           The right to redistribute footage to your own subscriber network. $3,000
-          standard, $10,000 for 24–48 hour exclusive rights, $15,000 for breaking
-          exclusive wire distribution. Lasts 30 days.
+          standard, $10,000 for a 24-hour exclusive, $15,000 for a 48-hour breaking
+          exclusive. Lasts 30 days.
+        </p>
+
+        <h2 style={S.h2}>Exclusive licenses</h2>
+        <p style={S.p}>
+          An exclusive license means VozIt removes the report from public view on
+          vozit.net entirely — the feed, search, the direct report page, and the
+          embed widget — for the exclusive window's duration (24 or 48 hours,
+          starting once payment clears, not at checkout). It is not just an ad-free
+          page; nobody can view or license the footage anywhere on VozIt during
+          that window.
+        </p>
+        <p style={S.p}>
+          Exclusivity is scoped to what you actually bought: a Broadcast exclusive
+          protects you against another broadcaster or a digital publisher during
+          your window, but does not block a Wire Service license on the same
+          footage — wire distribution reaches an entirely different, much larger
+          network, and a single broadcast license isn't exclusivity over that
+          channel. A Wire Service exclusive blocks every other license type,
+          since a wire deal already reaches the full subscriber market.
         </p>
 
         <h2 style={S.h2}>What you're actually getting</h2>

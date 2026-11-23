@@ -133,7 +133,16 @@ export async function POST(req: NextRequest) {
       if (license.exclusive && license.exclusive_hours) {
         const exclusiveUntil = new Date(Date.now() + license.exclusive_hours * 60 * 60 * 1000)
         await admin.from('licenses').update({ exclusive_until: exclusiveUntil.toISOString() }).eq('id', licenseId)
-        await admin.from('reports').update({ exclusive_hold_until: exclusiveUntil.toISOString() }).eq('id', license.report_id)
+
+        // More than one exclusive hold can be active at once now (e.g. a
+        // wire exclusive sold during an already-active broadcast exclusive's
+        // window, since broadcast doesn't block wire) — the report stays
+        // dark until the LATEST of them ends, never shortened by a newer,
+        // shorter-windowed sale.
+        const { data: reportRow } = await admin.from('reports').select('exclusive_hold_until').eq('id', license.report_id).single()
+        const existingHold = reportRow?.exclusive_hold_until ? new Date(reportRow.exclusive_hold_until) : null
+        const newHoldUntil = existingHold && existingHold > exclusiveUntil ? existingHold : exclusiveUntil
+        await admin.from('reports').update({ exclusive_hold_until: newHoldUntil.toISOString() }).eq('id', license.report_id)
       }
 
       // Credit the reporter's share as real, withdrawable earnings (same

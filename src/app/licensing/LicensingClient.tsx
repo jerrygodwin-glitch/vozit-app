@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Top, Nav } from '@/lib/ui'
+import { exclusiveBlocksTier } from '@/lib/exclusive-hold'
 
 // Isolated so ONLY this small piece depends on useSearchParams(). When
 // Next can't resolve search params during server rendering, it bails
@@ -93,6 +94,14 @@ function Licensing() {
   const tierOptions = result?.pricing ? Object.keys(result.pricing) : []
   const typeOptions = result?.pricing?.[tier]?.pricing ? Object.entries(result.pricing[tier].pricing as Record<string, number>) : []
 
+  // Which active exclusive hold (if any) blocks the CURRENTLY SELECTED tier
+  // — scoped, not "any exclusive blocks everything": a broadcast exclusive
+  // doesn't block a wire request, a wire exclusive blocks every tier.
+  // Recomputed every time the tier dropdown changes.
+  const activeHolds: { tier: string; until: string }[] = result?.report?.activeExclusiveHolds || []
+  const blockingHold = activeHolds.find(h => exclusiveBlocksTier(h.tier, tier))
+  const allTiersBlocked = activeHolds.some(h => h.tier === 'wire') // only a wire exclusive blocks every tier
+
   async function submitLicense() {
     if (!org.trim() || !contactEmail.trim()) return
     setSubmitting(true); setLicenseError(''); setLicenseResult(null)
@@ -120,8 +129,8 @@ function Licensing() {
   const T = [
     { n: 'Embed', p: [{ l: 'Editorial', v: 'Free' }, { l: 'Commercial', v: '$6 CPM' }], dur: '1yr', rights: ['Embed player', 'Link back'], pop: false },
     { n: 'Digital', p: [{ l: 'Clip', v: '$75' }, { l: 'Standard', v: '$150' }, { l: 'Breaking', v: '$250' }], dur: '30d', rights: ['Download', 'Digital publish', 'Social'], pop: true },
-    { n: 'Broadcast', p: [{ l: 'Local', v: '$500' }, { l: 'National', v: '$2,500' }, { l: 'Documentary', v: '$3,500' }, { l: 'Breaking excl.', v: '$7,500' }, { l: '24h excl.', v: '$10,000' }], dur: '90d', rights: ['Broadcast', 'Streaming', 'Archive'], pop: false },
-    { n: 'Wire Service', p: [{ l: 'Standard', v: '$3,000' }, { l: 'Exclusive', v: '$10,000' }, { l: 'Breaking', v: '$15,000' }], dur: '30d', rights: ['Redistribute', 'Sublicense', 'Full editorial'], pop: false },
+    { n: 'Broadcast', p: [{ l: 'Local', v: '$500' }, { l: 'National', v: '$2,500' }, { l: 'Documentary', v: '$3,500' }, { l: 'Exclusive', v: '$7,500' }, { l: 'Breaking excl.', v: '$10,000' }], dur: '90d', rights: ['Broadcast', 'Streaming', 'Archive'], pop: false },
+    { n: 'Wire Service', p: [{ l: 'Standard', v: '$3,000' }, { l: 'Exclusive', v: '$10,000' }, { l: 'Breaking excl.', v: '$15,000' }], dur: '30d', rights: ['Redistribute', 'Sublicense', 'Full editorial'], pop: false },
   ]
 
   return (
@@ -169,15 +178,15 @@ function Licensing() {
                 <div style={{ fontSize: 12, color: '#0a8fe8', marginTop: 2 }}>{result.report.location}{result.report.isBreaking && ' · 🔴 Breaking'}</div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: '#666' }}>
                   <span>By <b>@{result.report.reporter}</b></span>
-                  {result.report.licensingLocked && (
-                    <span style={{ color: '#DC2626' }}>
-                      Under an active exclusive license until {new Date(result.report.lockedUntil).toLocaleString()}
+                  {activeHolds.map(h => (
+                    <span key={h.tier} style={{ color: '#DC2626' }}>
+                      Under an active {h.tier} exclusive until {new Date(h.until).toLocaleString()}
                     </span>
-                  )}
+                  ))}
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button onClick={() => setShowForm(s => !s)} disabled={result.report.licensingLocked} className="btn btn-primary btn-sm">
-                    {result.report.licensingLocked ? 'Unavailable — exclusively licensed' : 'License this report'}
+                  <button onClick={() => setShowForm(s => !s)} disabled={allTiersBlocked} className="btn btn-primary btn-sm">
+                    {allTiersBlocked ? 'Unavailable — exclusively licensed' : 'License this report'}
                   </button>
                   <button onClick={copyEmbed} className="btn btn-outline">Get embed code</button>
                 </div>
@@ -200,10 +209,15 @@ function Licensing() {
               <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Contact email" type="email" style={{ marginBottom: 8, fontSize: 13 }} />
               <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Contact name (optional)" style={{ marginBottom: 8, fontSize: 13 }} />
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', marginBottom: 12 }}>
-                <input type="checkbox" checked={exclusive} onChange={e => setExclusive(e.target.checked)} disabled={!result.report.exclusiveAvailable} />
-                Request exclusive rights {!result.report.exclusiveAvailable && '(unavailable — already exclusively licensed)'}
+                <input type="checkbox" checked={exclusive} onChange={e => setExclusive(e.target.checked)} disabled={!!blockingHold} />
+                Request exclusive rights
               </label>
 
+              {blockingHold && (
+                <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 10 }}>
+                  This tier is blocked by an active {blockingHold.tier} exclusive license until {new Date(blockingHold.until).toLocaleString()}.
+                </div>
+              )}
               {licenseError && <div style={{ fontSize: 12, color: '#DC2626', marginBottom: 10 }}>{licenseError}</div>}
               {licenseResult ? (
                 <div style={{ padding: 12, borderRadius: 8, background: '#ECFDF5', color: '#065F46', fontSize: 13 }}>
@@ -212,7 +226,7 @@ function Licensing() {
                     : <>Request created — ${licenseResult.license.price} ({licenseResult.payment.note}). We'll follow up at <strong>{contactEmail}</strong> via {licenseResult.payment.contact} to complete payment.</>}
                 </div>
               ) : (
-                <button onClick={submitLicense} disabled={submitting || !licenseType || !org.trim() || !contactEmail.trim()} className="btn btn-primary" style={{ width: '100%' }}>
+                <button onClick={submitLicense} disabled={submitting || !licenseType || !org.trim() || !contactEmail.trim() || !!blockingHold} className="btn btn-primary" style={{ width: '100%' }}>
                   {submitting ? 'Submitting...' : 'Request license'}
                 </button>
               )}

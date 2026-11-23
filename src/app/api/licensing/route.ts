@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { calculateReporterShare } from '@/lib/payouts'
 import { captureError } from '@/lib/monitoring'
 import type { ReporterTier } from '@/types'
+import { exclusiveBlocksTier } from '@/lib/exclusive-hold'
 
 // ── LICENSING TIERS ──────────────────────────────────────────────────
 // What news organizations pay to use VozIt footage
@@ -43,8 +44,8 @@ export const LICENSE_TIERS = {
       local_market: 500,      // Local/regional TV station
       national: 2500,         // National network (CNN, BBC, etc.) — raised from $1,500
       documentary: 3500,      // Documentary / long-form — raised from $2,500
-      breaking_exclusive: 7500, // Breaking exclusive (24h) — NEW tier
-      exclusive_24h: 10000,   // Full 24-hour exclusive rights — raised from $5,000
+      exclusive: 7500,        // 24h exclusive — the shorter, cheaper exclusive option
+      breaking_exclusive: 10000, // 48h exclusive — longer window costs more, same ordering as Wire below (previously backwards: breaking_exclusive was priced BELOW the shorter 24h option)
     },
     rights: ['download', 'broadcast', 'streaming', 'archive', 'credit_required'],
     duration_days: 90,
@@ -74,9 +75,12 @@ type LicenseTier = keyof typeof LICENSE_TIERS
 // there's no single published industry number for the window length, so
 // these are a deliberate choice, not a standard being quoted. A $75 social
 // clip or a free editorial embed should never be able to claim exclusivity
-// and take a report fully offline — only these four combos can.
+// and take a report fully offline — only these four combos can. "Exclusive"
+// and "breaking_exclusive" mean the same 24h/48h split on both tiers now —
+// Broadcast used to call its 24h option "exclusive_24h" while Wire just
+// called it "exclusive"; same product, now the same name on both.
 const EXCLUSIVE_WINDOW_HOURS: Record<string, number> = {
-  'broadcast:exclusive_24h': 24,
+  'broadcast:exclusive': 24,
   'broadcast:breaking_exclusive': 48,
   'wire:exclusive': 24,
   'wire:breaking_exclusive': 48,
@@ -130,12 +134,18 @@ export async function GET(req: NextRequest) {
       .eq('report_id', reportId)
       .eq('status', 'active')
 
-    // An active exclusive window blocks ANY new license on this report, not
-    // just a competing exclusive bid — the whole point of paying a premium
-    // for exclusivity is that VozIt isn't selling anything else on it during
-    // that window either. Checked against exclusive_until (the real,
-    // payment-cleared clock), not the license's full expires_at.
-    const activeExclusive = licenses?.find(l => l.exclusive && l.exclusive_until && new Date(l.exclusive_until) > new Date())
+    // An active exclusive window blocks some or all new licenses on this
+    // report, scoped by which tier bought exclusivity (exclusiveBlocksTier)
+    // — a broadcast exclusive doesn't block a wire deal, a wire exclusive
+    // blocks everything. More than one can be active at once (a wire
+    // exclusive can be sold during an already-active broadcast exclusive's
+    // window, since broadcast doesn't block wire), so this is a list, not a
+    // single row. Checked against exclusive_until (the real, payment-
+    // cleared clock), not the license's full expires_at.
+    const now = new Date()
+    const activeExclusiveHolds = (licenses || [])
+      .filter(l => l.exclusive && l.exclusive_until && new Date(l.exclusive_until) > now)
+      .map(l => ({ tier: l.tier, until: l.exclusive_until }))
 
     return NextResponse.json({
       report: {
@@ -147,9 +157,7 @@ export async function GET(req: NextRequest) {
         reporter: (report.user as any)?.username,
         isBreaking,
         hoursOld: Math.round(hoursOld),
-        exclusiveAvailable: !activeExclusive,
-        licensingLocked: !!activeExclusive,
-        lockedUntil: activeExclusive?.exclusive_until || null,
+        activeExclusiveHolds,
       },
       pricing: LICENSE_TIERS,
       existingLicenses: (licenses || []).length,
@@ -199,25 +207,26 @@ export async function POST(req: NextRequest) {
     if (reportError && reportError.code !== 'PGRST116') captureError(reportError, { route: 'POST /api/licensing', report_id })
     if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
-    // Block ANY new license request — exclusive or not — while another
-    // exclusive window is active on this report. Previously this only
-    // blocked a second *exclusive* bid, and checked against nothing
-    // time-bound at all (a long-expired exclusive license blocked every
-    // future exclusive request on that report forever). Checked against
-    // exclusive_until, the real payment-cleared clock.
-    const { data: activeExclusive } = await admin
+    // Block this request if ANY currently-active exclusive hold on this
+    // report blocks the tier being requested here — scoped, not a blanket
+    // "any exclusive blocks everything": a broadcast exclusive doesn't block
+    // a wire request, a wire exclusive blocks every tier (see
+    // exclusiveBlocksTier). Previously this only blocked a second
+    // *exclusive* bid of any tier, and checked against nothing time-bound at
+    // all (a long-expired exclusive license blocked every future exclusive
+    // request on that report forever). Checked against exclusive_until, the
+    // real payment-cleared clock.
+    const { data: activeExclusives } = await admin
       .from('licenses')
-      .select('id, exclusive_until')
+      .select('id, tier, exclusive_until')
       .eq('report_id', report_id)
       .eq('status', 'active')
       .eq('exclusive', true)
       .gt('exclusive_until', new Date().toISOString())
-      .order('exclusive_until', { ascending: false })
-      .limit(1)
-      .single()
 
-    if (activeExclusive) {
-      return NextResponse.json({ error: `This report is under an active exclusive license until ${activeExclusive.exclusive_until}.` }, { status: 409 })
+    const blockingHold = (activeExclusives || []).find(l => exclusiveBlocksTier(l.tier, tier))
+    if (blockingHold) {
+      return NextResponse.json({ error: `This report is under an active ${blockingHold.tier} exclusive license until ${blockingHold.exclusive_until}.` }, { status: 409 })
     }
 
     // Calculate revenue split

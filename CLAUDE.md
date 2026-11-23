@@ -715,10 +715,11 @@ genuinely decided per contract. Built:
 
 - **`EXCLUSIVE_WINDOW_HOURS`** in `src/app/api/licensing/route.ts` — only
   four specific (tier, license_type) combos can carry exclusivity at all
-  (Broadcast `exclusive_24h`=24h/`breaking_exclusive`=48h, Wire `exclusive`
-  =24h/`breaking_exclusive`=48h, Jerry's own call after discussing the
-  tradeoff — not a researched standard). A $75 social clip or free
-  editorial embed can never claim exclusivity.
+  (Broadcast/Wire `exclusive`=24h, Broadcast/Wire `breaking_exclusive`
+  =48h, Jerry's own call after discussing the tradeoff — not a researched
+  standard; see the follow-up update below, these labels/prices got
+  corrected). A $75 social clip or free editorial embed can never claim
+  exclusivity.
 - **`licenses.exclusive_hours`/`exclusive_until`** (new columns) —
   `exclusive_hours` is decided at request time; `exclusive_until` is only
   set once Stripe payment actually clears (in the webhook), never at
@@ -745,6 +746,45 @@ genuinely decided per contract. Built:
   came from the Wire tier's own `rights` array, not from being exclusive.
   An exclusive wire deal means VozIt sold it to exactly one wire service,
   not that only one end viewer ever sees it.
+
+**Follow-up same day — Jerry spotted a real pricing inconsistency and asked
+two questions that led to scoping how exclusivity blocks other sales:**
+- **Broadcast's two exclusive prices were backwards.** `breaking_exclusive`
+  (48h, the longer window) was priced at $7,500 — *below* `exclusive_24h`
+  (24h, the shorter window) at $10,000, meaning the cheaper option got more
+  exclusive time. Fixed by swapping the prices (24h exclusive = $7,500, 48h
+  breaking exclusive = $10,000) rather than swapping the hours — matches
+  Wire's tier, which was already ordered correctly ($10,000/24h, $15,000/
+  48h).
+- **Renamed Broadcast's `exclusive_24h` → `exclusive`** to match Wire's
+  naming exactly — both tiers now use the identical two keys
+  (`exclusive`/`breaking_exclusive`), and the frontend's auto-generated
+  label (`key.replace(/_/g,' ')`) now shows "exclusive"/"breaking
+  exclusive" identically on both tiers with no separate label map needed.
+  Confirmed via research this isn't real, citable broadcast/wire jargon —
+  VozIt's own product naming, free to make consistent.
+- **Exclusivity blocking is now scoped by tier, not blanket** —
+  `exclusiveBlocksTier()` in `src/lib/exclusive-hold.ts`: a Wire exclusive
+  blocks every other tier (wire already reaches the full subscriber
+  market, no scarcity left for anyone else); a Broadcast exclusive only
+  blocks Broadcast and Digital (direct-to-public/broadcast use) — it does
+  NOT block a Wire license on the same report, since a single broadcaster
+  isn't paying enough to control an entirely different, much larger
+  distribution channel. This means **more than one exclusive hold can be
+  active on the same report at once** (e.g. a Wire exclusive sold during
+  an already-active Broadcast exclusive's window) — `/api/licensing`'s GET
+  now returns `activeExclusiveHolds: {tier, until}[]`, not a single
+  boolean, and the Stripe webhook sets `reports.exclusive_hold_until` to
+  the *latest* of any concurrently active holds, never shortening it.
+- **`/policies/licensing-agreement`** (English-only, no translations —
+  confirmed before editing, same as the other 9 non-translated policy
+  pages) had stale hardcoded prose describing the old 24h/24h Broadcast
+  split and no explanation of what "exclusive" concretely does. Updated
+  the tier prices/wording and added a new "Exclusive licenses" section
+  spelling out the real mechanics (full removal from public view, not
+  just ad-free; the scoped Broadcast-doesn't-block-Wire rule) — a buyer
+  paying a premium for this should have it in writing, not just enforced
+  silently in code.
 
 ## 7. DESIGN SYSTEM
 
