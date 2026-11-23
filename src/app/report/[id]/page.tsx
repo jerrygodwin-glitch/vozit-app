@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import { ReportDetailClient } from './ReportDetailClient'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
+import { isExclusivelyHeld } from '@/lib/exclusive-hold'
 
 interface Props { params: { id: string } }
 
@@ -17,6 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .single()
 
   if (!report) return { title: 'Report not found — VozIt' }
+  if (isExclusivelyHeld(report.exclusive_hold_until)) return { title: 'Exclusively licensed — VozIt', description: 'This report is temporarily unavailable under an active exclusive license.' }
 
   const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/og?id=${params.id}`
 
@@ -73,6 +75,19 @@ export default async function ReportDetailPage({ params }: Props) {
         <div className="text-center">
           <h1 className="text-xl font-bold text-white mb-2">Report not found</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)' }}>This report may have been removed or doesn't exist.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isExclusivelyHeld(report.exclusive_hold_until)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{ background: '#1E5B8A' }}>
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-white mb-2">Exclusively licensed</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)' }}>
+            This report is temporarily unavailable under an active exclusive license, until {new Date(report.exclusive_hold_until).toLocaleString()}.
+          </p>
         </div>
       </div>
     )

@@ -8,6 +8,7 @@ export const revalidate = 30
 import { supabase } from '@/lib/supabase'
 import { Top, Nav } from '@/lib/ui'
 import { FeedClient } from '@/components/feed/FeedClient'
+import { excludeExclusiveHoldFilter } from '@/lib/exclusive-hold'
 
 export const metadata = {
   title: 'Feed — VozIt!',
@@ -21,6 +22,7 @@ export default async function Feed() {
     .from('reports')
     .select('*, user:users(id, username, display_name, tier, credibility_score)')
     .eq('status', 'published')
+    .or(excludeExclusiveHoldFilter())
     .order('created_at', { ascending: false })
     .limit(FEED_PAGE_SIZE)
 

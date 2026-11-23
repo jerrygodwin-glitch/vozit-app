@@ -702,6 +702,50 @@ done:
   (same approach as the previous AdSense pass), without leaving debug
   markers in shipped markup.
 
+### Exclusive licensing actually means exclusive (2026-11-23)
+Jerry asked to verify the licensing flow end-to-end and found two real gaps:
+an "exclusive" purchase only blocked a second *exclusive* bid, never a plain
+non-exclusive one on the same report — and the block itself never expired
+(a long-lapsed exclusive license permanently blocked all future exclusive
+requests). Researched real stock/broadcast footage license agreements
+(Axiom Images, Buyout Footage, Pond5, plus Getty v. Stability AI commentary
+on exclusivity) before building, since there's no single published
+"industry standard" number for an exclusive window's length — it's
+genuinely decided per contract. Built:
+
+- **`EXCLUSIVE_WINDOW_HOURS`** in `src/app/api/licensing/route.ts` — only
+  four specific (tier, license_type) combos can carry exclusivity at all
+  (Broadcast `exclusive_24h`=24h/`breaking_exclusive`=48h, Wire `exclusive`
+  =24h/`breaking_exclusive`=48h, Jerry's own call after discussing the
+  tradeoff — not a researched standard). A $75 social clip or free
+  editorial embed can never claim exclusivity.
+- **`licenses.exclusive_hours`/`exclusive_until`** (new columns) —
+  `exclusive_hours` is decided at request time; `exclusive_until` is only
+  set once Stripe payment actually clears (in the webhook), never at
+  checkout-start, so an abandoned checkout never takes anything offline.
+- **`reports.exclusive_hold_until`** (new column) — while an exclusive
+  window is active, the report is pulled from every public read path:
+  homepage, feed, `/api/reports` (search), the sitemap, the reporter's own
+  profile list, the direct `/report/[id]` page (replaced with a plain
+  "exclusively licensed" placeholder, OG/social-preview metadata included),
+  and `/embed/[id]`. Otherwise a buyer paying a premium for "exclusive"
+  would be undercut by the same footage sitting free, with VozIt's own ads,
+  on vozit.net itself. `src/lib/exclusive-hold.ts` holds the one filter
+  (`excludeExclusiveHoldFilter()`) every list query uses and the one check
+  (`isExclusivelyHeld()`) every single-report page uses — no cron job, the
+  hold lifts itself the instant the timestamp passes.
+- **The block itself now covers any new license request, not just a
+  competing exclusive one**, and is time-bound against `exclusive_until`
+  (fixing the "blocks forever" bug) rather than against the full
+  `expires_at`.
+- **Exclusivity is a separate axis from sub-licensing/resale, confirmed
+  against real license agreements, not assumed** — Broadcast/Digital
+  exclusivity still can't sublicense or resell; Wire Service's exclusivity
+  still can redistribute to its own subscriber network, because that right
+  came from the Wire tier's own `rights` array, not from being exclusive.
+  An exclusive wire deal means VozIt sold it to exactly one wire service,
+  not that only one end viewer ever sees it.
+
 ## 7. DESIGN SYSTEM
 
 ### CSS Custom Properties (src/app/globals.css)

@@ -9,6 +9,7 @@ import { moderateContent, logModerationResult } from '@/lib/hive-moderation'
 import { applyStrike } from '@/lib/strikes'
 import { captureError } from '@/lib/monitoring'
 import { lookupWeather } from '@/lib/weather'
+import { excludeExclusiveHoldFilter } from '@/lib/exclusive-hold'
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
       .from('reports')
       .select('*, user:users(id, username, display_name, tier, credibility_score)')
       .eq('status', 'published')
+      .or(excludeExclusiveHoldFilter())
 
     if (region) {
       query = query.ilike('location_name', `%${region}%`)

@@ -3,6 +3,7 @@ import{createServerClient}from'@/lib/supabase-server'
 import{cookies}from'next/headers'
 import Link from'next/link'
 import BlockReporterButton from'./BlockReporterButton'
+import{excludeExclusiveHoldFilter}from'@/lib/exclusive-hold'
 
 export const dynamic='force-dynamic'
 
@@ -31,7 +32,7 @@ if(viewer&&!isOwnProfile){
   isBlocked=!!existingBlock
 }
 
-const{data:reports}=await supabase.from('reports').select('id, title, thumbnail_url, playback_id, location_name, created_at, upvotes, downvotes, credibility_pct, duration').eq('user_id',reporter.id).eq('status','published').order('created_at',{ascending:false}).limit(20)
+const{data:reports}=await supabase.from('reports').select('id, title, thumbnail_url, playback_id, location_name, created_at, upvotes, downvotes, credibility_pct, duration').eq('user_id',reporter.id).eq('status','published').or(excludeExclusiveHoldFilter()).order('created_at',{ascending:false}).limit(20)
 
 const tierColors:Record<string,string>={starter:'#22C55E',silver:'#94A3B8',gold:'#EAB308',platinum:'#8B5CF6'}
 const tc=tierColors[reporter.tier]||tierColors.starter

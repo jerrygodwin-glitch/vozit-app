@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createServerClient } from '@/lib/supabase-server'
 import { LandingClient } from './LandingClient'
+import { excludeExclusiveHoldFilter } from '@/lib/exclusive-hold'
 
 export const metadata = {
   title: 'VozIt! — I was there...',
@@ -22,6 +23,7 @@ export default async function Page() {
     .from('reports')
     .select('*, user:users(id, username, display_name, tier, credibility_score)')
     .eq('status', 'published')
+    .or(excludeExclusiveHoldFilter())
     .order('created_at', { ascending: false })
     .range(0, 49)
 

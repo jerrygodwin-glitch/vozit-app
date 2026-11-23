@@ -2,6 +2,7 @@
 import { createServerClient, createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { headers } from 'next/headers'
+import { isExclusivelyHeld } from '@/lib/exclusive-hold'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,13 +21,17 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
   // Fetch report
   const { data: report } = await supabase
     .from('reports')
-    .select('id, title, playback_id, thumbnail_url, location_name, created_at, duration, watermarked_url, watermark_applied, user:users(username, display_name, tier)')
+    .select('id, title, playback_id, thumbnail_url, location_name, created_at, duration, watermarked_url, watermark_applied, exclusive_hold_until, user:users(username, display_name, tier)')
     .eq('id', params.id)
     .eq('status', 'published')
     .single()
 
   if (!report) {
     return <div style={{ padding: 40, textAlign: 'center', fontFamily: 'system-ui', color: '#999' }}>Report not found</div>
+  }
+
+  if (isExclusivelyHeld(report.exclusive_hold_until)) {
+    return <div style={{ padding: 40, textAlign: 'center', fontFamily: 'system-ui', color: '#999' }}>This report is temporarily unavailable under an active exclusive license.</div>
   }
 
   // Track embed view (non-blocking)

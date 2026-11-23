@@ -66,6 +66,22 @@ export const LICENSE_TIERS = {
 
 type LicenseTier = keyof typeof LICENSE_TIERS
 
+// Which (tier, license_type) combos can actually carry exclusivity, and how
+// many hours that exclusive window lasts once payment clears — researched
+// against real stock/broadcast-footage license agreements rather than
+// guessed: exclusivity is sold as a short, separately-priced premium window
+// for breaking news specifically (not the full usage-rights duration), and
+// there's no single published industry number for the window length, so
+// these are a deliberate choice, not a standard being quoted. A $75 social
+// clip or a free editorial embed should never be able to claim exclusivity
+// and take a report fully offline — only these four combos can.
+const EXCLUSIVE_WINDOW_HOURS: Record<string, number> = {
+  'broadcast:exclusive_24h': 24,
+  'broadcast:breaking_exclusive': 48,
+  'wire:exclusive': 24,
+  'wire:breaking_exclusive': 48,
+}
+
 // GET — browse available reports + pricing for licensees
 export async function GET(req: NextRequest) {
   try {
@@ -110,11 +126,16 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient()
     const { data: licenses } = await admin
       .from('licenses')
-      .select('tier, license_type, licensee_org, exclusive, expires_at')
+      .select('tier, license_type, licensee_org, exclusive, exclusive_until')
       .eq('report_id', reportId)
       .eq('status', 'active')
 
-    const hasExclusive = licenses?.some(l => l.exclusive && new Date(l.expires_at) > new Date())
+    // An active exclusive window blocks ANY new license on this report, not
+    // just a competing exclusive bid — the whole point of paying a premium
+    // for exclusivity is that VozIt isn't selling anything else on it during
+    // that window either. Checked against exclusive_until (the real,
+    // payment-cleared clock), not the license's full expires_at.
+    const activeExclusive = licenses?.find(l => l.exclusive && l.exclusive_until && new Date(l.exclusive_until) > new Date())
 
     return NextResponse.json({
       report: {
@@ -126,7 +147,9 @@ export async function GET(req: NextRequest) {
         reporter: (report.user as any)?.username,
         isBreaking,
         hoursOld: Math.round(hoursOld),
-        exclusiveAvailable: !hasExclusive,
+        exclusiveAvailable: !activeExclusive,
+        licensingLocked: !!activeExclusive,
+        lockedUntil: activeExclusive?.exclusive_until || null,
       },
       pricing: LICENSE_TIERS,
       existingLicenses: (licenses || []).length,
@@ -154,6 +177,14 @@ export async function POST(req: NextRequest) {
     const price = pricing[license_type]
     if (price === undefined) return NextResponse.json({ error: 'Invalid license type for this tier' }, { status: 400 })
 
+    // Only specific, named license types can actually carry exclusivity —
+    // a $75 social clip or a free editorial embed was never meant to take a
+    // report fully offline.
+    const exclusiveHours = EXCLUSIVE_WINDOW_HOURS[`${tier}:${license_type}`]
+    if (exclusive && !exclusiveHours) {
+      return NextResponse.json({ error: 'Exclusive rights aren\'t available for this license type — only Broadcast (exclusive_24h / breaking_exclusive) and Wire Service (exclusive / breaking_exclusive) support exclusivity.' }, { status: 400 })
+    }
+
     const supabase = createServerClient()
     const admin = createAdminClient()
 
@@ -168,19 +199,25 @@ export async function POST(req: NextRequest) {
     if (reportError && reportError.code !== 'PGRST116') captureError(reportError, { route: 'POST /api/licensing', report_id })
     if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
-    // Check exclusivity — admin client, see note in GET above
-    if (exclusive) {
-      const { data: existing } = await admin
-        .from('licenses')
-        .select('id')
-        .eq('report_id', report_id)
-        .eq('status', 'active')
-        .eq('exclusive', true)
-        .single()
+    // Block ANY new license request — exclusive or not — while another
+    // exclusive window is active on this report. Previously this only
+    // blocked a second *exclusive* bid, and checked against nothing
+    // time-bound at all (a long-expired exclusive license blocked every
+    // future exclusive request on that report forever). Checked against
+    // exclusive_until, the real payment-cleared clock.
+    const { data: activeExclusive } = await admin
+      .from('licenses')
+      .select('id, exclusive_until')
+      .eq('report_id', report_id)
+      .eq('status', 'active')
+      .eq('exclusive', true)
+      .gt('exclusive_until', new Date().toISOString())
+      .order('exclusive_until', { ascending: false })
+      .limit(1)
+      .single()
 
-      if (existing) {
-        return NextResponse.json({ error: 'Exclusive license already active for this report' }, { status: 409 })
-      }
+    if (activeExclusive) {
+      return NextResponse.json({ error: `This report is under an active exclusive license until ${activeExclusive.exclusive_until}.` }, { status: 409 })
     }
 
     // Calculate revenue split
@@ -204,6 +241,7 @@ export async function POST(req: NextRequest) {
       reporter_share: reporterShare,
       vozit_share: vozitShare,
       exclusive: exclusive || false,
+      exclusive_hours: exclusive ? exclusiveHours : null,
       rights: tierConfig.rights,
       status: price === 0 ? 'active' : 'pending_payment',
       expires_at: expiresAt.toISOString(),

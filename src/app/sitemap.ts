@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { MetadataRoute } from 'next'
 import { supabase } from '@/lib/supabase'
+import { excludeExclusiveHoldFilter } from '@/lib/exclusive-hold'
 
 const BASE = 'https://www.vozit.net'
 
@@ -31,6 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .from('reports')
     .select('id, updated_at, created_at')
     .eq('status', 'published')
+    .or(excludeExclusiveHoldFilter())
     .order('created_at', { ascending: false })
     .limit(5000)
 

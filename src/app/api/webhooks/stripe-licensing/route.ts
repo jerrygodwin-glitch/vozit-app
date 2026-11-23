@@ -123,6 +123,19 @@ export async function POST(req: NextRequest) {
         expires_at: expiresAt.toISOString(),
       }).eq('id', licenseId)
 
+      // Start the exclusivity clock from the moment payment actually
+      // clears, not from checkout-start — an abandoned checkout should
+      // never take a report offline. Pulls the report from every public
+      // listing (feed/homepage/search/sitemap/direct link/embed) for the
+      // window's duration; src/lib/exclusive-hold.ts is what every public
+      // read path checks against, and it lifts itself automatically once
+      // this timestamp passes.
+      if (license.exclusive && license.exclusive_hours) {
+        const exclusiveUntil = new Date(Date.now() + license.exclusive_hours * 60 * 60 * 1000)
+        await admin.from('licenses').update({ exclusive_until: exclusiveUntil.toISOString() }).eq('id', licenseId)
+        await admin.from('reports').update({ exclusive_hold_until: exclusiveUntil.toISOString() }).eq('id', license.report_id)
+      }
+
       // Credit the reporter's share as real, withdrawable earnings (same
       // 7-day hold as every other earnings source) — this is the step that
       // was entirely missing before: a license could be marked paid and the

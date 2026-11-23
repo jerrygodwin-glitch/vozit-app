@@ -169,10 +169,16 @@ function Licensing() {
                 <div style={{ fontSize: 12, color: '#0a8fe8', marginTop: 2 }}>{result.report.location}{result.report.isBreaking && ' · 🔴 Breaking'}</div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: '#666' }}>
                   <span>By <b>@{result.report.reporter}</b></span>
-                  {!result.report.exclusiveAvailable && <span style={{ color: '#DC2626' }}>Exclusive rights already licensed</span>}
+                  {result.report.licensingLocked && (
+                    <span style={{ color: '#DC2626' }}>
+                      Under an active exclusive license until {new Date(result.report.lockedUntil).toLocaleString()}
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button onClick={() => setShowForm(s => !s)} className="btn btn-primary btn-sm">License this report</button>
+                  <button onClick={() => setShowForm(s => !s)} disabled={result.report.licensingLocked} className="btn btn-primary btn-sm">
+                    {result.report.licensingLocked ? 'Unavailable — exclusively licensed' : 'License this report'}
+                  </button>
                   <button onClick={copyEmbed} className="btn btn-outline">Get embed code</button>
                 </div>
               </div>
