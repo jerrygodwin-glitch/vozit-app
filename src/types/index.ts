@@ -32,7 +32,7 @@ export interface User {
   payout_method?: PayoutMethod
   payout_account_id?: string
   stripe_account_id?: string
-  revenue_enabled: boolean
+  revenue_opt_in: boolean
   is_admin: boolean
   is_banned: boolean
   ban_reason?: string

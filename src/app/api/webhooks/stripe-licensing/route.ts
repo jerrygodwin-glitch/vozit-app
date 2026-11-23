@@ -127,7 +127,13 @@ export async function POST(req: NextRequest) {
       // 7-day hold as every other earnings source) — this is the step that
       // was entirely missing before: a license could be marked paid and the
       // reporter's cut would still never reach their actual balance.
-      if (license.reporter_id && Number(license.reporter_share) > 0) {
+      // A reporter who's opted out of revenue sharing still has their
+      // footage licensed normally — VozIt just keeps their share too,
+      // instead of crediting it to them.
+      const { data: reporterProfile } = license.reporter_id
+        ? await admin.from('users').select('revenue_opt_in').eq('id', license.reporter_id).single()
+        : { data: null }
+      if (license.reporter_id && Number(license.reporter_share) > 0 && reporterProfile?.revenue_opt_in) {
         await admin.from('earnings').insert({
           user_id: license.reporter_id,
           report_id: license.report_id,

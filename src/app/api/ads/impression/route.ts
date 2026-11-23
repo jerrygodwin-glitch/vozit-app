@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!report_id) return NextResponse.json({ error: 'report_id required' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data: report } = await admin.from('reports').select('id, user_id, user:users(tier)').eq('id', report_id).single()
+  const { data: report } = await admin.from('reports').select('id, user_id, user:users(tier, revenue_opt_in)').eq('id', report_id).single()
   if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
   const cpm = Number(process.env.AD_CPM_USD || 5)
@@ -35,9 +35,12 @@ export async function POST(req: NextRequest) {
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Only credit real earnings once the ad actually finished playing —
-  // a skipped/abandoned ad doesn't earn anything.
-  if (completed && grossRevenue > 0) {
+  // Only credit real earnings once the ad actually finished playing — a
+  // skipped/abandoned ad doesn't earn anything. A reporter who opted out of
+  // revenue sharing still gets their content monetized (VozIt just keeps
+  // the full amount instead of splitting it), so this only gates whether
+  // *their* share gets credited, never whether the ad itself runs.
+  if (completed && grossRevenue > 0 && report.user?.revenue_opt_in) {
     const reporterShare = calculateEarnings(grossRevenue, report.user?.tier || 'starter')
     if (reporterShare > 0) {
       await admin.from('earnings').insert({
