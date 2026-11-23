@@ -281,11 +281,68 @@ export function LandingClient({ reports, assignments }: { reports: any[]; assign
         <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>About VozIt!</h2>
           <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
-            VozIt! is a citizen journalism platform that empowers eyewitnesses around the world to report breaking news, document human rights, and earn revenue from their footage. Every report goes through AI-powered 5W analysis, content moderation, and provenance verification before being published and distributed across social media platforms.
+            VozIt! is a citizen journalism platform that empowers eyewitnesses around the world to report breaking news, document human rights, and earn revenue from their footage. Citizen journalism means ordinary people — not accredited news crews — capturing and sharing what's actually happening around them, often from places traditional media can't reach quickly or safely: a protest as it unfolds, the aftermath of a natural disaster, or an everyday injustice that would otherwise go undocumented.
+          </p>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
+            Every report submitted to VozIt! goes through the same pipeline before it reaches the public feed: AI-powered 5W analysis (who, what, where, when, why) to add context automatically, automated content moderation to screen out abuse and policy violations, and provenance verification so viewers and licensees can trust that a video is what it claims to be. Reports that pass are published to VozIt!'s public feed and automatically distributed across VozIt!'s own social media channels, extending their reach well beyond the app itself.
           </p>
           <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7 }}>
-            Reporters earn 40-55% of all revenue generated from their content — including ad revenue, media licensing fees, and assignment fees. All payouts are screened for OFAC compliance with 8 payout providers covering 200+ countries.
+            VozIt! is built for anyone with a phone and something true to show the world — eyewitnesses, independent journalists, and everyday observers alike — and for the newsrooms, insurers, researchers, and platforms that need real, verified footage of real events.
           </p>
+        </div>
+      </div>
+
+      {/* HOW REPORTERS EARN */}
+      <div style={{ padding: '48px 20px', background: '#fff' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
+          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>How reporters earn</h2>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
+            VozIt! reporters earn a share of every dollar their footage generates — from advertising shown alongside their videos, from media organizations licensing their footage for broadcast or digital use, and from funded assignments where a paying requester asks for coverage of a specific event or location.
+          </p>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
+            Earnings are tiered: reporters start at the Starter level (40% revenue share) and move up to Silver (45%), Gold (50%), and Platinum (55%) as their report count and credibility score grow — the more reports a reporter files, and the more consistently the community verifies them as credible, the larger their share becomes. There's no cap and no application process; every tier is earned automatically through real activity on the platform.
+          </p>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7 }}>
+            Payouts are screened for OFAC sanctions compliance and can be sent through any of 8 payout providers covering 200+ countries, so reporters anywhere in the world can actually receive what they've earned, not just reporters in a handful of supported markets.
+          </p>
+        </div>
+      </div>
+
+      {/* FOR MEDIA ORGANIZATIONS */}
+      <div style={{ background: '#f7f7f8', padding: '48px 20px' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
+          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>For media organizations</h2>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
+            VozIt! licenses verified eyewitness footage directly to newsrooms, broadcasters, and digital publishers who need real, rights-cleared video of breaking news and real-world events — not stock footage, and not unverified social media clips of unknown origin.
+          </p>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
+            Licensing is self-serve and transparent: a free Editorial Embed tier for linking back to a story, Digital licenses for standalone publishing and social use, Broadcast licenses (including exclusive options) for television and streaming, and Wire Service licenses for organizations that need to redistribute or sublicense footage across their own network. Every license purchase pays the reporter who filmed it directly, as part of the same revenue-share system described above.
+          </p>
+          <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, marginBottom: 20 }}>
+            Organizations can browse and license any published report directly from its page, with pricing and terms shown upfront before any payment is made.
+          </p>
+          <a href="/licensing" className="cta" style={{ display: 'inline-block', padding: '10px 24px', borderRadius: 10, background: '#0a3ff1', color: '#fff', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+            See licensing tiers & pricing
+          </a>
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={{ padding: '48px 20px', background: '#fff' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, textAlign: 'center' }}>Frequently asked questions</h2>
+          {[
+            { q: 'What is VozIt!?', a: "VozIt! is a citizen journalism platform where eyewitnesses report breaking news and real-world events directly from their phones, and earn money when their footage is viewed, licensed, or used to fulfill a paid assignment." },
+            { q: 'Who can become a VozIt! reporter?', a: "Anyone with a smartphone. There's no application, no portfolio requirement, and no minimum following — reporters start at the Starter tier and move up automatically as they file more reports and build credibility." },
+            { q: 'How does VozIt! verify that a report is real?', a: "Every submission goes through AI-powered content moderation and provenance verification before it's published, and the community rates each report's credibility afterward — so viewers and licensees aren't relying on a single, unchecked source." },
+            { q: 'How do reporters get paid?', a: 'Through a tiered revenue share (40-55% depending on tier) on ad revenue, media licensing fees, and funded assignments, paid out through one of 8 payout providers covering 200+ countries, with OFAC sanctions screening on every payout.' },
+            { q: 'Can a news organization license footage from VozIt!?', a: 'Yes. Any published report can be licensed directly from its page, with Editorial, Digital, Broadcast, and Wire Service tiers available — see the Licensing page for full pricing and terms.' },
+          ].map(item => (
+            <div key={item.q} style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{item.q}</h3>
+              <p style={{ fontSize: 15, color: '#666', lineHeight: 1.7, margin: 0 }}>{item.a}</p>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -648,6 +648,60 @@ anything:
   not added to the sitemap; including a URL that 404s for every crawl
   would hurt more than help.
 
+### AdSense review round 2 (2026-11-23) — "ads on screens without content" + ads.txt
+A second pasted spec arrived after AdSense's dashboard showed two new
+findings: **"Google-served ads on screens without publisher-content"** and
+**"Ads.txt not found."** Same pattern as before — verified each claim
+directly before building, since most of the spec duplicated work already
+done:
+
+- **ads.txt and robots.txt were already correct** — confirmed via a live
+  `curl https://www.vozit.net/ads.txt` (200, exact expected content,
+  `google.com, pub-1085926458838222, DIRECT, f08c47fec0942fa0`) and reading
+  robots.txt directly (no `_next/static` block, already permissive). The
+  dashboard's "Not found" status is read as stale/pre-fix, same conclusion
+  as the earlier AdSense pass.
+- **Homepage/feed SSR, policy pages as server components — already done**
+  (see the entry above this one); the spec's items 2a-2d and 6 were
+  redundant, not re-built.
+- **The real, new issue: `layout.tsx` loaded the AdSense script
+  unconditionally on every single route**, including thin, mostly-chrome
+  pages (`/auth/*`, `/upload`'s camera screen, `/settings` + its
+  sub-pages, `/payouts`, `/earnings`, `/profile`, `/tasks`,
+  `/admin/moderation`, and the `/embed/[id]` third-party widget) — exactly
+  what "ads on screens without publisher-content" describes. Fixed:
+  - **`src/lib/ads.ts`** — `shouldLoadAds(pathname)`, an **allowlist** of
+    real-content route prefixes (`/`, `/feed`, `/assignments`,
+    `/licensing`, `/search`, `/report/`, `/reporter/`, `/policies`,
+    `/terms`, `/privacy`, `/contact`, `/submit-telegram`). Allowlist, not
+    denylist, deliberately — a future page that forgets to opt in just
+    doesn't show ads yet, rather than a future thin page silently getting
+    them.
+  - **`src/components/AdSenseScript.tsx`** (new, `'use client'`) — reads
+    the real pathname via `usePathname()` and only renders the
+    `adsbygoogle.js` `<Script>` tag when `shouldLoadAds()` says yes.
+    Replaces the inline unconditional `<Script>` that used to sit directly
+    in `layout.tsx`.
+  - **The `<meta name="google-adsense-account">` site-ownership
+    verification tag stays unconditional** in `layout.tsx`'s `<head>`,
+    unaffected by this change — it's a separate, already-confirmed-working
+    signal, not the ad-serving script itself, so narrowing where the
+    script loads doesn't touch site-ownership verification.
+- **Homepage content expanded** (`LandingClient.tsx`) — the existing About
+  section was real but thin (~75 words); added two full paragraphs to it,
+  plus three new prose sections: **"How reporters earn"** (the tier system,
+  40-55% revenue share, 8 payout providers/200+ countries, OFAC
+  screening), **"For media organizations"** (the real licensing tiers from
+  `LicensingClient.tsx` — Editorial/Digital/Broadcast/Wire Service — with a
+  link to `/licensing`), and a **5-question FAQ**. All real, accurate copy
+  grounded in the actual tier percentages/payout facts already elsewhere
+  in this codebase, not invented numbers.
+- **One spec item deliberately NOT done**: *HTML comments like
+  `<!-- SSR: landing -->` on every page to verify server rendering in View
+  Source.* Skipped — verified server rendering directly via `curl` instead
+  (same approach as the previous AdSense pass), without leaving debug
+  markers in shipped markup.
+
 ## 7. DESIGN SYSTEM
 
 ### CSS Custom Properties (src/app/globals.css)
