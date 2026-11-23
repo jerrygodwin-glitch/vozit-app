@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
     const usernameCheck = sanitizeUsername(username || '')
     if (!usernameCheck.valid) return NextResponse.json({ error: usernameCheck.error }, { status: 400 })
 
-    // Cloudflare Turnstile CAPTCHA
+    // Cloudflare Turnstile CAPTCHA — fails closed in production: a missing
+    // secret must never silently skip the check, only local/dev setup (where
+    // NODE_ENV isn't 'production') gets that pass.
     if (process.env.TURNSTILE_SECRET_KEY) {
       if (!turnstile_token) return NextResponse.json({ error: 'CAPTCHA verification required' }, { status: 400 })
       const captchaRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -41,6 +43,9 @@ export async function POST(req: NextRequest) {
       })
       const captchaData = await captchaRes.json()
       if (!captchaData.success) return NextResponse.json({ error: 'CAPTCHA failed. Please try again.' }, { status: 400 })
+    } else if (process.env.NODE_ENV === 'production') {
+      captureError(new Error('TURNSTILE_SECRET_KEY missing in production — refusing signup'), { route: 'POST /api/auth/register' })
+      return NextResponse.json({ error: 'Registration temporarily unavailable. Please try again shortly.' }, { status: 500 })
     }
 
     const { data: existing } = await supabase.from('users').select('id').eq('username', usernameCheck.cleaned).single()

@@ -86,8 +86,17 @@ export async function middleware(req: NextRequest) {
     for (const [k, v] of Object.entries(corsHeaders)) res.headers.set(k, v)
   }
 
-  // Public routes — no auth check needed
-  const isPublic = PUBLIC.some(p => path.startsWith(p)) || path === '/' || path === '/settings' || path === '/payouts' || path === '/earnings' || path === '/upload'
+  // Public routes — no auth check needed.
+  // /settings, /payouts, /earnings, and /upload used to be listed here too —
+  // confirmed directly these are account-only pages with no server-side
+  // guard of their own (useAuth() just sets user=null for a logged-out
+  // visitor, it never redirects), so this bypass was the only thing
+  // standing between an anonymous visitor and the full page shell loading.
+  // The real private data was never exposed (separately protected by RLS /
+  // each API route's own auth check), but there's no reason these four
+  // should be reachable without logging in, and robots.txt already assumes
+  // they aren't.
+  const isPublic = PUBLIC.some(p => path.startsWith(p)) || path === '/'
   if (isPublic) {
     return res
   }

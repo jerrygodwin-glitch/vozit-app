@@ -193,6 +193,10 @@ export async function POST(req: NextRequest) {
       if (got !== process.env.TELEGRAM_WEBHOOK_SECRET) {
         return NextResponse.json({ error: 'invalid secret token' }, { status: 401 })
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      // Fails closed in production — a missing secret must never silently
+      // skip verification, only local/dev setup gets that pass.
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
     }
 
     const update = await req.json()

@@ -87,6 +87,16 @@ export async function POST(req: NextRequest) {
     const { user, supabase } = await getAuthedUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // Creating/publishing a report, deciding its moderation status, and
+    // banning/promoting the author are all server-decided outcomes, not
+    // things the reporter's own session should be trusted to write directly
+    // — a logged-in user's own client can touch the reports/users tables so
+    // narrowly now (see the RLS/column-grant migration) that any of these
+    // writes made with the request's own `supabase` client would simply be
+    // rejected. `admin` is for exactly these privileged writes; `supabase`
+    // stays in use above for plain reads scoped to the requester themselves.
+    const admin = createAdminClient()
+
     const limit = await rateLimit(`upload:${user.id}`, RATE_LIMITS.upload.max, RATE_LIMITS.upload.window, supabase)
     if (!limit.allowed) {
       return NextResponse.json({ error: 'You are posting reports too quickly. Please wait before submitting another.' }, { status: 429 })
@@ -141,7 +151,7 @@ export async function POST(req: NextRequest) {
         // First update to this report — retroactively start a series with the original as part 1
         seriesId = crypto.randomUUID()
         seriesPart = 2
-        await supabase.from('reports').update({ series_id: seriesId, series_part: 1 }).eq('id', parent.id)
+        await admin.from('reports').update({ series_id: seriesId, series_part: 1 }).eq('id', parent.id)
       }
     }
 
@@ -195,7 +205,7 @@ export async function POST(req: NextRequest) {
     const weatherData = (location_lat && location_lng) ? await lookupWeather(location_lat, location_lng) : null
 
     // Insert report
-    const { data: report, error } = await supabase.from('reports').insert({
+    const { data: report, error } = await admin.from('reports').insert({
       user_id: user.id,
       title: titleClean,
       who: whoClean,
@@ -240,10 +250,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await logModerationResult(supabase, report.id, textModeration)
+    await logModerationResult(admin, report.id, textModeration)
 
     if (textModeration.autoAction === 'auto_ban') {
-      await supabase.from('users').update({
+      await admin.from('users').update({
         is_banned: true,
         ban_reason: `Auto-banned: ${textModeration.flags.map(f => f.category).join(', ')}`,
       }).eq('id', user.id)
@@ -268,7 +278,7 @@ export async function POST(req: NextRequest) {
     // (which reads report_count) will fire at half the intended report count.
 
     // Check for tier promotion
-    const promotion = status === 'published' ? await checkAndPromoteTier(supabase, user.id) : { promoted: false }
+    const promotion = status === 'published' ? await checkAndPromoteTier(admin, user.id) : { promoted: false }
 
     return NextResponse.json({
       ok: true,

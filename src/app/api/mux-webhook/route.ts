@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
     const body = JSON.parse(rawBody)
     const { type, data } = body
 
-    // Verify Mux webhook signature
+    // Verify Mux webhook signature — fails closed in production: a missing
+    // secret must never silently skip verification, only local/dev setup
+    // (where NODE_ENV isn't 'production') gets that pass.
     if (process.env.MUX_WEBHOOK_SECRET) {
       const { verifyMuxSignature } = await import('@/lib/security')
       const sig = req.headers.get('mux-signature')
@@ -65,6 +67,9 @@ export async function POST(req: NextRequest) {
         captureMessage('Mux webhook signature verification failed', { type })
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      captureMessage('MUX_WEBHOOK_SECRET missing in production — refusing webhook', { type })
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
     }
 
     // Real root cause of videos stuck forever on "Video processing...":
